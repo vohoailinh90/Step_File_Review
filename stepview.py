@@ -15,6 +15,10 @@ First open of a big assembly pays the one-time tessellation cost; every open
 after that comes from the local cache and is near-instant.
 
 Requires:  pip install cascadio     (bundled OpenCASCADE, no CAD install needed)
+
+The packaged Windows build (QuickSTEP.exe) carries Python, the viewer and the
+tessellation engine inside the single file — colleagues without Python run the
+same commands with `QuickSTEP.exe` in place of `python stepview.py`.
 """
 import argparse
 import hashlib
@@ -29,8 +33,17 @@ import webbrowser
 from pathlib import Path
 from urllib.parse import quote, unquote
 
+FROZEN = getattr(sys, "frozen", False)      # True when running from the packaged exe
+
+
+def _resource(name: str) -> Path:
+    """Locate a bundled data file, both when run from source and from the exe."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+    return base / name
+
+
 CACHE_DIR = Path.home() / ".stepview_cache"
-VIEWER = Path(__file__).parent / "viewer.html"
+VIEWER = _resource("viewer.html")
 STEP_EXT = {".step", ".stp"}
 
 # Tessellation tolerance presets: (linear deflection, angular deflection rad)
@@ -47,13 +60,23 @@ def check_engine(fatal: bool = True) -> bool:
         import cascadio  # noqa: F401
         return True
     except ImportError:
-        py = Path(sys.executable).name
+        if FROZEN:
+            msg = (
+                "\n  The tessellation engine (cascadio) is missing from this build.\n"
+                "  This is a packaging problem, not a setup problem on your machine —\n"
+                "  please report it with the version of QuickSTEP you are running.\n"
+                "  GLB / GLTF / STL files still open — only STEP needs the engine.\n"
+            )
+            if fatal:
+                sys.exit(msg)
+            print(msg)
+            return False
         msg = (
             "\n  The tessellation engine (cascadio) is not installed for this Python.\n"
             f"  Python in use: {sys.executable}  ({sys.version.split()[0]})\n\n"
-            f"  Install it with:\n      \"{sys.executable}\" -m pip install cascadio\n\n"
+            f"  Install it with:\n      \"{sys.executable}\" -m pip install cascadio numpy\n\n"
             "  Behind a corporate proxy, add your proxy:\n"
-            f"      \"{sys.executable}\" -m pip install --proxy http://user:pass@proxy:port cascadio\n"
+            f"      \"{sys.executable}\" -m pip install --proxy http://user:pass@proxy:port cascadio numpy\n"
             "  Or download the wheel on a machine with access and install it offline:\n"
             f"      \"{sys.executable}\" -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl\n\n"
             "  Wheels exist for Windows/macOS/Linux on Python 3.9-3.13 (64-bit).\n"
@@ -70,8 +93,10 @@ def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
         import cascadio
     except ImportError:
         raise RuntimeError(
+            "the tessellation engine is missing from this build"
+            if FROZEN else
             "the tessellation engine is not installed — run:  "
-            f'"{sys.executable}" -m pip install cascadio'
+            f'"{sys.executable}" -m pip install cascadio numpy'
         ) from None
     tmp = out.with_suffix(".partial")
     try:
@@ -255,8 +280,11 @@ def main():
 
     if args.check:
         ok = check_engine(fatal=False)
+        print(f"  build: {'packaged exe' if FROZEN else 'source'}   python {sys.version.split()[0]}")
         print(f"  viewer.html present: {VIEWER.exists()}   cache: {CACHE_DIR}")
         print("  Setup OK — STEP conversion available." if ok else "  STEP conversion unavailable.")
+        if FROZEN:
+            _hold()
         return
 
     qname = "fine" if args.fine else "coarse" if args.coarse else "normal"
@@ -298,5 +326,36 @@ def main():
         serve_and_open(glb, src.name)
 
 
+def _hold():
+    """Keep a double-clicked console window open long enough to read the output."""
+    if not FROZEN or not sys.stdin or not sys.stdin.isatty():
+        return
+    try:
+        input("\nPress Enter to close ...")
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
+def _run():
+    """Entry point: same as main(), but never flashes an unreadable console away."""
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    except SystemExit as e:
+        code = e.code
+        if isinstance(code, str):        # sys.exit("message")
+            print(code, file=sys.stderr)
+            code = 1
+        if code:
+            _hold()
+        raise SystemExit(code)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        _hold()
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
-    main()
+    _run()

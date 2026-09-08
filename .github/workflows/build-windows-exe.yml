@@ -1,0 +1,58 @@
+name: Build Windows exe
+
+# Builds QuickSTEP.exe — a single file containing Python, viewer.html and the
+# cascadio/OpenCASCADE tessellation engine, for colleagues with no Python.
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - stepview.py
+      - viewer.html
+      - quickstep.spec
+      - tests/make_cube_step.py
+      - .github/workflows/build-windows-exe.yml
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write        # needed only to attach the exe to a release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller cascadio numpy
+
+      - name: Build QuickSTEP.exe
+        run: pyinstaller --clean --noconfirm quickstep.spec
+
+      - name: Smoke-test the executable
+        run: |
+          dist\QuickSTEP.exe --check
+          if ($LASTEXITCODE -ne 0) { throw "--check failed" }
+          python tests\make_cube_step.py cube.step
+          dist\QuickSTEP.exe cube.step --convert-only --out cube.glb
+          if (-not (Test-Path cube.glb)) { throw "conversion produced no GLB" }
+          Write-Host "converted cube.step -> cube.glb ($((Get-Item cube.glb).Length) bytes)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuickSTEP-windows-x64
+          path: dist/QuickSTEP.exe
+          retention-days: 90
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.ref_name }} dist/QuickSTEP.exe --clobber

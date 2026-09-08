@@ -1,0 +1,11 @@
+# PyInstaller output
+build/
+dist/
+*.spec.bak
+
+__pycache__/
+*.pyc
+
+# build/test leftovers
+cube.step
+cube.glb

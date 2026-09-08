@@ -12,16 +12,28 @@ Full CAD applications rebuild exact B-rep geometry, feature history, and constra
 python stepview.py --warm  \\server\projects\incoming_step\
 ```
 
-## Setup (one time, per machine)
+## Sending it to someone without Python
 
-Requires 64-bit Python 3.9–3.13 and one package:
+`QuickSTEP.exe` is a single Windows file that already contains Python, `viewer.html` and the OpenCASCADE engine. Copy it to a colleague's machine and it runs — nothing to install, no admin rights, no CAD software. Double-click it to open the viewer and drop STEP files on the page, or drag a `.step` file onto the exe to open that file directly. Every command below works the same way with `QuickSTEP.exe` in place of `python stepview.py`.
+
+Get the exe from **Actions → Build Windows exe → the latest run → Artifacts**, or build it yourself on any Windows machine that has Python:
 
 ```
-python -m pip install cascadio
+build_exe.bat                       -> dist\QuickSTEP.exe
+```
+
+Two things to expect. The first start unpacks the bundle into a temporary folder and takes a few seconds; later starts are quicker. And because the file is unsigned, Windows SmartScreen may show "Windows protected your PC" the first time — *More info → Run anyway*, or right-click → Properties → Unblock. Sign the exe with your company certificate if you plan to hand it around widely.
+
+## Setup from source (one time, per machine)
+
+Not needed for the exe. To run from `stepview.py` you need 64-bit Python 3.9–3.13 and two packages:
+
+```
+python -m pip install cascadio numpy
 python stepview.py --check          verify the setup
 ```
 
-`cascadio` ships prebuilt wheels for Windows, macOS and Linux, so nothing is compiled and no CAD software or OpenCASCADE install is needed. If `pip` cannot reach the internet from a corporate network, either pass the proxy (`python -m pip install --proxy http://user:pass@proxy:port cascadio`) or download the matching `.whl` from pypi.org/project/cascadio on a machine with access and install it offline (`python -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl`).
+`cascadio` ships prebuilt wheels for Windows, macOS and Linux, so nothing is compiled and no CAD software or OpenCASCADE install is needed; it imports `numpy`, so install that alongside it. If `pip` cannot reach the internet from a corporate network, either pass the proxy (`python -m pip install --proxy http://user:pass@proxy:port cascadio numpy`) or download the matching `.whl` from pypi.org/project/cascadio on a machine with access and install it offline (`python -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl`).
 
 If several Pythons are installed, make sure it is the *same* interpreter that runs `stepview.py` — use `python -m pip` rather than a bare `pip`, or the full path shown by `--check`. Without the package the viewer still opens GLB, GLTF and STL files; only STEP conversion is unavailable, and it tells you so on the start screen.
 
@@ -42,6 +54,8 @@ python stepview.py assembly.step --fine     smoother surfaces for report screens
 python stepview.py assembly.step --force    reconvert, ignore cache
 python stepview.py assembly.step --convert-only --out part.glb
 ```
+
+With the packaged build the same commands read `QuickSTEP.exe assembly.step --coarse`, and so on.
 
 The cache lives in `~/.stepview_cache` and is keyed on file path, modification time, size, and tessellation quality — editing the STEP file automatically triggers a fresh conversion.
 
