@@ -16,7 +16,11 @@ python stepview.py --warm  \\server\projects\incoming_step\
 
 `QuickSTEP.exe` is a single Windows file that already contains Python, `viewer.html` and the OpenCASCADE engine. Copy it to a colleague's machine and it runs — nothing to install, no admin rights, no CAD software. Double-click it to open the viewer and drop STEP files on the page, or drag a `.step` file onto the exe to open that file directly. Every command below works the same way with `QuickSTEP.exe` in place of `python stepview.py`.
 
-Download it from [Releases](https://github.com/vohoailinh90/Step_File_Review/releases/latest) — that link needs no GitHub account, so it can be sent to anyone as is. Cutting a new one is a tag: `git tag v0.2.0 && git push origin v0.2.0` builds the exe and attaches it to the release. The build from any branch is also kept for 90 days under **Actions → Build Windows exe → the latest run → Artifacts** (that one does need a GitHub login). Or build it yourself on any Windows machine that has Python:
+Download it here — the link needs no GitHub account, so it can be passed on to anyone as is, and it always points at the newest build:
+
+**https://github.com/vohoailinh90/Step_File_Review/releases/download/latest-windows/QuickSTEP.exe**
+
+Every push rebuilds it and refreshes that release. Pushing a tag (`git tag v0.2.0 && git push origin v0.2.0`) publishes a fixed version alongside it, for when a specific build needs to stay downloadable. Each run also keeps the exe for 90 days under **Actions → Build Windows exe → the latest run → Artifacts**, though that copy does need a GitHub login. Or build it yourself on any Windows machine that has Python:
 
 ```
 build_exe.bat                       -> dist\QuickSTEP.exe

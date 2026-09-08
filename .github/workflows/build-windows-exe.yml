@@ -49,15 +49,36 @@ jobs:
           path: dist/QuickSTEP.exe
           retention-days: 90
 
+      # A release asset downloads without a GitHub account, unlike the artifact
+      # above, so this is the copy to hand to a colleague. A tag build publishes
+      # that version; any other build refreshes the rolling "latest-windows"
+      # release, whose download URL therefore never changes.
       - name: Publish as a downloadable release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          NOTES: >-
+            Standalone Windows build of QuickSTEP. No Python, no CAD software
+            and no admin rights needed: download QuickSTEP.exe, double-click it,
+            and drop STEP files onto the page that opens. The first start takes
+            a few seconds while it unpacks. The file is unsigned, so Windows may
+            warn once (More info -> Run anyway).
         run: |
-          gh release view $env:TAG 2>$null
-          if ($LASTEXITCODE -ne 0) {
-              gh release create $env:TAG dist\QuickSTEP.exe --title "QuickSTEP $env:TAG" --notes "Standalone Windows build of QuickSTEP. No Python, no CAD software, no admin rights needed: download QuickSTEP.exe, double-click it, and drop STEP files onto the page that opens. The file is unsigned, so Windows may warn the first time (More info -> Run anyway)."
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+              $tag = $env:GITHUB_REF_NAME
+              $title = "QuickSTEP $tag"
+              $extra = @()
           } else {
-              gh release upload $env:TAG dist\QuickSTEP.exe --clobber
+              $tag = 'latest-windows'
+              $title = "QuickSTEP - latest Windows build"
+              $extra = @('--prerelease')
+              # Recreate it so the tag follows the commit that was built.
+              gh release delete $tag --yes --cleanup-tag 2>$null
           }
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+              gh release create $tag dist\QuickSTEP.exe --target $env:GITHUB_SHA --title $title --notes $env:NOTES @extra
+          } else {
+              gh release upload $tag dist\QuickSTEP.exe --clobber
+          }
+          if ($LASTEXITCODE -ne 0) { throw "publishing the release failed" }
+          Write-Host "Download: https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/QuickSTEP.exe"
