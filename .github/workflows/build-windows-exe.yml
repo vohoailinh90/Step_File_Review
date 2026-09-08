@@ -5,12 +5,10 @@ name: Build Windows exe
 on:
   push:
     branches: [main, "claude/**"]
-    paths:
-      - stepview.py
-      - viewer.html
-      - quickstep.spec
-      - tests/make_cube_step.py
-      - .github/workflows/build-windows-exe.yml
+    # Tagging is how a downloadable release is cut: the build then publishes
+    # QuickSTEP.exe as a release asset, which anyone can download without a
+    # GitHub account.   git tag v0.1.0 && git push origin v0.1.0
+    tags: ["v*"]
   workflow_dispatch:
   release:
     types: [published]
@@ -51,8 +49,15 @@ jobs:
           path: dist/QuickSTEP.exe
           retention-days: 90
 
-      - name: Attach to release
+      - name: Publish as a downloadable release
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.ref_name }} dist/QuickSTEP.exe --clobber
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view $env:TAG 2>$null
+          if ($LASTEXITCODE -ne 0) {
+              gh release create $env:TAG dist\QuickSTEP.exe --title "QuickSTEP $env:TAG" --notes "Standalone Windows build of QuickSTEP. No Python, no CAD software, no admin rights needed: download QuickSTEP.exe, double-click it, and drop STEP files onto the page that opens. The file is unsigned, so Windows may warn the first time (More info -> Run anyway)."
+          } else {
+              gh release upload $env:TAG dist\QuickSTEP.exe --clobber
+          }
