@@ -59,8 +59,11 @@ jobs:
       - name: Launcher unit tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
 
-      - name: Geometry unit tests
-        run: node --test tests/geometry.test.mjs
+      # Quoted so node expands the glob itself (Node >= 21) rather than the
+      # shell, which differs between PowerShell and bash. shell: bash pins it.
+      - name: Viewer unit tests (geometry, units, face flood-fill)
+        shell: bash
+        run: node --test "tests/*.test.mjs"
 
       # Proves the checks above can actually fail. Runs last because it edits
       # files (reverting each in a finally block) and is the slowest step.

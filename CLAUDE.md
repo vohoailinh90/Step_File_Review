@@ -161,8 +161,16 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 20 mutations, all currently caught. When you ship a fix with a
+suite to notice — 26 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
+
+This is not theoretical. The first version of this suite reported 20/20 caught
+while `src/app/00-scene.js` and `src/app/30-select.js` had no tests at all, so
+two silent defects passed everything: `unitScale` 1000 → 1 (every reported length
+1000x wrong) and the face break angle 20° → 85° (every reported face area
+inflated). An independent review found them by trying to defeat the suite rather
+than by running it. **A green suite is evidence about the mutations you wrote,
+not about the code.** When you add a module, add a suite that loads it.
 
 ## Verification rule
 
@@ -177,8 +185,15 @@ Code written is not work finished.
   and an explicit statement of what remains unverified.
 
 Never describe an unrun check as passing. `node` may be absent, in which case the
-geometry tests skip and `run_checks.py` says so — that run is not green for
-anything touching geometry.
+viewer tests skip and `run_checks.py` says so — that run is not green for
+anything touching geometry or units.
+
+`tests/harness.mjs` is how a viewer module is tested outside a browser: the
+modules load into one `node:vm` context against THREE and DOM stubs, in filename
+order, exactly as `build.py` concatenates them. Its `Vector3` must keep three.js
+semantics (mutate in place, return `this`); an unfaithful stub would silently
+void every test that uses it. Nothing there renders, so nothing there proves a
+pixel — that needs headless Chromium and belongs to `test-engineer`.
 
 ## Scope of this file
 

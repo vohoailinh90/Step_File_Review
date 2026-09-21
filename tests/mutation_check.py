@@ -30,7 +30,10 @@ PY = sys.executable
 
 INVARIANTS = [PY, "tests/check_invariants.py"]
 UNIT_PY = [PY, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]
-GEOMETRY = ["node", "--test", "tests/geometry.test.mjs"]
+# Every JS suite, discovered. A mutation must be caught by *some* suite; naming
+# one file here is how src/app/00-scene.js and 30-select.js went uncovered.
+JS = ["node", "--test", *sorted(str(p.relative_to(ROOT)) for p in (ROOT / "tests").glob("*.test.mjs"))]
+GEOMETRY = JS
 
 MUTATIONS = [
     # ---- the build contract -------------------------------------------------
@@ -122,6 +125,46 @@ MUTATIONS = [
          find="if (a >= 10) return v.toFixed(2);",
          replace="if (a >= 10) return v.toFixed(0);",
          must_fail=GEOMETRY),
+
+    # ---- unit scaling: a wrong scale here is a 1000x error that looks plausible
+    dict(name="scene/unit-scale-broken",
+         behaviour="glTF metres must be reported as millimetres (x1000)",
+         file="src/app/00-scene.js",
+         find="let unitScale = 1000;",
+         replace="let unitScale = 1;",
+         must_fail=JS),
+    dict(name="scene/area-scaled-like-a-length",
+         behaviour="area must scale by unitScale squared, not unitScale",
+         file="src/app/00-scene.js",
+         find="fmt(v * unitScale * unitScale)",
+         replace="fmt(v * unitScale)",
+         must_fail=JS),
+
+    # ---- the face flood-fill ----------------------------------------------
+    dict(name="select/break-angle-widened",
+         behaviour="a face must stop at a break sharper than 20 degrees",
+         file="src/app/30-select.js",
+         find="THREE.MathUtils.degToRad(20)",
+         replace="THREE.MathUtils.degToRad(85)",
+         must_fail=JS),
+    dict(name="select/break-angle-narrowed",
+         behaviour="a face must grow across a break softer than 20 degrees",
+         file="src/app/30-select.js",
+         find="THREE.MathUtils.degToRad(20)",
+         replace="THREE.MathUtils.degToRad(2)",
+         must_fail=JS),
+    dict(name="select/normal-comparison-loses-abs",
+         behaviour="a surface folded back on itself stays one face (documented)",
+         file="src/app/30-select.js",
+         find="Math.abs(nCur.dot(nNb)) > COS",
+         replace="nCur.dot(nNb) > COS",
+         must_fail=JS),
+    dict(name="select/flatness-threshold-loosened",
+         behaviour="a folded face must report curved, not planar",
+         file="src/app/30-select.js",
+         find="Math.abs(nCur.dot(n0)) < 0.999",
+         replace="Math.abs(nCur.dot(n0)) < 0.5",
+         must_fail=JS),
 
     # ---- the launcher ------------------------------------------------------
     dict(name="launcher/cache-key-ignores-mtime",

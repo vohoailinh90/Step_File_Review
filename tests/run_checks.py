@@ -16,11 +16,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 
+# Discovered, not listed: a new tests/*.test.mjs is picked up without editing
+# this file, so a suite cannot be silently left out of the run.
+JS_TESTS = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "tests").glob("*.test.mjs"))
+
 STAGES = [
     ("build fidelity", [PY, "build.py", "--check"], True),
     ("repo + product invariants", [PY, "tests/check_invariants.py"], True),
     ("launcher unit tests", [PY, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"], True),
-    ("geometry unit tests", ["node", "--test", "tests/geometry.test.mjs"], False),
+    (f"viewer unit tests ({len(JS_TESTS)} files)", ["node", "--test", *JS_TESTS], False),
 ]
 
 

@@ -46,12 +46,17 @@ def decide(file_path: str) -> str | None:
     """Return a denial reason, or None to stay out of the way."""
     if not file_path:
         return None
-    parts = Path(file_path).parts
-    if Path(file_path).name == GENERATED:
+    # Windows and macOS paths are case-insensitive, so "Viewer.html" and
+    # "VENDOR/three.min.js" name the same files that the lowercase spellings do.
+    # Comparing case-sensitively would let either spelling through on the very
+    # platform this project targets.
+    name = Path(file_path).name.casefold()
+    parts = {p.casefold() for p in Path(file_path).parts}
+    if name == GENERATED.casefold():
         return REASON_GENERATED
-    if VENDOR_DIR in parts:
+    if VENDOR_DIR.casefold() in parts:
         # allow SHA256SUMS: refreshing it is how a legitimate upgrade is recorded
-        if Path(file_path).name == "SHA256SUMS":
+        if name == "sha256sums":
             return None
         return REASON_VENDOR.format(path=Path(file_path).name)
     return None
