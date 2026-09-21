@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.stepview_cache/
+*.partial
+.claude/settings.json

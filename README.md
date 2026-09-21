@@ -69,6 +69,29 @@ Lengths are shown in millimetres. OpenCASCADE writes glTF in metres whatever uni
 
 *Plane from a circle* — press **Plane from circle…** then click any circular edge: a hole rim, a boss, a bore. The plane is built through that circle's axis and passes through its centre, and the **angle** slider sweeps the plane around the axis from 0° to 180°, so you can cut a bore at exactly the orientation you want. Offset then shifts the plane sideways from the axis. If you have already picked a circle in Edge mode, the button uses it directly.
 
+## Working on the code
+
+Users get two files. Contributors get the same two files plus their sources.
+
+`viewer.html` is **generated** — it is assembled by `build.py` from `src/` and
+`vendor/`, and committed so that a user never needs a build step, npm, or an
+internet connection. About 99% of its 796 KB is the bundled three.js, so it is
+not a file to read or edit. The 831 lines of application code live in
+`src/app/`, split by concern (scene, load, parts, select, geometry, section, io).
+
+```
+python build.py                 rebuild viewer.html after editing src/
+python build.py --check         verify viewer.html matches its sources
+python tests/run_checks.py      build fidelity + invariants + unit tests
+python tests/run_checks.py --mutations   also prove those checks can fail
+```
+
+Edit `src/`, never `viewer.html`, and never `vendor/` (pinned by
+`vendor/SHA256SUMS`). Rebuild in the same commit — CI runs `build.py --check`.
+Tests need no `cascadio` and no pip install; the geometry tests need `node`.
+
+`CLAUDE.md` has the full map, the pinned-API notes and the review policy.
+
 ## Known limits of this first version
 
 Colors assigned in the source CAD are preserved when present in the STEP file; parts without color render in a neutral gray. The viewer shows tessellated geometry, so it is not suitable for precise measurement — dimensions in the status bar come from the mesh bounding box. There is no assembly *tree* yet (the part list is flat), and no point-to-point measuring tool; those are natural next steps. Face detection works on tessellated triangles rather than the original B-rep, so a face that meets its neighbour at less than a 20° break will be grown across the junction, and a fillet is picked as one continuous curved face. Reported diameters come from a least-squares fit to the tessellated rim: on the samples tested the fit recovered known diameters to within 0.02%, but a coarse tessellation will inscribe the polygon slightly inside the true circle, so treat the figure as a check rather than an inspection result.

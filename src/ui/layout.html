@@ -1,0 +1,112 @@
+<div id="app">
+  <div id="topbar">
+    <span id="brand"><b>QuickSTEP</b> viewer</span>
+    <span id="fname"></span>
+    <span id="loadtime" class="empty">— no model —</span>
+    <span class="spacer"></span>
+
+    <span class="lbl">select</span>
+    <div class="btn-group" role="group" aria-label="Selection mode">
+      <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
+      <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
+      <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
+    </div>
+    <span class="sep"></span>
+
+    <button class="btn" id="btnSection" title="Section views (X)">Section</button>
+    <button class="btn" id="btnParts" title="Show or hide part list">Parts</button>
+    <div class="btn-group" role="group" aria-label="Standard views">
+      <button class="btn" data-view="iso">Iso</button>
+      <button class="btn" data-view="front">Front</button>
+      <button class="btn" data-view="top">Top</button>
+      <button class="btn" data-view="right">Right</button>
+    </div>
+    <button class="btn" id="btnFit" title="Fit model in view (F)">Fit</button>
+    <button class="btn" id="btnEdges" title="Toggle feature edges (E)">Edges</button>
+    <button class="btn" id="btnBg" title="White background for reports (B)">White BG</button>
+    <button class="btn" id="btnShot" title="Save PNG screenshot (S)">Screenshot</button>
+    <select class="btn" id="quality" title="Tessellation quality used when converting STEP">
+      <option value="coarse">Coarse</option>
+      <option value="normal" selected>Normal</option>
+      <option value="fine">Fine</option>
+    </select>
+    <button class="btn" id="btnOpen">Open file…</button>
+    <input type="file" id="fileinput" accept=".step,.stp,.glb,.gltf,.stl" style="display:none">
+  </div>
+
+  <div id="main">
+    <div id="sidebar" class="hidden">
+      <div id="sidehead"><span>Assembly parts</span><span id="partcount"></span></div>
+      <div id="parts"></div>
+      <div id="sidefoot">
+        <button class="btn" id="btnShowAll">Show all</button>
+        <button class="btn" id="btnInvert">Invert</button>
+      </div>
+    </div>
+
+    <div id="viewport">
+      <canvas id="canvas3d"></canvas>
+
+      <div id="info"></div>
+
+      <div id="sectionpanel">
+        <div class="row">
+          <span class="lbl">plane</span>
+          <div class="btn-group">
+            <button class="btn" data-sec="right">Right</button>
+            <button class="btn" data-sec="top">Top</button>
+            <button class="btn" data-sec="front">Front</button>
+          </div>
+          <button class="btn" id="btnSecFlip" title="Flip cut direction">Flip</button>
+          <button class="btn" id="btnSecOff">Off</button>
+        </div>
+        <div class="row">
+          <span class="lbl">offset</span>
+          <input type="range" id="secOffset" min="-1" max="1" step="0.001" value="0">
+          <span class="val" id="secOffsetVal">0.00</span>
+        </div>
+        <div class="row" id="rowAngle">
+          <span class="lbl">angle</span>
+          <input type="range" id="secAngle" min="0" max="180" step="0.5" value="0" disabled>
+          <span class="val" id="secAngleVal">0.0°</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnPickCircle" style="flex:1">Plane from circle…</button>
+          <button class="btn" id="btnCaps" title="Fill the cut surface">Caps</button>
+        </div>
+        <div class="row"><span class="hint" id="secHint">Pick a standard plane, or build one from a circular edge.</span></div>
+      </div>
+
+      <div id="drop">
+        <div class="clock">00.00 s</div>
+        <div class="big">Drop a STEP file here</div>
+        <div class="sub">
+          Accepts <code>.step</code> / <code>.stp</code>, and already-converted
+          <code>.glb</code> / <code>.gltf</code> / <code>.stl</code>.<br>
+          The first open of a large assembly tessellates it once on this machine;
+          every open after that loads from cache in seconds.
+        </div>
+        <button class="btn" id="btnOpen2">Choose a file</button>
+        <div id="enginewarn">
+          <b>STEP conversion is unavailable on this machine.</b>
+          The tessellation engine is not installed for the Python running this viewer.
+          Install it with <code id="pipcmd">pip install cascadio</code>, then restart stepview.py.
+          GLB, GLTF and STL files still open normally.
+        </div>
+      </div>
+
+      <div id="spin">working…</div>
+      <div id="toast" role="status"></div>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <span>parts <b id="stParts">0</b></span>
+    <span>triangles <b id="stTris">0</b></span>
+    <span>size <b id="stSize">–</b></span>
+    <span>bbox <b id="stBbox">–</b></span>
+    <span id="unitToggle" style="cursor:pointer" title="Click if the scale looks wrong">units <b id="stUnits">mm</b></span>
+    <span class="spacer"></span>
+    <span id="hintbar">LMB rotate · RMB pan · wheel zoom · click to select · H hide · I isolate</span>
+  </div>
+</div>

@@ -1,5 +1,79 @@
 # QuickSTEP — instructions for Claude Code
 
+A two-file local STEP viewer: `stepview.py` tessellates and serves, `viewer.html`
+displays. `README.md` is the user-facing documentation and is accurate; read it
+before changing behavior it describes.
+
+## Read this first: viewer.html is generated
+
+`viewer.html` is **796 KB, and about 99% of it is vendored three.js**. It is
+assembled by `build.py` from `src/` and `vendor/`, and it is committed because
+shipping it *is* the product — a user gets two files, no npm, no build step, no
+internet.
+
+**Never open `viewer.html` to work, and never edit it.** Reading it spends an
+enormous amount of context on a minified library; editing it produces a change
+that the next `python build.py` silently discards and that
+`python build.py --check` then fails on in CI. A `PreToolUse` hook blocks the
+write once `.claude/settings.json` is installed.
+
+Never edit `vendor/` either. Those files are upstream libraries pinned by
+`vendor/SHA256SUMS`; patch around them in `src/app/`.
+
+## Where the code lives
+
+831 lines of application code, in one shared closure, split by concern:
+
+| file | lines | owns |
+|---|---|---|
+| `src/app/00-scene.js`    | 69  | renderer, scene, camera, lights, `unitScale`, `L()`/`A2()`, framing |
+| `src/app/10-load.js`     | 104 | format sniffing, GLB/GLTF/STL load, dispose, load status |
+| `src/app/20-parts.js`    | 42  | part list, visibility, isolate, hover |
+| `src/app/30-select.js`   | 155 | pick modes, raycast, face flood-fill (20° break angle) |
+| `src/app/40-geometry.js` | 180 | edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
+| `src/app/50-section.js`  | 144 | section planes, plane-from-circle, stencil caps |
+| `src/app/60-io.js`       | 132 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
+| `src/ui/viewer.css`      | 92  | all styling |
+| `src/ui/layout.html`     | 112 | toolbar, sidebar, section panel, status bar |
+| `src/viewer.template.html` | — | the shell and the concatenation order |
+| `stepview.py`            | 302 | tessellation, cache, CLI, loopback server |
+
+`.claude/skills/viewer-change/SKILL.md` maps a symptom to a file. Use it.
+
+## The loop
+
+```bash
+python build.py                 # regenerate viewer.html after any src/ edit
+python tests/run_checks.py      # build fidelity, invariants, launcher, geometry
+python tests/run_checks.py --mutations   # also prove those checks can fail
+python stepview.py              # look at it, for anything visual
+```
+
+Modules are script fragments sharing one closure, concatenated in **filename
+order**. No `import`/`export`. Functions hoist across modules; top-level `const`
+and `addEventListener` do not, so order matters for those. Keep each module under
+250 lines — add `70-<name>.js` rather than growing one past the budget.
+
+## Constraints that are product features
+
+Breaking any of these breaks the product, not just a test. `tests/check_invariants.py`
+enforces the ones a script can:
+
+- **Offline.** No CDN, no npm, no remote font or stylesheet, no `<script src>`.
+  The viewer must run air-gapped.
+- **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
+  bundler, `package.json`, TypeScript or a preprocessor.
+- **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
+  the local Python process; no data leaves the machine.
+- **`stepview.py` stays stdlib + `cascadio`.** No new pip dependency.
+- **three.js is pinned** to a bundled r13x-era build: `renderer.outputEncoding`,
+  `THREE.sRGBEncoding`, and the `THREE.OrbitControls` / `THREE.GLTFLoader`
+  globals. Post-r152 names (`outputColorSpace`, `SRGBColorSpace`, ESM imports)
+  do not exist here and throw at runtime. Upgrading three.js is its own T3
+  requirement, never a step inside another change.
+- **The cache is the performance bet.** Anything that changes the cache key makes
+  every existing user's next open slow again. Treat it as a migration.
+
 ## Platform this is run on — Windows
 
 QuickSTEP is developed and run on **Windows**. That is where it is used, where
@@ -20,9 +94,10 @@ What it means in practice:
   it, and do not let it block a review. Portability is not a requirement of
   this project, so it never becomes a review finding on its own.
 - **Windows behavior is fully in scope** — console encoding (`cp1252` vs
-  UTF-8), CRLF line endings, file locking, UNC paths such as
-  `\\server\projects\`, the `~/.stepview_cache` location under a Windows user
-  profile, and path-length limits. These are where this tool actually breaks.
+  UTF-8, so print ASCII only), CRLF line endings (which is why `build.py` does
+  binary I/O), file locking, UNC paths such as `\\server\projects\`, the
+  `~/.stepview_cache` location under a Windows user profile, and path-length
+  limits. These are where this tool actually breaks.
 - **Existing cross-platform code stays as it is.** This rule stops new effort;
   it is not a licence to strip working non-Windows branches, drop the
   macOS/Linux wheels, or narrow the packaging. Removing them is a behavior
@@ -31,10 +106,85 @@ What it means in practice:
 A requirement that explicitly asks for verified non-Windows support is a
 change to this note: confirm with the user before doing the work.
 
+## Known open defect
+
+`convert_bytes()` in `stepview.py` builds a cache filename from the browser's
+`X-Filename` header without sanitising it. A PDM-style name such as
+`HOUSING:REV-B.step` puts a `:` into a Windows path, which Win32 rejects, so the
+drop fails with a raw `OSError` instead of this file's usual actionable message.
+POSIX accepts the colon, which is why it went unnoticed.
+
+`tests/test_stepview.py` carries this as an `@unittest.expectedFailure` with the
+one-line fix in its docstring. Landing the fix means deleting that decorator in
+the same commit.
+
+## Choosing how much process a change deserves
+
+Most changes here need no agents at all. The roster exists for the few that do.
+Pick the smallest row that honestly fits; escalate if implementation reveals more.
+
+| tier | looks like | who does it | agents | budget |
+|---|---|---|---|---|
+| **T0** | a label, a colour, a README line, a keyboard shortcut, a tooltip | main session only | none | 0 |
+| **T1** | one module, no reported number changes: a new toolbar toggle, a part-list affordance, a CLI flag | main session implements | `code-reviewer` | 1 |
+| **T2** | selection, section planes, the loader, the cache, the server, or anything touching a reported number | main session implements | `geometry-reviewer` **or** `code-reviewer`, plus `windows-verifier` if it touches paths/filenames/console/server | 2 |
+| **T3** | assembly tree, point-to-point measurement, B-rep-accurate faces, a three.js upgrade, a cache-format change | main session designs, then implements | `architecture-critic` before implementation, then the T2 reviewer | 3 |
+
+Three rules override the table:
+
+1. **Any change to a number the viewer reports** — diameter, length, area,
+   bounding box, units, the 20° face break, the `rms < 0.03` circle gate — gets
+   `geometry-reviewer`, at any tier. Someone checks a bore here and then drills.
+2. **Any change to `stepview.py`'s paths, filenames, console output or server**
+   gets `windows-verifier`. That is the platform this runs on.
+3. **A three.js upgrade is always T3.** It is a simultaneous breaking migration
+   across three vendored loaders with nothing rendering in CI.
+
+The budget counts every subagent invocation, resumed agents included. Reaching it
+with work outstanding is a signal to report the partial result and the remaining
+risk — not to spawn past it. `architecture-critic` runs **one** round; a second
+round requires unresolved critical findings and must resume the same critic.
+
+`.claude/agents/` holds the roster. `test-engineer` is **escalation only**:
+invoke it after a reviewer reports that verification needs designing (a
+headless-WebGL harness, a large-assembly rehearsal, a concurrency probe), never
+as a routine second reviewer.
+
+## Deterministic work is not agent work
+
+If the answer is computable, compute it. Counting, hashing, threshold comparison,
+conformance a validator can assert, and any lint/test run whose output is already
+a verdict all belong in a script — `tests/check_invariants.py` or
+`tests/mutation_check.py` — not in a reviewer's turn. A reviewer asked to eyeball
+796 KB for a stray CDN reference will sometimes miss it; the script never will.
+
+**Mutation checking is the worked example.** A passing test proves nothing on its
+own; a test that would still pass with the behavior deleted reports safety that
+is not there. `tests/mutation_check.py` breaks each behavior and requires the
+suite to notice — 20 mutations, all currently caught. When you ship a fix with a
+test, add the mutation that would have caught it.
+
+## Verification rule
+
+Code written is not work finished.
+
+- **T0** — look at it; `python build.py --check` if you touched `src/`.
+- **T1** — `python tests/run_checks.py` green, plus an independent diff review.
+- **T2** — the above, plus the geometry suite, plus a reviewer who *ran* the
+  checks rather than reading them.
+- **T3** — the above, plus whatever the change specifically endangers
+  (a rendered check, a large-assembly measurement, a cache-migration rehearsal),
+  and an explicit statement of what remains unverified.
+
+Never describe an unrun check as passing. `node` may be absent, in which case the
+geometry tests skip and `run_checks.py` says so — that run is not green for
+anything touching geometry.
+
 ## Scope of this file
 
-This file records the platform note and nothing else. It deliberately does not
-define a routing policy, agent roster or review process — this repository has
-not adopted one, and inventing rules nobody agreed to would be worse than the
-silence it replaces. Follow the conventions already in the code and in
-`README.md`.
+This file records the platform note, the build contract, the repo map and the
+routing policy. The earlier version deliberately defined no routing policy or
+agent roster, on the grounds that inventing rules nobody agreed to is worse than
+silence. That reasoning still stands — the roster below exists because it was
+asked for, and the Windows note above is unchanged. Do not invent a different
+tier model or add roles beyond `.claude/agents/` without being asked.
