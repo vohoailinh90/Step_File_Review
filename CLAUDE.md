@@ -106,17 +106,24 @@ What it means in practice:
 A requirement that explicitly asks for verified non-Windows support is a
 change to this note: confirm with the user before doing the work.
 
-## Known open defect
+## Untrusted input reaching the filesystem
 
-`convert_bytes()` in `stepview.py` builds a cache filename from the browser's
-`X-Filename` header without sanitising it. A PDM-style name such as
-`HOUSING:REV-B.step` puts a `:` into a Windows path, which Win32 rejects, so the
-drop fails with a raw `OSError` instead of this file's usual actionable message.
-POSIX accepts the colon, which is why it went unnoticed.
+`convert_bytes()` builds its cache filename from the browser's `X-Filename`
+header, which is untrusted. Two properties are load-bearing and both are pinned
+in `tests/test_stepview.py`:
 
-`tests/test_stepview.py` carries this as an `@unittest.expectedFailure` with the
-one-line fix in its docstring. Landing the fix means deleting that decorator in
-the same commit.
+- **Legality.** `safe_stem()` replaces every Win32-illegal character
+  (`< > : " / \ | ? *` and the C0 range). A PDM-style name such as
+  `HOUSING:REV-B.step` otherwise produced an unwritable Windows path and a bare
+  `OSError`. POSIX accepts the colon, which is why it went unnoticed for so long
+  — a reminder that a green run on Linux says little here.
+- **Containment.** `Path().stem` discards directory components, so
+  `../../evil.step` cannot escape the cache directory. Do not replace it with
+  raw string handling.
+
+`safe_stem()` must also leave ordinary names untouched: every existing user has
+a warm cache keyed on the old naming, and shifting a stem silently reconverts a
+large assembly. That is asserted too.
 
 ## Choosing how much process a change deserves
 

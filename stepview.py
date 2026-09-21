@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import http.server
 import json
+import re
 import socket
 import sys
 import tempfile
@@ -107,12 +108,34 @@ def convert(path: Path, tol: tuple, force: bool = False, quality: str = "normal"
     return out
 
 
+# Characters Win32 rejects in a filename, plus the C0 control range. POSIX
+# accepts all but "/", which is why an unsanitised upload name worked in testing
+# and failed on the platform this tool is actually used on.
+_ILLEGAL_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def safe_stem(name: str, limit: int = 40) -> str:
+    """Turn an untrusted upload filename into a cache stem Windows will accept.
+
+    The browser supplies the name via X-Filename, and a STEP exported from a PDM
+    system commonly carries a revision separator -- "HOUSING:REV-B.step". That
+    colon survives Path().stem on Windows as well as POSIX, so it reached the
+    cache path and Win32 rejected the whole write with a bare OSError instead of
+    the actionable message every other failure here produces.
+
+    Path().stem already discards directory components, so "../../evil.step"
+    cannot escape the cache directory; this is about legality, not traversal.
+    Both properties are pinned in tests/test_stepview.py.
+    """
+    return _ILLEGAL_FILENAME.sub("_", Path(name).stem)[:limit] or "model"
+
+
 def convert_bytes(data: bytes, name: str, quality: str) -> Path:
     """Convert STEP content posted from the viewer, cached by content hash."""
     CACHE_DIR.mkdir(exist_ok=True)
     tol = QUALITY.get(quality, QUALITY["normal"])
     digest = hashlib.sha1(data).hexdigest()[:16]
-    stem = Path(name).stem[:40] or "model"
+    stem = safe_stem(name)
     out = CACHE_DIR / f"{stem}_{quality}_{digest}.glb"
     if out.exists():
         print(f"[cache]   {name}  ->  {out.name}  (instant)")

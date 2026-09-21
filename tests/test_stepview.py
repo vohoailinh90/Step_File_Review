@@ -166,33 +166,61 @@ class ConvertFromUpload(TempCache):
 class WindowsFilenameSafety(TempCache):
     """CLAUDE.md: Windows is the platform this runs on. Cache names must be legal there."""
 
-    @unittest.expectedFailure
     def test_cache_name_has_no_windows_illegal_characters(self):
-        """KNOWN BUG on Windows -- convert_bytes does not sanitise the upload name.
+        """A PDM-style upload name must not reach the cache path unsanitised.
 
-        convert_bytes() builds the cache filename from `Path(name).stem[:40]`,
-        where `name` is the X-Filename header the browser sent. A STEP exported
-        from a PDM system commonly carries a revision separator, e.g.
-        "HOUSING:REV-B.step". That colon reaches the cache path unchanged:
-
-            C:\\Users\\<you>\\.stepview_cache\\HOUSING:REV-B_normal_<hash>.glb
-
-        Win32 rejects ':' in a filename, so the drop fails with a raw OSError
-        rather than the actionable message every other failure path in this file
-        produces. POSIX accepts the colon, which is why it has gone unnoticed.
-
-        Fix is one line in convert_bytes -- sanitise the stem before use:
-            stem = re.sub(r'[<>:"/\\\\|?*\\x00-\\x1f]', '_', Path(name).stem)[:40] or "model"
-
-        Left failing deliberately: this suite was added to surface defects, not
-        to change viewer behaviour in the same commit. Remove this decorator in
-        the commit that lands the fix.
+        convert_bytes() builds the cache filename from the browser's X-Filename
+        header. A STEP exported from a PDM system commonly carries a revision
+        separator, e.g. "HOUSING:REV-B.step", and that colon survives
+        Path().stem on Windows as well as POSIX. Before safe_stem() it reached
+        the cache path and Win32 rejected the write with a bare OSError.
         """
         for hostile in ['HOUSING:REV-B.step', 'q?.step', 'star*.step',
-                        'pipe|x.step', 'lt<gt>.step', 'quote".step']:
+                        'pipe|x.step', 'lt<gt>.step', 'quote".step',
+                        'a/b.step', 'a\\b.step', '\x01ctrl.step']:
             out = stepview.convert_bytes(b"AAAA" + hostile.encode(), hostile, "normal")
             bad = WIN_ILLEGAL & set(out.name)
             self.assertFalse(bad, f"{hostile!r} produced cache name {out.name!r} with {bad}")
+            self.assertFalse(any(ord(c) < 32 for c in out.name),
+                             f"{hostile!r} left a control character in {out.name!r}")
+
+    def test_sanitising_does_not_move_an_ordinary_cache_entry(self):
+        """The fix must not invalidate the cache for names that were always legal.
+
+        Every existing user has a warm cache keyed on the old naming. If
+        safe_stem() altered an ordinary stem, their next open would reconvert --
+        for a large assembly that is the one cost this tool exists to avoid.
+        """
+        for ordinary in ["assembly.step", "HOUSING-REV-B.step", "part_01.stp",
+                         "Bracket (rev 2).step", "hub.v3.step", "ĐỘNG-CƠ.step"]:
+            self.assertEqual(stepview.safe_stem(ordinary), Path(ordinary).stem[:40],
+                             f"{ordinary!r} must keep its original stem")
+
+    def test_safe_stem_replaces_every_illegal_character(self):
+        for ch in '<>:"|?*':
+            self.assertEqual(stepview.safe_stem(f"a{ch}b.step"), "a_b",
+                             f"{ch!r} must be replaced")
+        self.assertEqual(stepview.safe_stem("a\x00b.step"), "a_b", "NUL must be replaced")
+        self.assertEqual(stepview.safe_stem("a\x1fb.step"), "a_b", "C0 range must be replaced")
+
+    def test_safe_stem_falls_back_to_model_when_nothing_is_left(self):
+        for empty in ["", ".step", "/", "///"]:
+            self.assertTrue(stepview.safe_stem(empty),
+                            f"{empty!r} must not produce an empty stem")
+        self.assertEqual(stepview.safe_stem(""), "model")
+        self.assertEqual(stepview.safe_stem("/"), "model")
+
+    def test_safe_stem_is_idempotent(self):
+        # Sanitising an already-sanitised name must not keep changing it, or a
+        # cache entry could migrate on every open.
+        for name in ['HOUSING:REV-B.step', 'q?.step', 'part.step', '']:
+            once = stepview.safe_stem(name)
+            self.assertEqual(stepview.safe_stem(once), once, f"{name!r} is not stable")
+
+    def test_safe_stem_honours_the_length_limit(self):
+        self.assertEqual(len(stepview.safe_stem("x" * 300 + ".step")), 40)
+        self.assertEqual(len(stepview.safe_stem(":" * 300 + ".step")), 40,
+                         "replacement must happen before truncation, not after")
 
     def test_path_separators_in_an_upload_name_are_stripped(self):
         # Path(name).stem already drops directory parts, so a traversal attempt

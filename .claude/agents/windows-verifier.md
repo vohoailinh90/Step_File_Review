@@ -19,13 +19,13 @@ honest "this needs a Windows run to confirm" beats a fabricated pass.
 ## In scope — these are where this tool actually breaks
 
 - **Filenames from untrusted input.** `convert_bytes()` builds a cache filename
-  from the browser's `X-Filename` header via `Path(name).stem[:40]`. Win32
-  forbids `< > : " / \ | ? *` and control bytes in a filename. A PDM export such
-  as `HOUSING:REV-B.step` therefore produces an unopenable cache path on Windows
-  and a raw `OSError` instead of this file's usual actionable message.
-  **This is a known open bug** — `tests/test_stepview.py` carries it as an
-  `@unittest.expectedFailure` with the one-line fix in its docstring. Do not
-  report it as new; do check that a change has not widened it.
+  from the browser's `X-Filename` header. Win32 forbids `< > : " / \ | ? *` and
+  control bytes, and a PDM export such as `HOUSING:REV-B.step` used to produce
+  an unopenable cache path and a raw `OSError`. **Fixed** — `safe_stem()` now
+  sanitises it, and `tests/test_stepview.py` pins three properties: every
+  illegal character is replaced, `Path().stem` still contains traversal, and
+  ordinary names are left byte-identical so warm caches do not move. Check that
+  a change preserves all three; the third is the easiest to break by accident.
 - **Reserved device names.** `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` are
   reserved when they are the whole stem. The `_<quality>_<hash>` suffix currently
   saves us; a change to the naming scheme could remove that accident.
