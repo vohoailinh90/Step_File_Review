@@ -20,7 +20,7 @@ import tempfile
 import threading
 import unittest
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import stepview  # noqa: E402
@@ -197,11 +197,35 @@ class WindowsFilenameSafety(TempCache):
                              f"{ordinary!r} must keep its original stem")
 
     def test_safe_stem_replaces_every_illegal_character(self):
+        # Multi-character prefix on purpose. On Windows a SINGLE letter followed
+        # by ':' is a drive designator, so pathlib consumes "a:" before the regex
+        # can run and "a:b.step" yields "b". Any longer prefix keeps the colon,
+        # which is the real PDM case ("HOUSING:REV-B.step"). The drive form is
+        # pinned separately below.
         for ch in '<>:"|?*':
-            self.assertEqual(stepview.safe_stem(f"a{ch}b.step"), "a_b",
+            self.assertEqual(stepview.safe_stem(f"revA{ch}B.step"), "revA_B",
                              f"{ch!r} must be replaced")
-        self.assertEqual(stepview.safe_stem("a\x00b.step"), "a_b", "NUL must be replaced")
-        self.assertEqual(stepview.safe_stem("a\x1fb.step"), "a_b", "C0 range must be replaced")
+        self.assertEqual(stepview.safe_stem("revA\x00B.step"), "revA_B", "NUL must be replaced")
+        self.assertEqual(stepview.safe_stem("revA\x1fB.step"), "revA_B", "C0 range must be replaced")
+
+    def test_a_drive_designator_is_dropped_rather_than_sanitised(self):
+        """Windows parses "a:" as a drive; POSIX does not. Both outcomes are safe.
+
+        Found by CI on windows-latest -- not by a local run and not by review,
+        both of which were on Linux. On POSIX "a:b.step" keeps the colon and
+        sanitises to "a_b"; on Windows pathlib strips the drive and the stem is
+        already "b". The property that matters is the same on both: the result
+        is a single legal component that stays inside the cache directory. This
+        asserts that property rather than one platform's string.
+        """
+        for hostile in ["a:b.step", "C:x.step", "Z:evil.step"]:
+            stem = stepview.safe_stem(hostile)
+            self.assertTrue(stem, f"{hostile!r} produced an empty stem")
+            self.assertFalse(WIN_ILLEGAL & set(stem),
+                             f"{hostile!r} left an illegal character in {stem!r}")
+            out = stepview.convert_bytes(b"AAAA" + hostile.encode(), hostile, "normal")
+            self.assertEqual(out.parent, stepview.CACHE_DIR,
+                             f"{hostile!r} escaped the cache directory")
 
     def test_safe_stem_falls_back_to_model_when_nothing_is_left(self):
         for empty in ["", ".step", "/", "///"]:
@@ -246,6 +270,59 @@ class WindowsFilenameSafety(TempCache):
         # generously for a long profile name and still require slack.
         out = stepview.convert_bytes(b"AAAA", "x" * 300 + ".step", "normal")
         self.assertLess(len(out.name), 120, f"cache filename too long: {out.name!r}")
+
+
+class WindowsPathSemantics(unittest.TestCase):
+    """Run safe_stem() under Windows path parsing, whatever platform this is.
+
+    CI on windows-latest caught a divergence that every local run and every
+    review missed, because all of them were on Linux: pathlib reads a single
+    letter followed by ':' as a drive, so "a:b.step" has stem "b" there and
+    "a:b" here. pathlib can be forced into its Windows flavour anywhere, so that
+    class of bug does not actually need a Windows box to find -- only the
+    discipline of asking for it. These tests make the asking automatic.
+
+    Only safe_stem() is exercised under the patch. convert_bytes() also calls
+    .unlink() on a temp path, which a Pure path cannot do.
+    """
+
+    def setUp(self):
+        self._real_path = stepview.Path
+        stepview.Path = PureWindowsPath
+
+    def tearDown(self):
+        stepview.Path = self._real_path
+
+    def test_illegal_characters_are_replaced_under_windows_parsing(self):
+        for ch in '<>:"|?*':
+            self.assertEqual(stepview.safe_stem(f"revA{ch}B.step"), "revA_B",
+                             f"{ch!r} must be replaced under Windows parsing")
+
+    def test_the_real_pdm_name_survives_as_a_legal_stem(self):
+        self.assertEqual(stepview.safe_stem("HOUSING:REV-B.step"), "HOUSING_REV-B")
+
+    def test_a_drive_letter_is_consumed_by_pathlib(self):
+        # Documented divergence, not a defect: the drive is stripped, and what
+        # remains is a single legal component.
+        for hostile, expected in [("a:b.step", "b"), ("C:x.step", "x"),
+                                  ("Z:evil.step", "evil")]:
+            self.assertEqual(stepview.safe_stem(hostile), expected)
+
+    def test_windows_separators_are_consumed_not_escaped(self):
+        for hostile in [r"..\..\evil.step", r"C:\Windows\System32\evil.step",
+                        r"\\server\share\x.step", r"a\b.step"]:
+            stem = stepview.safe_stem(hostile)
+            self.assertTrue(stem, f"{hostile!r} produced an empty stem")
+            self.assertFalse(WIN_ILLEGAL & set(stem),
+                             f"{hostile!r} left an illegal character in {stem!r}")
+            self.assertNotIn("..", stem, f"{hostile!r} kept a traversal fragment")
+
+    def test_every_illegal_character_class_is_covered_under_windows(self):
+        for name in ['q?.step', 'star*.step', 'pipe|x.step', 'lt<gt>.step',
+                     'quote".step', '\x01ctrl.step', 'REV:A.step']:
+            stem = stepview.safe_stem(name)
+            self.assertFalse(WIN_ILLEGAL & set(stem), f"{name!r} -> {stem!r}")
+            self.assertFalse(any(ord(c) < 32 for c in stem), f"{name!r} -> {stem!r}")
 
 
 class EngineCheck(unittest.TestCase):

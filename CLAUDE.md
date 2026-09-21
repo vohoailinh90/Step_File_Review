@@ -125,6 +125,15 @@ in `tests/test_stepview.py`:
 a warm cache keyed on the old naming, and shifting a stem silently reconverts a
 large assembly. That is asserted too.
 
+**Test Windows path parsing from whatever machine you are on.** `pathlib` reads
+a single letter followed by `:` as a *drive*, so `"a:b.step"` has stem `"b"` on
+Windows and `"a:b"` on Linux. That divergence was found by CI on
+`windows-latest` after a local run and an independent review — both on Linux —
+had called the change clean. It did not need a Windows box to find: the
+`WindowsPathSemantics` class in `tests/test_stepview.py` swaps `stepview.Path`
+for `PureWindowsPath` and re-runs the assertions anywhere. Any new path or
+filename logic belongs in that class as well as the native one.
+
 ## Choosing how much process a change deserves
 
 Most changes here need no agents at all. The roster exists for the few that do.

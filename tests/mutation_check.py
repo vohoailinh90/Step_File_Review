@@ -180,6 +180,9 @@ MUTATIONS = [
          replace='stem = Path(name).stem[:40] or "model"',
          must_fail=UNIT_PY),
     dict(name="launcher/sanitiser-charset-narrowed",
+         # Drops ':' from the illegal set -- the exact character a PDM revision
+         # name carries, and the one whose Windows parsing diverges from POSIX.
+         # Caught by both the native and the WindowsPathSemantics test classes.
          behaviour="every Win32-illegal character must be replaced, not just some",
          file="stepview.py",
          find='[<>:"',
