@@ -167,6 +167,12 @@ MUTATIONS = [
          must_fail=JS),
 
     # ---- the launcher ------------------------------------------------------
+    dict(name="launcher/breaks-on-oldest-supported-python",
+         behaviour="stepview.py must import on Python 3.9, which README promises",
+         file="stepview.py",
+         find="from __future__ import annotations\n",
+         replace="",
+         must_fail=INVARIANTS),
     dict(name="launcher/cache-key-ignores-mtime",
          behaviour="editing a STEP file must invalidate its cache entry",
          file="stepview.py",

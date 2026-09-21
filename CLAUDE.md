@@ -66,6 +66,12 @@ enforces the ones a script can:
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
   the local Python process; no data leaves the machine.
 - **`stepview.py` stays stdlib + `cascadio`.** No new pip dependency.
+- **Python 3.9 is the floor**, because `README.md` promises it. PEP 604 unions
+  (`str | None`) are evaluated at runtime before 3.10, so every script here
+  carries `from __future__ import annotations`. Dropping it makes `stepview.py`
+  fail at *import* on 3.9 with a bare `TypeError` — which is exactly how it
+  shipped until CI on `windows-latest`/py3.9 caught it.
+  `tests/check_invariants.py` now enforces the pairing.
 - **three.js is pinned** to a bundled r13x-era build: `renderer.outputEncoding`,
   `THREE.sRGBEncoding`, and the `THREE.OrbitControls` / `THREE.GLTFLoader`
   globals. Post-r152 names (`outputColorSpace`, `SRGBColorSpace`, ESM imports)

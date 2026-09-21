@@ -16,6 +16,13 @@ after that comes from the local cache and is near-instant.
 
 Requires:  pip install cascadio     (bundled OpenCASCADE, no CAD install needed)
 """
+# README promises Python 3.9-3.13. The annotations below use PEP 604 unions
+# ("str | None"), which 3.9 evaluates at runtime and rejects with a bare
+# TypeError on import -- the one failure mode this file otherwise works hard to
+# avoid. Postponing annotations makes them strings, so 3.9 imports cleanly with
+# no change to behaviour. tests/check_invariants.py enforces this pairing.
+from __future__ import annotations
+
 import argparse
 import hashlib
 import http.server

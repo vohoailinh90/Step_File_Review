@@ -230,12 +230,59 @@ def _stdlib_only():
     allowed = {
         "argparse", "hashlib", "http", "json", "socket", "sys", "tempfile",
         "threading", "time", "webbrowser", "pathlib", "urllib", "cascadio", "re",
+        "__future__",
     }
     problems = []
     for m in re.finditer(r"^\s*(?:import|from)\s+([a-zA-Z0-9_]+)", src, re.M):
         mod = m.group(1)
         if mod not in allowed:
             problems.append(f"stepview.py imports {mod!r}, which is not stdlib or cascadio")
+    return problems
+
+
+@check("PRODUCT  every script imports on the oldest Python README promises (3.9)")
+def _min_python():
+    """PEP 604 unions ("str | None") are evaluated at runtime before 3.10.
+
+    Found by CI on windows-latest/py3.9 after the suite had been green on 3.13
+    everywhere: stepview.py failed at IMPORT with a bare TypeError, so a user
+    on the oldest Python the README promises could not run the tool at all.
+    The fix is `from __future__ import annotations`; this check keeps the two
+    from drifting apart again.
+    """
+    import ast
+    problems = []
+    for rel in ("stepview.py", "build.py", ".claude/hooks/no_direct_viewer_edit.py",
+                "tests/check_invariants.py", "tests/mutation_check.py",
+                "tests/run_checks.py", "tests/test_stepview.py"):
+        f = ROOT / rel
+        if not f.is_file():
+            continue
+        tree = ast.parse(f.read_text(encoding="utf-8"), filename=rel)
+        postponed = any(
+            isinstance(n, ast.ImportFrom) and n.module == "__future__"
+            and any(a.name == "annotations" for a in n.names)
+            for n in tree.body)
+        if postponed:
+            continue
+        for node in ast.walk(tree):
+            targets = []
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                a = node.args
+                targets = [x.annotation for x in (*a.posonlyargs, *a.args, *a.kwonlyargs)
+                           if x.annotation]
+                if node.returns:
+                    targets.append(node.returns)
+            elif isinstance(node, ast.AnnAssign) and node.annotation:
+                targets = [node.annotation]
+            for ann in targets:
+                for sub in ast.walk(ann):
+                    if isinstance(sub, ast.BinOp) and isinstance(sub.op, ast.BitOr):
+                        problems.append(
+                            f"{rel}:{getattr(node, 'lineno', '?')} uses a PEP 604 union "
+                            f"in an annotation without `from __future__ import "
+                            f"annotations` -- Python 3.9 raises TypeError on import")
+                        break
     return problems
 
 

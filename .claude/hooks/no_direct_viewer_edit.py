@@ -15,6 +15,8 @@ Reads the PreToolUse payload on stdin and emits a permission decision. Exits 0
 even when denying -- the decision is in the JSON, and a crashed hook must never
 be able to block legitimate work, so anything unexpected allows.
 """
+from __future__ import annotations   # "str | None" below must import on 3.9
+
 import json
 import sys
 from pathlib import Path
