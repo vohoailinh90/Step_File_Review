@@ -190,7 +190,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 36 mutations, all currently caught. When you ship a fix with a
+suite to notice — 37 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -210,10 +210,17 @@ inline `<style>` block still passing all 13. Probing for the rest of the class
 turned up two more nobody had named: `.style.background = "url(https://…)"` and
 an `innerHTML` string carrying a remote `<img src>`.
 
-Both fixes failed the same way: they enumerated **where** to look. The third
-scans every source file's whole text for the syntax instead, and is pinned by 26
-probes and 6 mutations. **When you write a check, do not list the places the
-problem can appear — decide what the problem looks like, then look everywhere.**
+Round 3 then found the same mistake one level up: the fix scanned every source
+file's whole text, but `SCANNED_SOURCES` was still a hardcoded tuple of three UI
+files, so a *newly included* `src/ui/probe.html` shipped a remote `url()` past all
+13 checks.
+
+Three rounds, three versions of one mistake: **enumerating**. Hostnames, then
+attributes and the one stylesheet, then the file list. The check now derives its
+inputs from `build.py`'s own template directives — what ships is what is scanned,
+so a new source is covered the moment it is included — and is pinned by 34 probes
+and 7 mutations. **Do not list the places a problem can appear. Decide what the
+problem looks like, then derive where to look from what actually ships.**
 
 ## Verification rule
 

@@ -15,8 +15,13 @@ edit that breaks it, and the command that must fail as a result. An entry whose
 `find` no longer matches exactly once fails as DRIFT rather than silently
 proving nothing.
 
-Every edit is reverted in a finally block, including on Ctrl-C. Nothing is left
-modified on disk.
+An entry may also carry `create`: a {path: content} mapping of extra files to add
+for the duration of the run. That is how a "a newly added source is not scanned"
+behaviour gets pinned -- the defect only exists when a file that did not exist
+before is included in the build.
+
+Every edit is reverted in a finally block, including on Ctrl-C, and every created
+file is removed. Nothing is left modified on disk.
 
 When you ship a fix with a test, add the mutation that would have caught it.
 """
@@ -124,6 +129,15 @@ MUTATIONS = [
          file="src/app/60-io.js",
          find="function openPicker()",
          replace="function injectRemote(){ document.body.innerHTML += '<img src=\"https://example.com/t.png\">'; }\nfunction openPicker()",
+         must_fail=INVARIANTS),
+
+    dict(name="product/new-included-source-unscanned",
+         behaviour="a source newly added to the build must be scanned for remote URLs",
+         file="src/viewer.template.html",
+         find="@@INCLUDE:src/ui/layout.html@@",
+         replace="@@INCLUDE:src/ui/layout.html@@@@INCLUDE:src/ui/probe.html@@",
+         create={"src/ui/probe.html":
+                 '<div style="background:url(https://example.com/probe.png)"></div>\n'},
          must_fail=INVARIANTS),
 
     # ---- the geometry the viewer reports to an engineer ---------------------
@@ -306,11 +320,19 @@ def main() -> int:
             continue
 
         mutated = original.replace(m["find"].encode(), m["replace"].encode(), 1)
+        created = []
         try:
+            for rel, content in (m.get("create") or {}).items():
+                extra = ROOT / rel
+                extra.parent.mkdir(parents=True, exist_ok=True)
+                extra.write_text(content, encoding="utf-8")
+                created.append(extra)
             target.write_bytes(mutated)
             rc = run(m["must_fail"])
         finally:
             target.write_bytes(original)
+            for extra in created:
+                extra.unlink(missing_ok=True)
 
         if rc != 0:
             caught.append(m["name"])

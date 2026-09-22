@@ -57,11 +57,27 @@ REMOTE_URL = re.compile(r"^\s*(?:https?:|ftps?:|wss?:|//)", re.I)
 CSS_URL = re.compile(r"""(?<![\w.$])url\(\s*(['\"]?)([^)'\"]*)\1\s*\)""", re.I)
 CSS_IMPORT = re.compile(r"""@import\s+(?:url\(\s*)?['\"]?([^'\")\s;]+)""", re.I)
 
-# Sources a UI change can touch. vendor/ is excluded on purpose: it is upstream
-# code pinned by vendor/SHA256SUMS, so a change there already fails that check,
-# and its spec links would produce constant false positives here.
-SCANNED_SOURCES = ("src/ui/viewer.css", "src/ui/layout.html",
-                   "src/viewer.template.html")
+def scanned_sources() -> list[str]:
+    """Every non-vendor file that actually ships, DERIVED from build.py.
+
+    Deliberately not a fixed list. build.py's template directives are the single
+    source of truth for what lands in viewer.html, so the scan follows the build:
+    a newly included source is covered the moment it is included, without editing
+    this file. Codex review round 3 on PR #1 found the previous version
+    enumerating three UI files, so adding `src/ui/probe.html` to the template
+    shipped a remote url() past all 13 checks -- the same enumeration mistake the
+    two earlier fixes made one level down.
+
+    vendor/ is excluded because it is upstream code pinned by vendor/SHA256SUMS:
+    any change there already fails that check, and its spec links and comments
+    would produce constant false positives. A bundled library added OUTSIDE
+    vendor/ is therefore scanned, which is the right default -- a new third-party
+    blob in the app tree should be looked at, not waved through.
+    """
+    import build
+    rels = [p for p in build.parts() if not p.startswith("vendor/")]
+    rels.append("src/viewer.template.html")   # the shell is not in its own list
+    return sorted(set(rels))
 
 failures: list[str] = []
 passes: list[str] = []
@@ -268,12 +284,11 @@ def _no_remote_resources_in_source():
             if REMOTE_URL.match(m.group(1)):
                 flag(m.start(), "css @import", m.group(1))
 
-    for rel in SCANNED_SOURCES:
+    # build.parts() already lists src/app/*.js, so one loop covers everything.
+    for rel in scanned_sources():
         f = ROOT / rel
         if f.is_file():
             scan(rel, f.read_text(encoding="utf-8"))
-    for f in sorted(APP_DIR.glob("*.js")):
-        scan(f"src/app/{f.name}", f.read_text(encoding="utf-8"))
     return problems
 
 
