@@ -88,6 +88,19 @@ MUTATIONS = [
          replace="import argparse\nimport requests",
          must_fail=INVARIANTS),
 
+    dict(name="product/remote-css-url-added",
+         behaviour="a CSS url() pointing off-machine must break the air-gap check",
+         file="src/ui/viewer.css",
+         find="#hintbar{color:var(--dim)}",
+         replace="#hintbar{color:var(--dim);background:url(https://example.com/pixel.png)}",
+         must_fail=INVARIANTS),
+    dict(name="product/remote-img-src-added",
+         behaviour="an <img src> pointing off-machine must break the air-gap check",
+         file="src/ui/layout.html",
+         find='<div id="info"></div>',
+         replace='<div id="info"></div><img src="https://evil.example/track.png">',
+         must_fail=INVARIANTS),
+
     # ---- the geometry the viewer reports to an engineer ---------------------
     dict(name="geometry/rms-gate-loosened",
          behaviour="loosening the rms gate lets a bad circle fit be reported",
