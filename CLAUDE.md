@@ -59,8 +59,12 @@ and `addEventListener` do not, so order matters for those. Keep each module unde
 Breaking any of these breaks the product, not just a test. `tests/check_invariants.py`
 enforces the ones a script can:
 
-- **Offline.** No CDN, no npm, no remote font or stylesheet, no `<script src>`.
-  The viewer must run air-gapped.
+- **Offline.** The viewer must run air-gapped: nothing fetched from the network,
+  by any route. `tests/check_invariants.py` enforces the whole class rather than
+  a hostname list — every URL-bearing HTML attribute (`src`, `srcset`, `href`,
+  `poster`, `action`, …), every CSS `url()` and `@import`, and any remote string
+  literal assigned to a URL property in JS. `data:` and `blob:` are allowed
+  because they never leave the page; `xmlns` is not a load and is not flagged.
 - **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
   bundler, `package.json`, TypeScript or a preprocessor.
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
@@ -183,7 +187,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 26 mutations, all currently caught. When you ship a fix with a
+suite to notice — 32 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -193,6 +197,12 @@ two silent defects passed everything: `unitScale` 1000 → 1 (every reported len
 inflated). An independent review found them by trying to defeat the suite rather
 than by running it. **A green suite is evidence about the mutations you wrote,
 not about the code.** When you add a module, add a suite that loads it.
+
+The same shape recurred in the offline check, and an independent review found it:
+it matched `<script src>` and a short CDN hostname allowlist, so a remote
+`<img src>` or a CSS `background:url(https://…)` rebuilt cleanly and passed all
+12 checks. Enumerating hostnames was the mistake — the check now covers the
+class. **When you write a check, ask which members of its class it cannot see.**
 
 ## Verification rule
 
