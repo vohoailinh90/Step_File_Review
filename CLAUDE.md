@@ -63,7 +63,10 @@ enforces the ones a script can:
   by any route. `tests/check_invariants.py` enforces the whole class rather than
   a hostname list — every URL-bearing HTML attribute (`src`, `srcset`, `href`,
   `poster`, `action`, …), every CSS `url()` and `@import`, and any remote string
-  literal assigned to a URL property in JS. `data:` and `blob:` are allowed
+  literal assigned to a URL property in JS. Each scan runs over **every** source
+  file's full text — stylesheet, markup, template and `src/app/*.js` alike — so a
+  `style=""` attribute, an inline `<style>` block, a `.style.background` string
+  and an `innerHTML` fragment are all covered. `data:` and `blob:` are allowed
   because they never leave the page; `xmlns` is not a load and is not flagged.
 - **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
   bundler, `package.json`, TypeScript or a preprocessor.
@@ -187,7 +190,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 32 mutations, all currently caught. When you ship a fix with a
+suite to notice — 36 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -198,11 +201,19 @@ inflated). An independent review found them by trying to defeat the suite rather
 than by running it. **A green suite is evidence about the mutations you wrote,
 not about the code.** When you add a module, add a suite that loads it.
 
-The same shape recurred in the offline check, and an independent review found it:
-it matched `<script src>` and a short CDN hostname allowlist, so a remote
-`<img src>` or a CSS `background:url(https://…)` rebuilt cleanly and passed all
-12 checks. Enumerating hostnames was the mistake — the check now covers the
-class. **When you write a check, ask which members of its class it cannot see.**
+The same shape recurred in the offline check, twice, and independent review found
+it both times. Round 1: it matched `<script src>` and a short CDN hostname
+allowlist, so a remote `<img src>` or a CSS `background:url(https://…)` rebuilt
+cleanly and passed all 12 checks. The fix enumerated the attributes and the
+stylesheet — and round 2 then found `style="background:url(https://…)"` and an
+inline `<style>` block still passing all 13. Probing for the rest of the class
+turned up two more nobody had named: `.style.background = "url(https://…)"` and
+an `innerHTML` string carrying a remote `<img src>`.
+
+Both fixes failed the same way: they enumerated **where** to look. The third
+scans every source file's whole text for the syntax instead, and is pinned by 26
+probes and 6 mutations. **When you write a check, do not list the places the
+problem can appear — decide what the problem looks like, then look everywhere.**
 
 ## Verification rule
 

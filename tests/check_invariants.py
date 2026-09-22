@@ -50,6 +50,19 @@ URL_ATTRS = ("src", "srcset", "href", "poster", "data", "action", "formaction",
 # are allowed -- an inline data: icon is a legitimate way to stay self-contained.
 REMOTE_URL = re.compile(r"^\s*(?:https?:|ftps?:|wss?:|//)", re.I)
 
+# CSS can fetch from a .css file, a style="" attribute, an inline <style> block,
+# or a JS string assigned to .style.*. So the CSS scan runs over EVERY source
+# file rather than only the stylesheet: enumerating *where* CSS lives is what
+# leaked twice already. The lookbehind keeps `URL.createObjectURL(` from matching.
+CSS_URL = re.compile(r"""(?<![\w.$])url\(\s*(['\"]?)([^)'\"]*)\1\s*\)""", re.I)
+CSS_IMPORT = re.compile(r"""@import\s+(?:url\(\s*)?['\"]?([^'\")\s;]+)""", re.I)
+
+# Sources a UI change can touch. vendor/ is excluded on purpose: it is upstream
+# code pinned by vendor/SHA256SUMS, so a change there already fails that check,
+# and its spec links would produce constant false positives here.
+SCANNED_SOURCES = ("src/ui/viewer.css", "src/ui/layout.html",
+                   "src/viewer.template.html")
+
 failures: list[str] = []
 passes: list[str] = []
 
@@ -204,74 +217,63 @@ def _no_cdn():
     return problems
 
 
-@check("PRODUCT  no app source loads a remote URL (attribute, CSS url(), or DOM assignment)")
+@check("PRODUCT  no app source fetches a remote URL, by any route")
 def _no_remote_resources_in_source():
-    """Catches the whole class, not a hostname allowlist.
+    """Covers the class, wherever it appears -- not a list of places to look.
 
-    Reported by Codex review on PR #1, and reproduced before being fixed: adding
-    `background:url(https://example.com/pixel.png)` to viewer.css, or an
-    `<img src="https://...">` to layout.html, rebuilt cleanly and passed all 12
-    checks -- the tag check only knew about <script src> and <link href>, and the
-    CDN check only matched a short hostname list. A future UI asset could have
-    broken the advertised air-gapped behaviour with CI green.
+    Two rounds of Codex review on PR #1 found four escapes here, each a member of
+    the same class the check claimed to cover:
 
-    Scans the app's own sources rather than the built viewer.html on purpose:
-    vendor/ is upstream code pinned by vendor/SHA256SUMS, so any change there
-    already fails the vendor check, while its comments and spec links would
-    produce endless false positives here.
+      round 1  <img src="https://...">                 in layout.html
+      round 1  background:url(https://...)             in viewer.css
+      round 2  style="background:url(https://...)"     inline attribute
+      round 2  <style>...url(https://...)...</style>   embedded block
+
+    Probing for the rest of the class then found two more that neither round
+    named: `el.style.background = "url(https://...)"` and an `innerHTML` string
+    carrying a remote `<img src>`. The lesson is in CLAUDE.md: the first two
+    fixes enumerated *where* CSS and markup live, and kept missing places they
+    live. So every scan below runs over every source file's full text.
     """
     problems = []
-
-    def flag(rel, text, idx, what, value):
-        line = text.count("\n", 0, idx) + 1
-        problems.append(f"{rel}:{line} {what} points at a remote URL: {value!r}")
-
-    # --- markup: every fetching attribute, however it is quoted ---------------
     names = "|".join(a.replace(":", r"\:") for a in URL_ATTRS)
     attr_re = re.compile(
-        rf"""\b({names})\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.I)
-    for rel in ("src/ui/layout.html", "src/viewer.template.html"):
-        f = ROOT / rel
-        if not f.is_file():
-            continue
-        text = f.read_text(encoding="utf-8")
+        rf"""\b({names})\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>'"`]+))""", re.I)
+    setattr_re = re.compile(
+        rf"""setAttribute\(\s*(['\"])({names})\1\s*,\s*(['\"`])([^'\"`]*)\3""", re.I)
+
+    def scan(rel: str, text: str):
+        def flag(idx, what, value):
+            line = text.count("\n", 0, idx) + 1
+            problems.append(f"{rel}:{line} {what} points at a remote URL: {value!r}")
+
+        # URL-bearing attributes, quoted or not. Also catches `.src = "https://"`
+        # in JS, and an attribute inside an innerHTML string literal.
         for m in attr_re.finditer(text):
             attr = m.group(1)
             raw = next(g for g in m.groups()[1:] if g is not None)
-            # srcset is a comma-separated candidate list
             for cand in (raw.split(",") if attr.lower() == "srcset" else [raw]):
                 url = cand.strip().split()[0] if cand.strip() else ""
                 if REMOTE_URL.match(url):
-                    flag(rel, text, m.start(), f"{attr}=", url)
-
-    # --- CSS: url() and @import ----------------------------------------------
-    css_f = ROOT / "src" / "ui" / "viewer.css"
-    if css_f.is_file():
-        css = css_f.read_text(encoding="utf-8")
-        for m in re.finditer(r"""url\(\s*(['\"]?)([^)'\"]*)\1\s*\)""", css, re.I):
-            if REMOTE_URL.match(m.group(2)):
-                flag("src/ui/viewer.css", css, m.start(), "url()", m.group(2).strip())
-        for m in re.finditer(r"""@import\s+(?:url\(\s*)?['\"]?([^'\")\s;]+)""", css, re.I):
-            if REMOTE_URL.match(m.group(1)):
-                flag("src/ui/viewer.css", css, m.start(), "@import", m.group(1))
-
-    # --- app JS: a remote literal assigned to a URL-bearing property ---------
-    # `a.href = URL.createObjectURL(blob)` is a call, not a literal, so the
-    # screenshot download is unaffected.
-    assign_re = re.compile(
-        r"""\.(src|srcset|href|poster|action|formAction)\s*=\s*(['\"`])([^'\"`]*)\2""")
-    setattr_re = re.compile(
-        r"""setAttribute\(\s*(['\"])(src|srcset|href|poster|action)\1\s*,\s*(['\"`])([^'\"`]*)\3""",
-        re.I)
-    for f in sorted(APP_DIR.glob("*.js")):
-        text = f.read_text(encoding="utf-8")
-        rel = f"src/app/{f.name}"
-        for m in assign_re.finditer(text):
-            if REMOTE_URL.match(m.group(3)):
-                flag(rel, text, m.start(), f".{m.group(1)} =", m.group(3))
+                    flag(m.start(), f"{attr}=", url)
         for m in setattr_re.finditer(text):
             if REMOTE_URL.match(m.group(4)):
-                flag(rel, text, m.start(), f"setAttribute({m.group(2)!r})", m.group(4))
+                flag(m.start(), f"setAttribute({m.group(2)})", m.group(4))
+        # CSS url() and @import, wherever they sit: stylesheet, style attribute,
+        # inline <style> block, or a JS string.
+        for m in CSS_URL.finditer(text):
+            if REMOTE_URL.match(m.group(2)):
+                flag(m.start(), "css url()", m.group(2).strip())
+        for m in CSS_IMPORT.finditer(text):
+            if REMOTE_URL.match(m.group(1)):
+                flag(m.start(), "css @import", m.group(1))
+
+    for rel in SCANNED_SOURCES:
+        f = ROOT / rel
+        if f.is_file():
+            scan(rel, f.read_text(encoding="utf-8"))
+    for f in sorted(APP_DIR.glob("*.js")):
+        scan(f"src/app/{f.name}", f.read_text(encoding="utf-8"))
     return problems
 
 
