@@ -1,0 +1,98 @@
+name: checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Windows is the platform this tool is actually run on (see CLAUDE.md), so it
+  # is the primary job and runs the full matrix. Ubuntu runs too, because it is
+  # fast and catches nothing-specific-to-Windows regressions early.
+  checks:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python: "3.13"
+          - os: windows-latest
+            python: "3.9"      # the floor README.md promises
+          - os: ubuntu-latest
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # A checkout that rewrote line endings would fail the build check for a
+      # reason unrelated to the change. .gitattributes pins this; verify it held.
+      - name: No CRLF reached the working tree
+        shell: python
+        run: |
+          import sys
+          from pathlib import Path
+          bad = [p for p in ("viewer.html", "src/viewer.template.html",
+                             "src/app/40-geometry.js", "stepview.py")
+                 if b"\r\n" in Path(p).read_bytes()]
+          if bad:
+              sys.exit(f"CRLF found in {bad} -- check .gitattributes")
+          print("line endings are LF")
+
+      # No pip install: the suite runs without cascadio on purpose, so CI needs
+      # no CAD engine and stays fast. Nothing here is third-party.
+      - name: viewer.html is a faithful build of src/
+        run: python build.py --check
+
+      - name: Repo and product invariants
+        run: python tests/check_invariants.py
+
+      - name: Launcher unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+
+      # Quoted so node expands the glob itself (Node >= 21) rather than the
+      # shell, which differs between PowerShell and bash. shell: bash pins it.
+      - name: Viewer unit tests (geometry, units, face flood-fill)
+        shell: bash
+        run: node --test "tests/*.test.mjs"
+
+      # Proves the checks above can actually fail. Runs last because it edits
+      # files (reverting each in a finally block) and is the slowest step.
+      - name: Mutation checks
+        run: python tests/mutation_check.py
+
+  # cascadio ships prebuilt wheels; confirm the documented install still works
+  # and that a real STEP conversion path is importable. Separate job so a PyPI
+  # outage cannot fail the checks above.
+  #
+  # `stepview.py --check` exits 1 when cascadio cannot be imported. It used to
+  # exit 0 regardless, so this job could not go red even for a wheel that
+  # installs but fails to load its DLL. The job stays non-blocking
+  # (continue-on-error) so a PyPI outage does not fail a PR, but its result is
+  # now truthful: red means the documented install is broken.
+  #
+  # And it was: the first honest run found that cascadio 0.1.1 imports numpy
+  # without declaring it, so README's `pip install cascadio` left an engine that
+  # could not load. The install line below must stay the one README.md gives
+  # users -- tests/check_invariants.py fails if the two differ, since a job
+  # that installs anything else tests an install nobody does.
+  engine:
+    name: cascadio install (windows)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install cascadio numpy
+      - run: python stepview.py --check

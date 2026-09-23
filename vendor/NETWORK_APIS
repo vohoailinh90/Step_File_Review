@@ -1,0 +1,18 @@
+# Every use of a network-capable API in vendor/, counted per file and reviewed.
+#
+# tests/check_invariants.py counts each API in every vendored file and fails,
+# by name, when a count differs from this list -- so a vendor upgrade that adds a
+# WebSocket, a Worker or one more fetch() shows up as a line in the diff, even
+# when the URL it would reach is assembled at runtime and so invisible to
+# vendor/URLS. Codex review round 10 on PR #1: new WebSocket('ws' + 's://...')
+# appended to STLLoader.js, with SHA256SUMS refreshed, passed all 20 checks.
+#
+# Update a count only after reading the code at each site. A loader path is safe
+# when it resolves its URL through manager.resolveURL(), which src/app/10-load.js
+# routes through sameOrigin(); anything else can reach the network.
+#
+# count  file  api
+3  three.min.js  fetch     # FileLoader.load and ImageBitmapLoader.load, both after manager.resolveURL() -> sameOrigin(); the third is a "fetch() not supported" warning string
+1  three.min.js  img.src   # ImageLoader.load: a.src=t after manager.resolveURL() -> sameOrigin()
+1  GLTFLoader.js  img.src  # WebP support probe: image.src = a data: URI, never leaves the page
+1  GLTFLoader.js  Image    # the same WebP probe's new Image()

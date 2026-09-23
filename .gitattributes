@@ -1,0 +1,9 @@
+# build.py --check compares viewer.html byte-for-byte against src/ + vendor/, so
+# line endings must not depend on which platform ran the checkout. Without this,
+# a Windows clone with core.autocrlf=true can rewrite LF to CRLF inconsistently
+# between the generated file and its sources, and the build check fails for
+# reasons that have nothing to do with the change under test.
+* text=auto eol=lf
+
+# The vendored three.js build is one 607 KB line. Never let any tool touch it.
+vendor/three.min.js -text -diff

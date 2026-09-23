@@ -14,14 +14,14 @@ python stepview.py --warm  \\server\projects\incoming_step\
 
 ## Setup (one time, per machine)
 
-Requires 64-bit Python 3.9–3.13 and one package:
+Requires 64-bit Python 3.9–3.13 and one package, `cascadio`, installed together with `numpy`:
 
 ```
-python -m pip install cascadio
+python -m pip install cascadio numpy
 python stepview.py --check          verify the setup
 ```
 
-`cascadio` ships prebuilt wheels for Windows, macOS and Linux, so nothing is compiled and no CAD software or OpenCASCADE install is needed. If `pip` cannot reach the internet from a corporate network, either pass the proxy (`python -m pip install --proxy http://user:pass@proxy:port cascadio`) or download the matching `.whl` from pypi.org/project/cascadio on a machine with access and install it offline (`python -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl`).
+`cascadio` ships prebuilt wheels for Windows, macOS and Linux, so nothing is compiled and no CAD software or OpenCASCADE install is needed. `numpy` is there because `cascadio` 0.1.1 imports it when it loads but does not declare it, so `pip` would not install it and the engine could not start; `--check` names any module that is still missing. If `pip` cannot reach the internet from a corporate network, either pass the proxy (`python -m pip install --proxy http://user:pass@proxy:port cascadio numpy`) or, on a machine that has access and the same OS and Python version, download the wheels (`python -m pip download cascadio numpy -d wheels`), copy the `wheels` folder over and install from it (`python -m pip install --no-index --find-links wheels cascadio numpy`).
 
 If several Pythons are installed, make sure it is the *same* interpreter that runs `stepview.py` — use `python -m pip` rather than a bare `pip`, or the full path shown by `--check`. Without the package the viewer still opens GLB, GLTF and STL files; only STEP conversion is unavailable, and it tells you so on the start screen.
 
@@ -68,6 +68,29 @@ Lengths are shown in millimetres. OpenCASCADE writes glTF in metres whatever uni
 *Standard planes* — **Right**, **Top** and **Front** cut through the model centre along the X, Y and Z normals. **Offset** slides the plane through the model, **Flip** swaps which side is kept, and **Off** clears the cut. **Caps** fills the cut surface using a stencil pass so the section reads as solid material rather than a hollow shell; it turns off automatically above 400 parts, where the extra draw calls start to cost more than they are worth.
 
 *Plane from a circle* — press **Plane from circle…** then click any circular edge: a hole rim, a boss, a bore. The plane is built through that circle's axis and passes through its centre, and the **angle** slider sweeps the plane around the axis from 0° to 180°, so you can cut a bore at exactly the orientation you want. Offset then shifts the plane sideways from the axis. If you have already picked a circle in Edge mode, the button uses it directly.
+
+## Working on the code
+
+Users get two files. Contributors get the same two files plus their sources.
+
+`viewer.html` is **generated** — it is assembled by `build.py` from `src/` and
+`vendor/`, and committed so that a user never needs a build step, npm, or an
+internet connection. About 99% of its 796 KB is the bundled three.js, so it is
+not a file to read or edit. The 831 lines of application code live in
+`src/app/`, split by concern (scene, load, parts, select, geometry, section, io).
+
+```
+python build.py                 rebuild viewer.html after editing src/
+python build.py --check         verify viewer.html matches its sources
+python tests/run_checks.py      build fidelity + invariants + unit tests
+python tests/run_checks.py --mutations   also prove those checks can fail
+```
+
+Edit `src/`, never `viewer.html`, and never `vendor/` (pinned by
+`vendor/SHA256SUMS`). Rebuild in the same commit — CI runs `build.py --check`.
+Tests need no `cascadio` and no pip install; the geometry tests need `node`.
+
+`CLAUDE.md` has the full map, the pinned-API notes and the review policy.
 
 ## Known limits of this first version
 

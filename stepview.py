@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-stepview.py — quick local STEP viewer launcher.
+stepview.py -- quick local STEP viewer launcher.
 
 Usage:
     python stepview.py                             # open the viewer, then drag & drop STEP files
@@ -9,17 +9,25 @@ Usage:
     python stepview.py assembly.step --convert-only
     python stepview.py --warm folder/              # pre-convert every STEP in a folder
 
-Once the viewer is open you can drop .step / .stp files straight onto it — the
+Once the viewer is open you can drop .step / .stp files straight onto it -- the
 conversion runs in this local process, not in the browser and not in the cloud.
 First open of a big assembly pays the one-time tessellation cost; every open
 after that comes from the local cache and is near-instant.
 
-Requires:  pip install cascadio     (bundled OpenCASCADE, no CAD install needed)
+Requires:  pip install cascadio numpy   (bundled OpenCASCADE, no CAD install needed)
 """
+# README promises Python 3.9-3.13. The annotations below use PEP 604 unions
+# ("str | None"), which 3.9 evaluates at runtime and rejects with a bare
+# TypeError on import -- the one failure mode this file otherwise works hard to
+# avoid. Postponing annotations makes them strings, so 3.9 imports cleanly with
+# no change to behaviour. tests/check_invariants.py enforces this pairing.
+from __future__ import annotations
+
 import argparse
 import hashlib
 import http.server
 import json
+import re
 import socket
 import sys
 import tempfile
@@ -41,38 +49,89 @@ QUALITY = {
 }
 
 
-def check_engine(fatal: bool = True) -> bool:
-    """Verify the tessellation engine is importable, with an actionable message."""
+# What pip has to install for the engine to LOAD, not merely to install.
+# cascadio 0.1.1 imports numpy when it loads but does not declare it, so on a
+# clean Python `pip install cascadio` succeeds and `import cascadio` then fails
+# -- found by the CI engine job on PR #1. numpy is cascadio's dependency, not
+# this launcher's: stepview.py never imports it. tests/check_invariants.py
+# holds every documented install command to this tuple.
+ENGINE_PACKAGES = ("cascadio", "numpy")
+
+
+def diagnose_engine(err: ImportError) -> tuple[str, str]:
+    """Why `import cascadio` failed, and the pip arguments that fix it.
+
+    An ImportError is not proof the engine is missing. Only a missing module
+    named `cascadio` itself means that, and only a missing top-level module
+    means a dependency is absent. Anything else means the package IS installed
+    and broken -- and a plain `pip install` of an installed package is
+    answered "Requirement already satisfied", the loop this function exists to
+    break. So a broken package gets a forced reinstall.
+    """
+    missing = (err.name or "") if isinstance(err, ModuleNotFoundError) else ""
+    if missing == "cascadio":
+        return ("The tessellation engine (cascadio) is not installed for this Python.",
+                " ".join(ENGINE_PACKAGES))
+    if missing and "." not in missing:
+        return (f"The tessellation engine (cascadio) is installed but cannot load: "
+                f"it needs the module '{missing}', which is not installed.",
+                missing)
+    # Installed but broken. `import numpy.x` only reaches x once numpy itself
+    # imported, so a dotted name means numpy is there and damaged; a DLL that
+    # will not load (no module name at all) could be either package.
+    package = missing.split(".")[0]
+    broken = package if package and package != "cascadio" else " ".join(ENGINE_PACKAGES)
+    return (f"The tessellation engine (cascadio) is installed but failed to load: {err}",
+            f"--force-reinstall {broken}")
+
+
+def engine_problem() -> tuple[str, str] | None:
+    """None when the engine loads; otherwise diagnose_engine()'s answer."""
     try:
         import cascadio  # noqa: F401
+    except ImportError as e:
+        return diagnose_engine(e)
+    return None
+
+
+def check_engine(fatal: bool = True) -> bool:
+    """Verify the tessellation engine loads; if not, say why and how to fix it."""
+    problem = engine_problem()
+    if problem is None:
         return True
-    except ImportError:
-        py = Path(sys.executable).name
-        msg = (
-            "\n  The tessellation engine (cascadio) is not installed for this Python.\n"
-            f"  Python in use: {sys.executable}  ({sys.version.split()[0]})\n\n"
-            f"  Install it with:\n      \"{sys.executable}\" -m pip install cascadio\n\n"
-            "  Behind a corporate proxy, add your proxy:\n"
-            f"      \"{sys.executable}\" -m pip install --proxy http://user:pass@proxy:port cascadio\n"
-            "  Or download the wheel on a machine with access and install it offline:\n"
-            f"      \"{sys.executable}\" -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl\n\n"
-            "  Wheels exist for Windows/macOS/Linux on Python 3.9-3.13 (64-bit).\n"
-            "  GLB / GLTF / STL files still open without it — only STEP needs the engine.\n"
-        )
-        if fatal:
-            sys.exit(msg)
-        print(msg)
-        return False
+    what, fix = problem
+    py = sys.executable
+    msg = (
+        f"\n  {what}\n"
+        f"  Python in use: {py}  ({sys.version.split()[0]})\n\n"
+        f"  Fix it with:\n      \"{py}\" -m pip install {fix}\n\n"
+        "  Behind a corporate proxy, add your proxy:\n"
+        f"      \"{py}\" -m pip install --proxy http://user:pass@proxy:port {fix}\n"
+        "  Without internet access, download the wheels on a machine that has it\n"
+        "  (same OS and Python version), copy the folder here and install from it:\n"
+        f"      python -m pip download {' '.join(ENGINE_PACKAGES)} -d wheels\n"
+        f"      \"{py}\" -m pip install --no-index --find-links wheels {fix}\n\n"
+        "  Wheels exist for Windows/macOS/Linux on Python 3.9-3.13 (64-bit).\n"
+        "  GLB / GLTF / STL files still open without it -- only STEP needs the engine.\n"
+    )
+    if fatal:
+        sys.exit(msg)            # stderr escapes what it cannot encode by itself
+    # stdout does not. Redirected on Windows it is strictly encoded in the
+    # locale's ANSI code page, and Windows words a DLL-load failure in the UI
+    # language. Escape only what this stream cannot hold -- a console shows a
+    # non-ASCII interpreter path as is, and a crash here would hide the one
+    # error the user needs to see.
+    enc = getattr(sys.stdout, "encoding", None)
+    print(msg.encode(enc, "backslashreplace").decode(enc) if enc else msg)
+    return False
 
 
 def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
     try:
         import cascadio
-    except ImportError:
-        raise RuntimeError(
-            "the tessellation engine is not installed — run:  "
-            f'"{sys.executable}" -m pip install cascadio'
-        ) from None
+    except ImportError as e:
+        what, fix = diagnose_engine(e)
+        raise RuntimeError(f'{what} Fix it with:  "{sys.executable}" -m pip install {fix}') from None
     tmp = out.with_suffix(".partial")
     try:
         cascadio.step_to_glb(str(src), str(tmp), tol_linear=tol[0], tol_angular=tol[1])
@@ -82,7 +141,7 @@ def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
     except Exception as e:
         tmp.unlink(missing_ok=True)
         raise RuntimeError(
-            f"could not read '{label or src.name}' as STEP — the file may be corrupt, "
+            f"could not read '{label or src.name}' as STEP -- the file may be corrupt, "
             f"incomplete, or not a STEP file ({e})"
         ) from None
 
@@ -107,12 +166,34 @@ def convert(path: Path, tol: tuple, force: bool = False, quality: str = "normal"
     return out
 
 
+# Characters Win32 rejects in a filename, plus the C0 control range. POSIX
+# accepts all but "/", which is why an unsanitised upload name worked in testing
+# and failed on the platform this tool is actually used on.
+_ILLEGAL_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def safe_stem(name: str, limit: int = 40) -> str:
+    """Turn an untrusted upload filename into a cache stem Windows will accept.
+
+    The browser supplies the name via X-Filename, and a STEP exported from a PDM
+    system commonly carries a revision separator -- "HOUSING:REV-B.step". That
+    colon survives Path().stem on Windows as well as POSIX, so it reached the
+    cache path and Win32 rejected the whole write with a bare OSError instead of
+    the actionable message every other failure here produces.
+
+    Path().stem already discards directory components, so "../../evil.step"
+    cannot escape the cache directory; this is about legality, not traversal.
+    Both properties are pinned in tests/test_stepview.py.
+    """
+    return _ILLEGAL_FILENAME.sub("_", Path(name).stem)[:limit] or "model"
+
+
 def convert_bytes(data: bytes, name: str, quality: str) -> Path:
     """Convert STEP content posted from the viewer, cached by content hash."""
     CACHE_DIR.mkdir(exist_ok=True)
     tol = QUALITY.get(quality, QUALITY["normal"])
     digest = hashlib.sha1(data).hexdigest()[:16]
-    stem = Path(name).stem[:40] or "model"
+    stem = safe_stem(name)
     out = CACHE_DIR / f"{stem}_{quality}_{digest}.glb"
     if out.exists():
         print(f"[cache]   {name}  ->  {out.name}  (instant)")
@@ -153,13 +234,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.split("?")[0] == "/status":
-            try:
-                import cascadio  # noqa: F401
-                ok = True
-            except ImportError:
-                ok = False
-            self._send(200, json.dumps({"engine": ok, "python": sys.executable}).encode(),
-                       "application/json")
+            problem = engine_problem()
+            status = {"engine": problem is None, "python": sys.executable}
+            if problem is not None:
+                # The page shows these verbatim: the diagnosis lives here, once,
+                # rather than as a second guess in the viewer's JavaScript.
+                what, fix = problem
+                status["problem"] = what
+                status["fix"] = f'"{sys.executable}" -m pip install {fix}'
+            self._send(200, json.dumps(status).encode(), "application/json")
             return
         item = self.routes.get(self.path.split("?")[0])
         if item is None:
@@ -241,6 +324,31 @@ def serve_and_open(glb: Path | None, name: str):
         print("\nStopped.")
 
 
+def setup_problems() -> list[str]:
+    """What stops a launch besides the engine, which check_engine() covers.
+
+    `--check` has to fail on everything a normal launch fails on. Codex review
+    round 9 on PR #1: with viewer.html missing it printed "viewer.html present:
+    False" and then "Setup OK", exit 0 -- while serve_and_open() refuses to
+    start. Probing the rest found the cache folder the same way: a launch
+    creates it and writes a GLB into it, and --check only printed its path, so
+    an unusable one (a FILE in its place, a read-only profile, a synced or
+    redirected folder on Windows) also passed. Messages stay ASCII, and the
+    OSError is named rather than printed: Windows words it in the UI language.
+    """
+    problems = []
+    if not VIEWER.is_file():
+        problems.append(f"viewer.html is missing: keep it next to stepview.py ({VIEWER})")
+    try:
+        CACHE_DIR.mkdir(exist_ok=True)
+        with tempfile.TemporaryFile(dir=CACHE_DIR):
+            pass
+    except OSError as e:
+        problems.append(f"the cache folder cannot be written ({type(e).__name__}, "
+                        f"errno {e.errno}): {CACHE_DIR}")
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser(description="Quick local STEP viewer")
     ap.add_argument("file", nargs="?", help="STEP file (or GLB) to open")
@@ -254,9 +362,21 @@ def main():
     args = ap.parse_args()
 
     if args.check:
-        ok = check_engine(fatal=False)
-        print(f"  viewer.html present: {VIEWER.exists()}   cache: {CACHE_DIR}")
-        print("  Setup OK — STEP conversion available." if ok else "  STEP conversion unavailable.")
+        engine_ok = check_engine(fatal=False)
+        problems = setup_problems()
+        print(f"  viewer.html present: {VIEWER.is_file()}   cache: {CACHE_DIR}")
+        for problem in problems:
+            print(f"  PROBLEM: {problem}")
+        if not engine_ok:
+            print("  STEP conversion unavailable.")
+        ok = engine_ok and not problems
+        if ok:
+            print("  Setup OK -- STEP conversion available.")
+        # A check has to be able to fail. Installers, scripts and CI read the exit
+        # status, not the text, and --check used to return 0 even when cascadio
+        # could not be imported -- including a Windows DLL-load failure.
+        if not ok:
+            sys.exit(1)
         return
 
     qname = "fine" if args.fine else "coarse" if args.coarse else "normal"

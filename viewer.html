@@ -191,8 +191,8 @@ select.btn option{background:var(--panel2);color:var(--txt)}
         <button class="btn" id="btnOpen2">Choose a file</button>
         <div id="enginewarn">
           <b>STEP conversion is unavailable on this machine.</b>
-          The tessellation engine is not installed for the Python running this viewer.
-          Install it with <code id="pipcmd">pip install cascadio</code>, then restart stepview.py.
+          <span id="engineproblem">The tessellation engine is not installed for the Python running this viewer.</span>
+          Fix it with <code id="pipcmd">pip install cascadio numpy</code>, then restart stepview.py.
           GLB, GLTF and STL files still open normally.
         </div>
       </div>
@@ -5626,6 +5626,23 @@ $('btnFit').addEventListener('click', ()=> frame());
 // ── Load ─────────────────────────────────────────────────────
 const gltfLoader = new THREE.GLTFLoader(), stlLoader = new THREE.STLLoader();
 
+// The viewer is air-gapped. tests/check_invariants.py checks every URL written
+// in source; a URL that only exists at RUNTIME -- a ?model= query, a buffer or
+// image uri inside a dropped .gltf -- is checked here, and every such route goes
+// through this one function. Local means data:, blob:, a file: path with no host
+// (file://server/share is SMB on Windows), or this page's own origin.
+function sameOrigin(url){
+  const u = new URL(url, location.href);
+  const local = u.protocol === 'data:' || u.protocol === 'blob:' ||
+    (u.protocol === 'file:' ? u.host === '' : u.origin === location.origin);
+  if (!local) throw new Error('blocked a request to another host: ' + u.href);
+  return u.href;
+}
+// Every three.js loader resolves the URLs it fetches through the default
+// loading manager, so this one hook covers every uri a glTF can carry. The throw
+// rejects the load, and fail() shows the user which host was refused.
+THREE.DefaultLoadingManager.setURLModifier(sameOrigin);
+
 function sniff(buf){
   const head = new Uint8Array(buf, 0, Math.min(128, buf.byteLength));
   const ascii = String.fromCharCode.apply(null, head);
@@ -6073,13 +6090,29 @@ function fmt(v){
   if (a >= 0.1) return v.toFixed(3);
   return v.toPrecision(3);
 }
+// Built with textContent, never innerHTML: a part name comes from the model file,
+// and a supplier's .gltf named a part <style>@import'\68ttps...'</style> -- which
+// fetched off the machine the moment the part was clicked.
+function infoLine(cls, text){
+  const d = document.createElement(cls ? 'span' : 'div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  return d;
+}
 function showInfo(data){
   const el = $('info');
-  if (!data){ el.classList.remove('show'); el.innerHTML = ''; return; }
-  let html = '<div class="hd">' + data.title + '</div>';
-  data.rows.forEach(([k,v]) => { html += '<div><span class="k">' + k + '</span> <span class="v">' + v + '</span></div>'; });
-  if (data.foot) html += '<div class="k" style="margin-top:5px">' + data.foot + '</div>';
-  el.innerHTML = html; el.classList.add('show');
+  el.replaceChildren();
+  if (!data){ el.classList.remove('show'); return; }
+  const hd = infoLine(null, data.title); hd.className = 'hd'; el.append(hd);
+  data.rows.forEach(([k,v]) => {
+    const row = document.createElement('div');
+    row.append(infoLine('k', k), ' ', infoLine('v', v));
+    el.append(row);
+  });
+  if (data.foot){
+    const f = infoLine(null, data.foot); f.className = 'k'; f.style.marginTop = '5px'; el.append(f);
+  }
+  el.classList.add('show');
 }
 
 // ── Edges ────────────────────────────────────────────────────
@@ -6365,7 +6398,10 @@ if (HAS_SERVER){
   fetch('/status').then(r=>r.json()).then(j=>{
     if (!j.engine){
       $('enginewarn').classList.add('show');
-      if (j.python) $('pipcmd').textContent = '"' + j.python + '" -m pip install cascadio';
+      // stepview.py diagnoses; the page only shows it. An installed engine that
+      // cannot load needs a different fix than a missing one.
+      if (j.problem) $('engineproblem').textContent = j.problem;
+      if (j.fix) $('pipcmd').textContent = j.fix;
     }
   }).catch(()=>{});
 }
@@ -6375,7 +6411,7 @@ const params = new URLSearchParams(location.search);
 const modelUrl = params.get('model');
 if (modelUrl){
   spin(true, 'loading mesh');
-  fetch(modelUrl)
+  Promise.resolve().then(()=>fetch(sameOrigin(modelUrl)))
     .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
     .then(buf=>loadArrayBuffer(buf, params.get('name') || modelUrl.split('/').pop()))
     .catch(fail);
