@@ -89,8 +89,8 @@
         <button class="btn" id="btnOpen2">Choose a file</button>
         <div id="enginewarn">
           <b>STEP conversion is unavailable on this machine.</b>
-          The tessellation engine is not installed for the Python running this viewer.
-          Install it with <code id="pipcmd">pip install cascadio</code>, then restart stepview.py.
+          <span id="engineproblem">The tessellation engine is not installed for the Python running this viewer.</span>
+          Fix it with <code id="pipcmd">pip install cascadio numpy</code>, then restart stepview.py.
           GLB, GLTF and STL files still open normally.
         </div>
       </div>

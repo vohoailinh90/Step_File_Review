@@ -115,7 +115,10 @@ if (HAS_SERVER){
   fetch('/status').then(r=>r.json()).then(j=>{
     if (!j.engine){
       $('enginewarn').classList.add('show');
-      if (j.python) $('pipcmd').textContent = '"' + j.python + '" -m pip install cascadio';
+      // stepview.py diagnoses; the page only shows it. An installed engine that
+      // cannot load needs a different fix than a missing one.
+      if (j.problem) $('engineproblem').textContent = j.problem;
+      if (j.fix) $('pipcmd').textContent = j.fix;
     }
   }).catch(()=>{});
 }

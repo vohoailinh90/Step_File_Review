@@ -14,14 +14,14 @@ python stepview.py --warm  \\server\projects\incoming_step\
 
 ## Setup (one time, per machine)
 
-Requires 64-bit Python 3.9–3.13 and one package:
+Requires 64-bit Python 3.9–3.13 and one package, `cascadio`, installed together with `numpy`:
 
 ```
-python -m pip install cascadio
+python -m pip install cascadio numpy
 python stepview.py --check          verify the setup
 ```
 
-`cascadio` ships prebuilt wheels for Windows, macOS and Linux, so nothing is compiled and no CAD software or OpenCASCADE install is needed. If `pip` cannot reach the internet from a corporate network, either pass the proxy (`python -m pip install --proxy http://user:pass@proxy:port cascadio`) or download the matching `.whl` from pypi.org/project/cascadio on a machine with access and install it offline (`python -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl`).
+`cascadio` ships prebuilt wheels for Windows, macOS and Linux, so nothing is compiled and no CAD software or OpenCASCADE install is needed. `numpy` is there because `cascadio` 0.1.1 imports it when it loads but does not declare it, so `pip` would not install it and the engine could not start; `--check` names any module that is still missing. If `pip` cannot reach the internet from a corporate network, either pass the proxy (`python -m pip install --proxy http://user:pass@proxy:port cascadio numpy`) or, on a machine that has access and the same OS and Python version, download the wheels (`python -m pip download cascadio numpy -d wheels`), copy the `wheels` folder over and install from it (`python -m pip install --no-index --find-links wheels cascadio numpy`).
 
 If several Pythons are installed, make sure it is the *same* interpreter that runs `stepview.py` — use `python -m pip` rather than a bare `pip`, or the full path shown by `--check`. Without the package the viewer still opens GLB, GLTF and STL files; only STEP conversion is unavailable, and it tells you so on the start screen.
 

@@ -17,12 +17,15 @@ import contextlib
 import hashlib
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import threading
 import unittest
 import urllib.request
 from pathlib import Path, PureWindowsPath
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import stepview  # noqa: E402
@@ -341,8 +344,121 @@ class EngineCheck(unittest.TestCase):
             stepview.check_engine(fatal=False)
         msg = buf.getvalue()
         self.assertIn(sys.executable, msg, "must name the exact interpreter to fix")
-        self.assertIn("pip install cascadio", msg)
+        self.assertIn(f'"{sys.executable}" -m pip install', msg)
         self.assertIn("proxy", msg.lower(), "corporate-proxy hint must survive")
+
+
+class EngineDiagnosis(unittest.TestCase):
+    """An ImportError is not proof the engine is missing.
+
+    cascadio 0.1.1 imports numpy when it loads but does not declare it, so on a
+    clean Python `pip install cascadio` succeeds and `import cascadio` then fails
+    with "No module named 'numpy'". check_engine called every ImportError "not
+    installed" and prescribed the install that had just succeeded. Found by the
+    CI engine job on PR #1, the first time `--check` could fail.
+    """
+
+    def test_only_cascadio_itself_missing_means_not_installed(self):
+        what, fix = stepview.diagnose_engine(
+            ModuleNotFoundError("No module named 'cascadio'", name="cascadio"))
+        self.assertIn("is not installed", what)
+        self.assertEqual(fix.split(), list(stepview.ENGINE_PACKAGES))
+
+    def test_a_missing_dependency_is_named_and_is_what_gets_installed(self):
+        what, fix = stepview.diagnose_engine(
+            ModuleNotFoundError("No module named 'numpy'", name="numpy"))
+        self.assertIn("is installed but cannot load", what)
+        self.assertIn("'numpy'", what)
+        self.assertEqual(fix, "numpy")
+
+    def test_a_broken_dependency_is_reinstalled_not_installed(self):
+        # `numpy._core` can only go missing once `numpy` itself imported: numpy
+        # is installed and damaged, and `pip install numpy` would be a no-op.
+        what, fix = stepview.diagnose_engine(
+            ModuleNotFoundError("No module named 'numpy._core'", name="numpy._core"))
+        self.assertIn("is installed but failed to load", what)
+        self.assertIn("numpy._core", what)
+        self.assertEqual(fix, "--force-reinstall numpy")
+
+    def test_a_missing_part_of_cascadio_is_a_broken_install(self):
+        what, fix = stepview.diagnose_engine(
+            ModuleNotFoundError("No module named 'cascadio._core'", name="cascadio._core"))
+        self.assertIn("is installed but failed to load", what)
+        self.assertEqual(fix.split(), ["--force-reinstall", *stepview.ENGINE_PACKAGES])
+
+    def test_a_dll_load_failure_is_reported_verbatim(self):
+        err = ImportError("DLL load failed while importing _core: "
+                          "The specified module could not be found.")
+        what, fix = stepview.diagnose_engine(err)
+        self.assertIn(str(err), what)
+        self.assertEqual(fix.split(), ["--force-reinstall", *stepview.ENGINE_PACKAGES])
+
+    def test_a_dropped_file_gets_the_same_diagnosis_as_check(self):
+        # A STEP file dropped on the page converts through _tessellate, and its
+        # error is what the page shows -- it must not fall back to "not installed".
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "cascadio").mkdir()
+            Path(d, "cascadio", "__init__.py").write_text("import quickstep_absent_dependency\n")
+            with mock.patch.dict(sys.modules), mock.patch.object(sys, "path", [d, *sys.path]):
+                sys.modules.pop("cascadio", None)
+                with self.assertRaises(RuntimeError) as cm:
+                    stepview._tessellate(Path(d, "a.step"), Path(d, "a.glb"),
+                                         stepview.QUALITY["normal"])
+        self.assertIn("needs the module 'quickstep_absent_dependency'", str(cm.exception))
+        self.assertIn(f'"{sys.executable}" -m pip install quickstep_absent_dependency',
+                      str(cm.exception))
+
+
+class EngineCheckEndToEnd(unittest.TestCase):
+    """`stepview.py --check` against a cascadio that installs but cannot load.
+
+    The CI engine job's case, run the way a user runs it: a real interpreter, a
+    real import, the real exit status. The stand-in cascadio imports a module
+    that does not exist, as cascadio 0.1.1 imports numpy on a clean Python.
+    """
+
+    def test_an_undeclared_dependency_is_named_and_fails_the_check(self):
+        with tempfile.TemporaryDirectory() as d:
+            pkg = Path(d, "cascadio")
+            pkg.mkdir()
+            (pkg / "__init__.py").write_text("import quickstep_absent_dependency\n")
+            r = subprocess.run([sys.executable, str(Path(stepview.__file__).resolve()), "--check"],
+                               env=dict(os.environ, PYTHONPATH=d),
+                               capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("needs the module 'quickstep_absent_dependency'", r.stdout)
+        self.assertIn("-m pip install quickstep_absent_dependency", r.stdout)
+        self.assertNotIn("is not installed for this Python", r.stdout)
+
+
+class EngineReportEncoding(unittest.TestCase):
+    """The engine report must survive the stream it is printed to.
+
+    Windows words a DLL-load failure in the UI language, and redirected stdout is
+    strictly encoded in the locale's ANSI code page -- cp1252, cp1258, cp932.
+    """
+
+    def report(self, encoding, detail):
+        raw = io.BytesIO()
+        out = io.TextIOWrapper(raw, encoding=encoding, errors="strict")
+        diagnosis = stepview.diagnose_engine(
+            ImportError("DLL load failed while importing _core: " + detail))
+        with mock.patch.object(stepview, "engine_problem", return_value=diagnosis):
+            with contextlib.redirect_stdout(out):
+                self.assertFalse(stepview.check_engine(fatal=False))
+        out.flush()
+        return raw.getvalue()
+
+    def test_a_localised_error_cannot_crash_a_code_page_stream(self):
+        # U+6307 U+5B9A, Japanese: nothing in cp1252 can encode them.
+        report = self.report("cp1252", chr(0x6307) + chr(0x5B9A))
+        self.assertIn(b"DLL load failed while importing _core", report)
+
+    def test_a_stream_that_can_show_the_text_shows_it_as_is(self):
+        # U+1EC5, Vietnamese -- the kind of letter in a user name, and so in the
+        # interpreter path the fix command has to name exactly.
+        text = "Nguy" + chr(0x1EC5) + "n"
+        self.assertIn(text.encode("utf-8"), self.report("utf-8", text))
 
 
 class CheckCommandExitStatus(unittest.TestCase):
@@ -399,12 +515,21 @@ class HttpSurface(unittest.TestCase):
     def url(self, path):
         return f"http://127.0.0.1:{self.port}{path}"
 
-    def test_status_reports_engine_and_interpreter(self):
-        with urllib.request.urlopen(self.url("/status"), timeout=5) as r:
-            body = json.loads(r.read())
-        self.assertEqual(set(body), {"engine", "python"})
-        self.assertIsInstance(body["engine"], bool)
-        self.assertEqual(body["python"], sys.executable)
+    def status(self, problem):
+        with mock.patch.object(stepview, "engine_problem", return_value=problem):
+            with urllib.request.urlopen(self.url("/status"), timeout=5) as r:
+                return json.loads(r.read())
+
+    def test_status_reports_a_working_engine_and_the_interpreter(self):
+        self.assertEqual(self.status(None), {"engine": True, "python": sys.executable})
+
+    def test_status_says_why_the_engine_cannot_load_and_how_to_fix_it(self):
+        body = self.status(("cascadio is installed but cannot load.", "numpy"))
+        self.assertEqual(body, {
+            "engine": False, "python": sys.executable,
+            "problem": "cascadio is installed but cannot load.",
+            "fix": f'"{sys.executable}" -m pip install numpy',
+        })
 
     def test_root_serves_the_viewer(self):
         with urllib.request.urlopen(self.url("/"), timeout=5) as r:

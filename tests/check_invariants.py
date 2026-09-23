@@ -682,6 +682,56 @@ def _hook_interpreter():
     return problems
 
 
+@check("PRODUCT  every install command installs what the engine needs to load")
+def _engine_install_complete():
+    """`pip install cascadio` can succeed and still leave no engine.
+
+    cascadio 0.1.1 imports numpy when it loads but does not declare it, so the
+    documented install left `import cascadio` failing on a clean Python -- and
+    check_engine called that "not installed" and prescribed the install that had
+    just succeeded. Found by the CI engine job on PR #1, the first time
+    `--check` could fail at all; until then that job was green over it.
+
+    stepview.ENGINE_PACKAGES is the one list. Every pip command that installs
+    cascadio -- in README, the launcher, the page or CI -- must install all of
+    it, and CI's engine job must run exactly the command README gives users:
+    a job that installs anything else tests an install nobody does.
+    """
+    import stepview
+    command = re.compile(r"pip\s+(?:install|download)\b([^`\"'<\n]*)")
+    comment = {".py": "#", ".yml": "#", ".js": "//"}
+    problems = []
+    for rel in ["README.md", "stepview.py", ".github/workflows/ci.yml", *scanned_sources()]:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        lines = text.splitlines()
+        for m in command.finditer(text):
+            line = text.count("\n", 0, m.start()) + 1
+            prefix = comment.get(Path(rel).suffix)
+            if prefix and lines[line - 1].lstrip().startswith(prefix):
+                continue                    # a comment is not an instruction anyone runs
+            # By substring, so every spelling counts: `cascadio==0.1.1`, a
+            # `cascadio-0.1.1-...whl` file, `cascadio\n` inside a string literal.
+            args = m.group(1)
+            missing = [p for p in stepview.ENGINE_PACKAGES if p not in args]
+            if "cascadio" in args and missing:
+                problems.append(f"{rel}:{line} installs cascadio without "
+                                f"{', '.join(missing)} -- the engine then cannot load")
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    documented = [c.strip() for c in re.findall(r"(?m)^python -m pip install .*$", readme)]
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    job = re.search(r"(?ms)^  engine:\n(.*?)(?=^  \S|\Z)", ci)
+    if not documented:
+        return problems + ["README.md shows no `python -m pip install` line to hold CI to"]
+    if not job:
+        return problems + ["ci.yml has no `engine` job: nothing installs what README documents"]
+    tested = re.findall(r"(?m)^\s*- run: (python -m pip install .*?)\s*$", job.group(1))
+    if tested != [documented[0]]:
+        problems.append(f"CI's engine job runs {tested or 'no pip install'}, but README.md tells "
+                        f"users to run {documented[0]!r} -- the job tests an install nobody does")
+    return problems
+
+
 # --------------------------------------------------------------------- main ---
 
 if __name__ == "__main__":

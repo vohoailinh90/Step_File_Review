@@ -86,7 +86,11 @@ enforces the ones a script can:
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
   the local Python process; no data leaves the machine.
 - **`stepview.py` stays stdlib + `cascadio`, and never reaches the network.**
-  No new pip dependency. Its imports are allowlisted at *submodule* level —
+  No new pip dependency. The install line also names `numpy` only because
+  `cascadio` 0.1.1 imports it without declaring it — cascadio's dependency, not
+  the launcher's. `stepview.ENGINE_PACKAGES` is the one list, and
+  `tests/check_invariants.py` holds every install command in README, the
+  launcher, the page and CI to it. Its imports are allowlisted at *submodule* level —
   `urllib.parse`, not `urllib`; `http.server`, not `http` — because allowing
   `urllib` wholesale let `urllib.request.urlopen("https://…")` pass every check.
   Its `socket` may listen, never connect. README promises tessellation happens
@@ -207,7 +211,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 56 mutations, all currently caught. When you ship a fix with a
+suite to notice — 64 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -295,6 +299,15 @@ reported as a miss, naming what actually failed. Repeating the disabled-checks
 experiment now reports exactly those twelve as `MISS` and nothing else.
 **To trust a mutation suite, switch off what it claims to test and watch it
 fail.**
+
+**A check that cannot fail hides what it exists to find.** `--check` exited 0
+whatever happened, so the CI job that installs `cascadio` the way README says
+stayed green over an install that did not work: cascadio 0.1.1 imports numpy
+without declaring it, and on a clean Python the engine could not load. The first
+run after `--check` learned to fail found it. The launcher then misreported it —
+every `ImportError` was "not installed", and the fix it prescribed was the install
+that had just succeeded. **An import failure is not proof a package is missing:
+read `ModuleNotFoundError.name` before prescribing a fix.**
 
 ## Verification rule
 
