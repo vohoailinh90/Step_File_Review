@@ -195,7 +195,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 38 mutations, all currently caught. When you ship a fix with a
+suite to notice — 41 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -227,6 +227,17 @@ so a new source is covered the moment it is included — and is pinned by 34 pro
 and 7 mutations. **Do not list the places a problem can appear. Decide what the
 problem looks like, then derive where to look from what actually ships.**
 
+Round 5 found the same mistake in a *sibling* check: the source-derivation fix had
+been applied to one check and not to `_same_origin_only`, which still globbed
+`src/app/*.js`. An audit then found three more siblings on hardcoded file sets.
+Round 5 also found `EventSource` unlisted — and listing network APIs is listing an
+open set. So the offline checks now **invert the enumeration**: they list the
+*safe* side, which is small and closed — a remote URL may appear only as an XML
+namespace declaration — and treat a remote URL anywhere else in any shipped source
+as a violation, whichever API would consume it. That catches APIs nobody named.
+`NETWORK_APIS` remains a list only for URLs built at runtime, which no static scan
+can see, and says so. **When the dangerous set is open, enumerate the safe one.**
+
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a
 pre-existing file at the fixture path and then deleting it — reporting the
@@ -236,6 +247,22 @@ that already exists (reported as DRIFT, nothing touched), creates files
 exclusively, and removes only the files and directories it made.
 `tests/test_mutation_harness.py` pins all of that — including by restoring the
 original destructive behaviour and confirming the tests fail.
+
+**A mutation must be caught by the check it names, not by any check.** For most of
+this PR the harness never rebuilt `viewer.html`, so every mutation to `src/` was
+"caught" by the build-fidelity check simply because `viewer.html` had gone stale.
+Disabling eight offline and structure checks outright left twelve mutations still
+reporting *caught* — every "N/N caught" claim made about the offline checks until
+then was measuring nothing. The checks themselves did work (separate probes,
+scoped to each check, showed it), but the harness offered as proof did not prove it.
+
+Two fields now make a mutation honest. `rebuild` (default on) runs `build.py`
+after the edit, as a contributor would, and restores `viewer.html` afterwards.
+`expect` names the check that must be the one to fail; a failure anywhere else is
+reported as a miss, naming what actually failed. Repeating the disabled-checks
+experiment now reports exactly those twelve as `MISS` and nothing else.
+**To trust a mutation suite, switch off what it claims to test and watch it
+fail.**
 
 ## Verification rule
 

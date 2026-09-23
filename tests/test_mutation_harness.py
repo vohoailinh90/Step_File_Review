@@ -104,5 +104,37 @@ class TargetIsRestored(unittest.TestCase):
         self.assertIn("matched 0 times", detail)
 
 
+class CaughtByTheRightCheck(unittest.TestCase):
+    """`expect` is what stops a mutation being "caught" by an unrelated check.
+
+    Before it existed, twelve mutations to src/ were caught by the build-fidelity
+    check alone, because the harness never rebuilt viewer.html. With the offline
+    and structure checks disabled they still reported "caught".
+    """
+
+    def test_a_failure_in_a_different_check_does_not_count(self):
+        # The must_fail command prints a FAIL for some OTHER check and exits 1.
+        other = [sys.executable, "-c",
+                 "print('FAIL  STRUCTURE  some unrelated check'); raise SystemExit(1)"]
+        e = entry()
+        e.update(must_fail=other, expect="the check this mutation targets")
+        status, detail = mc.apply_one(e)
+        self.assertEqual(status, "escaped", "a failure in an unrelated check proves nothing")
+        self.assertIn("some unrelated check", detail, "the report must say what actually failed")
+
+    def test_the_targeted_check_failing_counts(self):
+        target = [sys.executable, "-c",
+                  "print('FAIL  PRODUCT  the check this mutation targets'); raise SystemExit(1)"]
+        e = entry()
+        e.update(must_fail=target, expect="the check this mutation targets")
+        self.assertEqual(mc.apply_one(e)[0], "caught")
+
+    def test_viewer_html_is_restored_after_a_rebuild(self):
+        viewer = mc.ROOT / "viewer.html"
+        before = viewer.read_bytes()
+        mc.apply_one(entry(replace=ANCHOR + "<!--mutated-->"))   # rebuild=True by default
+        self.assertEqual(viewer.read_bytes(), before, "the rebuilt viewer.html was left behind")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

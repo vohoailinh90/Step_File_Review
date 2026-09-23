@@ -79,6 +79,32 @@ def scanned_sources() -> list[str]:
     rels.append("src/viewer.template.html")   # the shell is not in its own list
     return sorted(set(rels))
 
+
+def shipped_js() -> list[str]:
+    """The .js files among scanned_sources(): every script fragment that ships."""
+    return [r for r in scanned_sources() if r.endswith(".js")]
+
+
+# Browser APIs that can reach the network with a URL the code builds at RUNTIME,
+# which no literal scan can see. This is the one place the offline checks list
+# the dangerous side, and deliberately so: there is no source of truth in the
+# repo to derive it from. It is not the guarantee -- the remote-literal backstop
+# (_no_remote_url_literal) is. This only covers what that one cannot see. `fetch`
+# is absent on purpose: it is the viewer's legitimate same-origin API.
+NETWORK_APIS = (
+    (r"\bXMLHttpRequest\b", "XMLHttpRequest"),
+    (r"\bnew\s+WebSocket\b", "WebSocket"),
+    (r"\bnew\s+EventSource\b", "EventSource"),
+    (r"\bsendBeacon\s*\(", "navigator.sendBeacon"),
+    (r"\bnew\s+(?:Shared)?Worker\b", "Worker"),
+    (r"\bserviceWorker\s*\.\s*register\b", "serviceWorker.register"),
+    (r"\bimportScripts\s*\(", "importScripts"),
+    (r"\bnew\s+RTCPeerConnection\b", "RTCPeerConnection"),
+    (r"\bnew\s+WebTransport\b", "WebTransport"),
+    (r"\bwindow\s*\.\s*open\s*\(", "window.open"),
+    (r"\blocation\s*\.\s*(?:assign|replace)\s*\(", "location.assign/replace"),
+)
+
 failures: list[str] = []
 passes: list[str] = []
 
@@ -150,25 +176,25 @@ def _module_order():
     return []
 
 
-@check(f"STRUCTURE  no app module exceeds {MODULE_LINE_BUDGET} lines")
+@check(f"STRUCTURE  no shipped script exceeds {MODULE_LINE_BUDGET} lines")
 def _module_budget():
     problems = []
-    for p in sorted(APP_DIR.glob("*.js")):
-        n = len(p.read_bytes().splitlines())
+    for rel in shipped_js():            # derived: a script included from src/ui/ counts too
+        n = len((ROOT / rel).read_bytes().splitlines())
         if n > MODULE_LINE_BUDGET:
-            problems.append(f"src/app/{p.name} is {n} lines (budget {MODULE_LINE_BUDGET}) -- split it")
+            problems.append(f"{rel} is {n} lines (budget {MODULE_LINE_BUDGET}) -- split it")
     return problems
 
 
-@check("STRUCTURE  app modules carry no <script> tags")
+@check("STRUCTURE  shipped scripts carry no <script> tags")
 def _no_tags_in_modules():
     problems = []
-    for p in sorted(APP_DIR.glob("*.js")):
-        body = p.read_bytes()
+    for rel in shipped_js():            # derived: a stray </script> anywhere breaks the page
+        body = (ROOT / rel).read_bytes()
         for tag in (b"<script", b"</script"):
             if tag in body:
-                problems.append(f"src/app/{p.name} contains {tag.decode()} -- "
-                                "the template owns the tags, modules are body only")
+                problems.append(f"{rel} contains {tag.decode()} -- "
+                                "the template owns the tags, scripts are body only")
     return problems
 
 
@@ -224,7 +250,9 @@ def _no_external_resources():
 @check("PRODUCT  no CDN hostname appears in source or vendor")
 def _no_cdn():
     problems = []
-    targets = [*APP_DIR.glob("*.js"), *(ROOT / "src" / "ui").iterdir(), *VENDOR.glob("*.js")]
+    # derived from what ships, plus vendor/ (pinned, but a CDN host there is still
+    # worth naming). An earlier version globbed src/app and src/ui by hand.
+    targets = [ROOT / r for r in scanned_sources()] + sorted(VENDOR.glob("*.js"))
     for p in targets:
         text = p.read_text(encoding="utf-8", errors="replace")
         for host in CDN_HOSTS:
@@ -294,17 +322,70 @@ def _no_remote_resources_in_source():
 
 @check("PRODUCT  the viewer only ever fetches its own origin")
 def _same_origin_only():
+    """Scans every shipped source's FULL text, not only src/app/*.js.
+
+    Codex review round 5 on PR #1: this check still globbed src/app/*.js after
+    its sibling had been moved to scanned_sources(), so a fetch() in a newly
+    included src/ui/probe.js passed all 14 checks. And JS does not only live in
+    .js files -- an inline <script> or an onclick="" in markup ships too, so the
+    whole text of every source is scanned, the same way the CSS scan works.
+    """
     problems = []
-    for p in sorted(APP_DIR.glob("*.js")):
-        text = p.read_text(encoding="utf-8")
+    for rel in scanned_sources():
+        text = (ROOT / rel).read_text(encoding="utf-8")
         for m in re.finditer(r"""(fetch|importScripts|import)\s*\(\s*[`"']([^`"')]*)""", text):
             url = m.group(2)
             if re.match(r"[a-z]+:", url) or url.startswith("//"):
                 line = text.count("\n", 0, m.start()) + 1
-                problems.append(f"src/app/{p.name}:{line} fetches an absolute URL: {url!r}")
-        if "XMLHttpRequest" in text or "WebSocket" in text:
-            problems.append(f"src/app/{p.name} uses XMLHttpRequest/WebSocket -- "
-                            "review whether it can leave the machine")
+                problems.append(f"{rel}:{line} fetches an absolute URL: {url!r}")
+        for pattern, api in NETWORK_APIS:
+            for m in re.finditer(pattern, text):
+                line = text.count("\n", 0, m.start()) + 1
+                problems.append(f"{rel}:{line} uses {api}, which can reach the network with "
+                                f"a URL built at runtime -- the viewer's only network API is "
+                                f"same-origin fetch()")
+    return problems
+
+
+@check("PRODUCT  no shipped source contains a remote URL, outside an inert context")
+def _no_remote_url_literal():
+    """The class-level guarantee. It inverts the enumeration.
+
+    Five review rounds on PR #1 each found a network route the previous fix had
+    not listed: <img src>, CSS url(), style="", <style>, .style.*, innerHTML, a
+    newly included file, then EventSource. Listing the DANGEROUS side is listing
+    an open set -- the web platform keeps adding ways to open a connection.
+
+    So this lists the SAFE side instead, which is small and closed: a remote URL
+    may appear only as an XML namespace declaration (xmlns / xmlns:xlink), which
+    names a namespace and never fetches. Anywhere else, in any shipped source, it
+    is a violation -- whichever API would consume it, including ones nobody here
+    has thought of. That is why EventSource, sendBeacon, Worker, window.open and
+    location.href are all caught by this check without being named in it.
+
+    Comments are deliberately NOT exempt. Stripping JS comments with a regex is
+    fragile precisely because every URL contains "//", and a comment stripper
+    that misfires hides a real fetch. For an air-gap guarantee a false negative
+    is far worse than a false positive, so a reference link in a comment should
+    be written without its scheme ("threejs.org/docs").
+
+    Two limits, stated rather than hidden: a URL assembled at runtime from
+    fragments cannot be seen by any static check (NETWORK_APIS catches the APIs
+    that would carry one), and a protocol-relative "//host" is caught by the
+    attribute, CSS and fetch scans rather than here.
+    """
+    literal = re.compile(r"""(?:https?|wss?|ftps?)://[^\s'"`)<>\\]+""", re.I)
+    inert = re.compile(r"""xmlns(?::[\w-]+)?\s*=\s*["']?$""", re.I)
+    problems = []
+    for rel in scanned_sources():
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        for m in literal.finditer(text):
+            if inert.search(text[max(0, m.start() - 48):m.start()]):
+                continue
+            line = text.count("\n", 0, m.start()) + 1
+            problems.append(f"{rel}:{line} contains a remote URL {m.group(0)!r}. If it is a "
+                            f"reference in a comment, drop the scheme; if the code uses it, "
+                            f"the viewer is no longer air-gapped")
     return problems
 
 

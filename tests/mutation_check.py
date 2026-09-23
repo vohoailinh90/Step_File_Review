@@ -15,6 +15,20 @@ edit that breaks it, and the command that must fail as a result. An entry whose
 `find` no longer matches exactly once fails as DRIFT rather than silently
 proving nothing.
 
+Two further fields keep a mutation honest about WHAT caught it:
+
+  expect   a substring of the check_invariants.py check title that must be the
+           one to FAIL. Without it, any failing check counts -- and one did. For
+           most of this PR's life the harness never rebuilt viewer.html, so every
+           mutation to src/ was "caught" by the build-fidelity check simply
+           because viewer.html was stale. With eight offline and structure checks
+           DISABLED, twelve mutations still reported "caught". They proved
+           nothing about the checks they were named after.
+  rebuild  default True: run build.py after applying the mutation, as a
+           contributor would, and restore viewer.html afterwards. Checks that
+           inspect the BUILT file can only see a mutation after a rebuild. Only a
+           mutation whose point is a stale viewer.html sets it False.
+
 An entry may also carry `create`: a {path: content} mapping of extra files to add
 for the duration of the run. That is how a "a newly added source is not scanned"
 behaviour gets pinned -- the defect only exists when a file that did not exist
@@ -39,6 +53,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
+VIEWER = ROOT / "viewer.html"
 
 INVARIANTS = [PY, "tests/check_invariants.py"]
 UNIT_PY = [PY, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]
@@ -50,24 +65,29 @@ GEOMETRY = JS
 MUTATIONS = [
     # ---- the build contract -------------------------------------------------
     dict(name="build/viewer-hand-edited",
+         expect="faithful build",
+         rebuild=False,
          behaviour="viewer.html must be rejected if edited instead of rebuilt",
          file="viewer.html",
          find="<title>QuickSTEP Viewer</title>",
          replace="<title>QuickSTEP Viewer EDITED</title>",
          must_fail=INVARIANTS),
     dict(name="build/module-dropped-from-template",
+         expect="concatenated in filename order",
          behaviour="a module left out of the template must not build silently",
          file="src/viewer.template.html",
          find="@@INCLUDE:src/app/50-section.js@@",
          replace="",
          must_fail=INVARIANTS),
     dict(name="build/vendor-modified",
+         expect="vendor files are unmodified",
          behaviour="an edit to vendored upstream code must be caught",
          file="vendor/STLLoader.js",
          find="THREE.STLLoader = STLLoader;",
          replace="THREE.STLLoader = STLLoader; // local tweak",
          must_fail=INVARIANTS),
     dict(name="build/script-tag-in-module",
+         expect="carry no <script> tags",
          behaviour="modules are script bodies; the template owns the tags",
          file="src/app/20-parts.js",
          find="// ── Part list ",
@@ -76,24 +96,28 @@ MUTATIONS = [
 
     # ---- the product contract: offline, self-contained, loopback ------------
     dict(name="product/cdn-script-added",
+         expect="loads nothing from the network",
          behaviour="a remote <script src> must never ship in viewer.html",
          file="src/viewer.template.html",
          find="</head>",
          replace='<script src="https://cdn.jsdelivr.net/npm/three@0.160/build/three.min.js"></script>\n</head>',
          must_fail=INVARIANTS),
     dict(name="product/absolute-fetch-added",
+         expect="only ever fetches its own origin",
          behaviour="the viewer must not fetch an absolute URL",
          file="src/app/60-io.js",
          find="fetch('/convert', {",
          replace="fetch('https://example.com/convert', {",
          must_fail=INVARIANTS),
     dict(name="product/server-bound-to-all-interfaces",
+         expect="binds loopback only",
          behaviour="the helper server must stay on 127.0.0.1",
          file="stepview.py",
          find='httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)',
          replace='httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), Handler)',
          must_fail=INVARIANTS),
     dict(name="product/third-party-import-added",
+         expect="imports nothing outside the stdlib",
          behaviour="stepview.py must stay stdlib + cascadio",
          file="stepview.py",
          find="import argparse",
@@ -101,12 +125,14 @@ MUTATIONS = [
          must_fail=INVARIANTS),
 
     dict(name="product/remote-css-url-added",
+         expect="fetches a remote URL, by any route",
          behaviour="a CSS url() pointing off-machine must break the air-gap check",
          file="src/ui/viewer.css",
          find="#hintbar{color:var(--dim)}",
          replace="#hintbar{color:var(--dim);background:url(https://example.com/pixel.png)}",
          must_fail=INVARIANTS),
     dict(name="product/remote-img-src-added",
+         expect="fetches a remote URL, by any route",
          behaviour="an <img src> pointing off-machine must break the air-gap check",
          file="src/ui/layout.html",
          find='<div id="info"></div>',
@@ -114,24 +140,28 @@ MUTATIONS = [
          must_fail=INVARIANTS),
 
     dict(name="product/remote-inline-style-url",
+         expect="fetches a remote URL, by any route",
          behaviour="a remote url() in a style attribute must break the air-gap check",
          file="src/ui/layout.html",
          find='<div id="info"></div>',
          replace='<div id="info" style="background:url(https://example.com/p.png)"></div>',
          must_fail=INVARIANTS),
     dict(name="product/remote-embedded-style-block",
+         expect="fetches a remote URL, by any route",
          behaviour="a remote url() in an inline <style> block must break it too",
          file="src/ui/layout.html",
          find='<div id="info"></div>',
          replace='<style>#info{background:url(https://example.com/p.png)}</style><div id="info"></div>',
          must_fail=INVARIANTS),
     dict(name="product/remote-js-style-url",
+         expect="fetches a remote URL, by any route",
          behaviour="a remote url() assigned to .style from JS must break it too",
          file="src/app/60-io.js",
          find="fetch('/status')",
          replace="void(document.body.style.background='url(https://example.com/p.png)'), fetch('/status')",
          must_fail=INVARIANTS),
     dict(name="product/remote-innerhtml-img",
+         expect="fetches a remote URL, by any route",
          behaviour="a remote <img src> inside an innerHTML string must break it too",
          file="src/app/60-io.js",
          find="function openPicker()",
@@ -139,6 +169,7 @@ MUTATIONS = [
          must_fail=INVARIANTS),
 
     dict(name="product/new-included-source-unscanned",
+         expect="fetches a remote URL, by any route",
          behaviour="a source newly added to the build must be scanned for remote URLs",
          file="src/viewer.template.html",
          find="@@INCLUDE:src/ui/layout.html@@",
@@ -148,10 +179,34 @@ MUTATIONS = [
          must_fail=INVARIANTS),
 
     dict(name="product/hook-uses-undocumented-interpreter",
+         expect="interpreter README tells users to run",
          behaviour="the hook must run under the interpreter README documents",
          file=".claude/settings.example.json",
          find='"command": "python \\"${CLAUDE_PROJECT_DIR}',
          replace='"command": "python3 \\"${CLAUDE_PROJECT_DIR}',
+         must_fail=INVARIANTS),
+
+    dict(name="product/fetch-in-newly-included-script",
+         expect="only ever fetches its own origin",
+         behaviour="a fetch() in a script newly added to the build must be caught",
+         file="src/viewer.template.html",
+         find="@@INCLUDE:src/app/60-io.js@@",
+         replace="@@INCLUDE:src/app/60-io.js@@@@INCLUDE:src/ui/probe.js@@",
+         create={"src/ui/probe.js": "fetch('https://example.com/leak');\n"},
+         must_fail=INVARIANTS),
+    dict(name="product/eventsource-with-runtime-url",
+         expect="only ever fetches its own origin",
+         behaviour="a network API fed a URL built at runtime must be caught by presence",
+         file="src/app/60-io.js",
+         find="function openPicker()",
+         replace="function stream(u){ return new EventSource(u); }\nfunction openPicker()",
+         must_fail=INVARIANTS),
+    dict(name="product/remote-literal-in-unlisted-api",
+         expect="remote URL, outside an inert context",
+         behaviour="a remote URL handed to an API nobody listed must still be caught",
+         file="src/app/60-io.js",
+         find="function openPicker()",
+         replace="function req(){ return new Request('https://example.com/r'); }\nfunction openPicker()",
          must_fail=INVARIANTS),
 
     # ---- the geometry the viewer reports to an engineer ---------------------
@@ -234,6 +289,7 @@ MUTATIONS = [
 
     # ---- the launcher ------------------------------------------------------
     dict(name="launcher/breaks-on-oldest-supported-python",
+         expect="oldest Python README promises",
          behaviour="stepview.py must import on Python 3.9, which README promises",
          file="stepview.py",
          find="from __future__ import annotations\n",
@@ -326,7 +382,10 @@ def apply_one(m) -> tuple:
 
     mutated = original.replace(m["find"].encode(), m["replace"].encode(), 1)
     created_files, created_dirs, target_written = [], [], False
-    rc = 0
+    rc, output = 0, ""
+    rebuild = m.get("rebuild", True)
+    # saved only after the early returns, so a refused mutation touches nothing
+    viewer_original = VIEWER.read_bytes() if rebuild else None
     try:
         try:
             for rel, content in (m.get("create") or {}).items():
@@ -348,10 +407,15 @@ def apply_one(m) -> tuple:
             return "drift", f"fixture path appeared mid-run and was not touched: {e.filename}"
         target.write_bytes(mutated)
         target_written = True
-        rc = run(m["must_fail"])
+        if rebuild:
+            subprocess.run([PY, "build.py"], cwd=ROOT, capture_output=True)
+        res = subprocess.run(m["must_fail"], cwd=ROOT, capture_output=True, text=True)
+        rc, output = res.returncode, res.stdout
     finally:
         if target_written:
             target.write_bytes(original)
+        if viewer_original is not None:
+            VIEWER.write_bytes(viewer_original)
         for f in created_files:
             f.unlink(missing_ok=True)
         for d in reversed(created_dirs):          # deepest first
@@ -359,7 +423,15 @@ def apply_one(m) -> tuple:
                 d.rmdir()
             except OSError:
                 pass                              # not empty: someone else's, leave it
-    return ("caught" if rc != 0 else "escaped"), ""
+    if rc == 0:
+        return "escaped", ""
+    expect = m.get("expect")
+    if expect and not any(l.startswith("FAIL") and expect in l for l in output.splitlines()):
+        others = [l[4:].strip() for l in output.splitlines() if l.startswith("FAIL")]
+        return "escaped", (f"the check it targets ({expect!r}) never failed -- it was "
+                           f"caught only by {others or 'a non-zero exit'}, which proves "
+                           f"nothing about that check")
+    return "caught", ""
 
 
 def main() -> int:
@@ -389,7 +461,7 @@ def main() -> int:
             escaped.append(m["name"])
             print(f"MISS  {m['name']:44s} NOT caught")
             print(f"      {m['behaviour']}")
-            print(f"      {' '.join(m['must_fail'])} still passed with the behaviour broken.")
+            print(f"      {detail or ' '.join(m['must_fail']) + ' still passed with the behaviour broken.'}")
         else:
             drifted.append(m["name"])
             print(f"DRIFT {m['name']}")
