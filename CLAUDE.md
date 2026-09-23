@@ -25,6 +25,14 @@ says nothing. On a machine that only has `python3`, change it in your local
 Never edit `vendor/` either. Those files are upstream libraries pinned by
 `vendor/SHA256SUMS`; patch around them in `src/app/`.
 
+**Upgrading a vendored library** means refreshing `vendor/SHA256SUMS` — which is
+exactly why the hash cannot vet an upgrade: it is re-baselined on the very commit
+that brings in new third-party code. `vendor/URLS` lists every remote URL in
+`vendor/`, each reviewed; `tests/check_invariants.py` fails on any URL not listed,
+by name. So an upgrade that adds a network endpoint shows up as a readable line in
+the diff rather than an opaque hash change. **Add only the URLs the check names,
+after reading the code around each** — never regenerate the file wholesale.
+
 ## Where the code lives
 
 831 lines of application code, in one shared closure, split by concern:
@@ -77,7 +85,12 @@ enforces the ones a script can:
   bundler, `package.json`, TypeScript or a preprocessor.
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
   the local Python process; no data leaves the machine.
-- **`stepview.py` stays stdlib + `cascadio`.** No new pip dependency.
+- **`stepview.py` stays stdlib + `cascadio`, and never reaches the network.**
+  No new pip dependency. Its imports are allowlisted at *submodule* level —
+  `urllib.parse`, not `urllib`; `http.server`, not `http` — because allowing
+  `urllib` wholesale let `urllib.request.urlopen("https://…")` pass every check.
+  Its `socket` may listen, never connect. README promises tessellation happens
+  "never in the cloud"; those two checks are what hold the launcher to it.
 - **Python 3.9 is the floor**, because `README.md` promises it. PEP 604 unions
   (`str | None`) are evaluated at runtime before 3.10, so every script here
   carries `from __future__ import annotations`. Dropping it makes `stepview.py`
@@ -195,7 +208,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 41 mutations, all currently caught. When you ship a fix with a
+suite to notice — 50 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -237,6 +250,13 @@ namespace declaration — and treat a remote URL anywhere else in any shipped so
 as a violation, whichever API would consume it. That catches APIs nobody named.
 `NETWORK_APIS` remains a list only for URLs built at runtime, which no static scan
 can see, and says so. **When the dangerous set is open, enumerate the safe one.**
+
+Round 6 then tested the *safe* list itself, and found it too loose: the `xmlns`
+exemption keyed on the text before a URL, so `const xmlns = 'https://…';
+fetch(xmlns)` passed. An allowlist is only as narrow as its matching. It now
+requires all three of: a known W3C namespace URI, as the value of an `xmlns`
+attribute, inside an open tag in a markup file. JS gets no exemption at all.
+**Enumerating the safe side only helps if "safe" is recognised precisely.**
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a

