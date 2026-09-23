@@ -178,6 +178,8 @@ export function makeTHREE() {
     OrbitControls: class { constructor() { this.target = new Vector3(); this.enableDamping = false; }
                            update() {} addEventListener() {} saveState() {} reset() {} },
     GLTFLoader: class { parse(_b, _p, onLoad) { onLoad({ scene: new Scene() }); } setPath() {} },
+    // Records the hook src/app/10-load.js installs, so a test can call it.
+    DefaultLoadingManager: { urlModifier: null, setURLModifier(fn) { this.urlModifier = fn; return this; } },
     STLLoader: class { parse() { return geometryFromTriangles([]); } },
     DoubleSide: 2, FrontSide: 0, BackSide: 1, sRGBEncoding: 3001,
     AlwaysStencilFunc: 519, ReplaceStencilOp: 7681, KeepStencilOp: 7680,
@@ -190,8 +192,13 @@ export function makeTHREE() {
  * Evaluate the named modules in one shared context, in the order given, then
  * return the requested globals. Pass modules in filename order to match build.py.
  */
+// The page the viewer is served from: stepview.py's loopback server.
+export const PAGE = 'http://127.0.0.1:8000/?model=/model.glb';
+
 export function loadViewer(modules, names = []) {
   const THREE = makeTHREE();
+  const page = new URL(PAGE);
+  const location = { href: page.href, origin: page.origin, search: page.search };
   const el = stubElement();
   const ctx = createContext({
     THREE, Math, console, JSON, Set, Map, Array, Object, Number, String, Boolean,
@@ -202,7 +209,8 @@ export function loadViewer(modules, names = []) {
       createElement: () => stubElement(), body: el, addEventListener() {},
       createElementNS: () => stubElement(),
     },
-    window: { devicePixelRatio: 1, addEventListener() {}, location: { search: '' },
+    location,
+    window: { devicePixelRatio: 1, addEventListener() {}, location,
               matchMedia: () => ({ matches: false, addEventListener() {} }) },
     ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
     URLSearchParams: class { get() { return null; } },
@@ -210,7 +218,9 @@ export function loadViewer(modules, names = []) {
     requestAnimationFrame: () => 0,
     setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
     FileReader: class { readAsArrayBuffer() {} },
-    Blob: class {}, URL: { createObjectURL: () => 'blob:', revokeObjectURL() {} },
+    // The real WHATWG parser: sameOrigin() is only as good as the URL it parses.
+    Blob: class {}, URL: class extends URL {
+      static createObjectURL() { return 'blob:'; } static revokeObjectURL() {} },
     alert() {}, navigator: { userAgent: 'node' },
   });
   ctx.globalThis = ctx;

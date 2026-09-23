@@ -128,7 +128,7 @@ const params = new URLSearchParams(location.search);
 const modelUrl = params.get('model');
 if (modelUrl){
   spin(true, 'loading mesh');
-  fetch(modelUrl)
+  Promise.resolve().then(()=>fetch(sameOrigin(modelUrl)))
     .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
     .then(buf=>loadArrayBuffer(buf, params.get('name') || modelUrl.split('/').pop()))
     .catch(fail);

@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runInContext } from 'node:vm';
-import { loadViewer, geometryFromTriangles } from './harness.mjs';
+import { loadViewer, geometryFromTriangles, PAGE } from './harness.mjs';
 
 // ---------------------------------------------------------------------------
 // Unit scaling. OpenCASCADE writes glTF in METRES whatever the STEP authored,
@@ -155,4 +155,39 @@ test('an anti-parallel fold still merges, by documented design', () => {
   // together -- but it is a real limit worth pinning so a change is noticed.
   assert.equal(growFace(hingedPair(180)).tris, 2,
     'the abs() in the normal comparison makes 180 deg continuous');
+});
+
+// ---------------------------------------------------------------------------
+// The runtime half of the air-gap (src/app/10-load.js). A URL that only exists
+// at runtime -- a ?model= query, a buffer or image uri inside a .gltf -- cannot
+// be judged by tests/check_invariants.py, so every such route goes through
+// sameOrigin(). Codex review round 9 on PR #1: ?model=https://... fetched off
+// the machine, and so did a .gltf's buffer uri.
+// ---------------------------------------------------------------------------
+const io = loadViewer(['src/app/10-load.js'], ['sameOrigin']);
+
+test('sameOrigin passes the page\'s own origin, data: and blob:', () => {
+  const origin = new URL(PAGE).origin;
+  for (const u of ['/model.glb', 'model.glb', 'geo.bin', './a/b.bin', origin + '/x.glb',
+                   'data:application/octet-stream;base64,AAAA', 'blob:' + origin + '/1234']) {
+    assert.doesNotThrow(() => io.sameOrigin(u), u);
+  }
+});
+
+test('sameOrigin refuses every other host, however it is spelled', () => {
+  for (const u of ['https://example.com/x.glb', 'http://127.0.0.1:9999/x.glb', '//intranet/x.glb',
+                   '\\\\intranet\\x.glb', '/\\intranet/x.glb', 'https:example.com/x', ' //intranet/x',
+                   'ws://127.0.0.1:8000/x', 'file://server/share/x.bin']) {
+    assert.throws(() => io.sameOrigin(u), /blocked a request to another host/, u);
+  }
+});
+
+test('a hostless file: path is local, so a viewer opened from disk still loads', () => {
+  assert.doesNotThrow(() => io.sameOrigin('file:///C:/models/part.glb'));
+});
+
+test('every three.js loader URL is routed through sameOrigin', () => {
+  const hook = io.THREE.DefaultLoadingManager.urlModifier;
+  assert.equal(hook, io.sameOrigin, 'DefaultLoadingManager has no sameOrigin URL hook');
+  assert.throws(() => hook('https://example.com/geo.bin'), /another host/);
 });

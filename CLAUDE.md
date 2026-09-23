@@ -35,21 +35,21 @@ after reading the code around each** — never regenerate the file wholesale.
 
 ## Where the code lives
 
-831 lines of application code, in one shared closure, split by concern:
+846 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
 | `src/app/00-scene.js`    | 69  | renderer, scene, camera, lights, `unitScale`, `L()`/`A2()`, framing |
-| `src/app/10-load.js`     | 104 | format sniffing, GLB/GLTF/STL load, dispose, load status |
+| `src/app/10-load.js`     | 121 | `sameOrigin()` runtime URL guard, format sniffing, GLB/GLTF/STL load, dispose, load status |
 | `src/app/20-parts.js`    | 42  | part list, visibility, isolate, hover |
 | `src/app/30-select.js`   | 155 | pick modes, raycast, face flood-fill (20° break angle) |
 | `src/app/40-geometry.js` | 180 | edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
 | `src/app/50-section.js`  | 144 | section planes, plane-from-circle, stencil caps |
-| `src/app/60-io.js`       | 132 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
+| `src/app/60-io.js`       | 135 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
 | `src/ui/viewer.css`      | 92  | all styling |
 | `src/ui/layout.html`     | 112 | toolbar, sidebar, section panel, status bar |
 | `src/viewer.template.html` | — | the shell and the concatenation order |
-| `stepview.py`            | 302 | tessellation, cache, CLI, loopback server |
+| `stepview.py`            | 422 | tessellation, cache, CLI, loopback server |
 
 `.claude/skills/viewer-change/SKILL.md` maps a symptom to a file. Use it.
 
@@ -81,6 +81,12 @@ enforces the ones a script can:
   `style=""` attribute, an inline `<style>` block, a `.style.background` string
   and an `innerHTML` fragment are all covered. `data:` and `blob:` are allowed
   because they never leave the page; `xmlns` is not a load and is not flagged.
+  A URL that exists only **at runtime** — the `?model=` query, a buffer or image
+  uri inside a dropped `.gltf` — cannot be judged by any scan, so every such route
+  goes through one guard, `sameOrigin()` in `src/app/10-load.js`: `fetch()` takes
+  a quoted literal or a `sameOrigin()` call and nothing else, and three.js's
+  default loading manager resolves every loader URL through it. Both are enforced
+  by an invariant, and the guard itself is tested in `tests/viewer.test.mjs`.
 - **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
   bundler, `package.json`, TypeScript or a preprocessor.
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
@@ -211,7 +217,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 73 mutations, all currently caught. When you ship a fix with a
+suite to notice — 81 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -280,6 +286,14 @@ quoted string, attribute, `url()` and `@import`. **Model the consumer, don't
 match its input.** What remains is a URL **assembled at runtime**
 (`"ht" + "tps://"`, `String.fromCharCode`), which no static scan can see. That is
 not a gap to keep patching; it is the boundary of what static analysis can do.
+Round 9 found that boundary already crossed in shipped code: `fetch(modelUrl)` took
+whatever `?model=` named — `?model=https://example.com/x.glb` requested it, in a
+real browser — and a `.gltf`'s buffer uri was fetched the same way, so opening a
+supplier's file could reach the network. Both were on `main`. A value known only at
+runtime cannot be checked statically, so the check stopped trying: it now requires
+every such value to pass through `sameOrigin()`, which *is* checked — statically
+that it is used, and by a test that it refuses other hosts. **What a scan cannot
+judge, route through one thing it can.**
 The fix beyond it is a Content-Security-Policy in `viewer.html`, so the browser
 itself refuses every off-origin connection — a change to the shipped artifact,
 and so a decision for the maintainer rather than a check to add here.

@@ -324,6 +324,31 @@ def serve_and_open(glb: Path | None, name: str):
         print("\nStopped.")
 
 
+def setup_problems() -> list[str]:
+    """What stops a launch besides the engine, which check_engine() covers.
+
+    `--check` has to fail on everything a normal launch fails on. Codex review
+    round 9 on PR #1: with viewer.html missing it printed "viewer.html present:
+    False" and then "Setup OK", exit 0 -- while serve_and_open() refuses to
+    start. Probing the rest found the cache folder the same way: a launch
+    creates it and writes a GLB into it, and --check only printed its path, so
+    an unusable one (a FILE in its place, a read-only profile, a synced or
+    redirected folder on Windows) also passed. Messages stay ASCII, and the
+    OSError is named rather than printed: Windows words it in the UI language.
+    """
+    problems = []
+    if not VIEWER.is_file():
+        problems.append(f"viewer.html is missing: keep it next to stepview.py ({VIEWER})")
+    try:
+        CACHE_DIR.mkdir(exist_ok=True)
+        with tempfile.TemporaryFile(dir=CACHE_DIR):
+            pass
+    except OSError as e:
+        problems.append(f"the cache folder cannot be written ({type(e).__name__}, "
+                        f"errno {e.errno}): {CACHE_DIR}")
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser(description="Quick local STEP viewer")
     ap.add_argument("file", nargs="?", help="STEP file (or GLB) to open")
@@ -337,9 +362,16 @@ def main():
     args = ap.parse_args()
 
     if args.check:
-        ok = check_engine(fatal=False)
-        print(f"  viewer.html present: {VIEWER.exists()}   cache: {CACHE_DIR}")
-        print("  Setup OK -- STEP conversion available." if ok else "  STEP conversion unavailable.")
+        engine_ok = check_engine(fatal=False)
+        problems = setup_problems()
+        print(f"  viewer.html present: {VIEWER.is_file()}   cache: {CACHE_DIR}")
+        for problem in problems:
+            print(f"  PROBLEM: {problem}")
+        if not engine_ok:
+            print("  STEP conversion unavailable.")
+        ok = engine_ok and not problems
+        if ok:
+            print("  Setup OK -- STEP conversion available.")
         # A check has to be able to fail. Installers, scripts and CI read the exit
         # status, not the text, and --check used to return 0 even when cascadio
         # could not be imported -- including a Windows DLL-load failure.

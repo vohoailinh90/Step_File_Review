@@ -18,6 +18,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -471,9 +472,22 @@ class CheckCommandExitStatus(unittest.TestCase):
     whether or not cascadio is installed here.
     """
 
-    def run_check(self, engine_ok):
-        real_engine, real_argv = stepview.check_engine, sys.argv
+    def setUp(self):
+        # Never the real ~/.stepview_cache or the real viewer.html: every
+        # prerequisite is a stand-in the test controls.
+        self.tmp = Path(tempfile.mkdtemp())
+        self.viewer = self.tmp / "viewer.html"
+        self.viewer.write_text("<!DOCTYPE html>", encoding="utf-8")
+        self.cache = self.tmp / ".stepview_cache"
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_check(self, engine_ok, viewer=None, cache=None):
+        saved = (stepview.check_engine, stepview.VIEWER, stepview.CACHE_DIR, sys.argv)
         stepview.check_engine = lambda fatal=True: engine_ok
+        stepview.VIEWER = viewer or self.viewer
+        stepview.CACHE_DIR = cache or self.cache
         sys.argv = ["stepview.py", "--check"]
         try:
             with contextlib.redirect_stdout(io.StringIO()):
@@ -482,13 +496,29 @@ class CheckCommandExitStatus(unittest.TestCase):
         except SystemExit as e:
             return e.code
         finally:
-            stepview.check_engine, sys.argv = real_engine, real_argv
+            stepview.check_engine, stepview.VIEWER, stepview.CACHE_DIR, sys.argv = saved
 
     def test_a_missing_engine_exits_nonzero(self):
         self.assertNotEqual(self.run_check(False), 0, "--check reported success without an engine")
 
-    def test_a_working_engine_exits_zero(self):
+    def test_a_working_setup_exits_zero(self):
         self.assertIn(self.run_check(True), (0, None))
+
+    def test_a_missing_viewer_exits_nonzero(self):
+        # Codex review round 9: "viewer.html present: False", then "Setup OK", exit 0.
+        code = self.run_check(True, viewer=self.tmp / "nowhere" / "viewer.html")
+        self.assertNotEqual(code, 0, "--check reported success without viewer.html")
+
+    def test_an_unwritable_cache_exits_nonzero(self):
+        # A file where the cache folder belongs: every launch that converts dies.
+        blocker = self.tmp / "cache-is-a-file"
+        blocker.write_text("x", encoding="utf-8")
+        self.assertNotEqual(self.run_check(True, cache=blocker), 0,
+                            "--check reported success with no usable cache folder")
+
+    def test_the_check_creates_the_cache_folder_a_launch_would(self):
+        self.assertIn(self.run_check(True), (0, None))
+        self.assertTrue(self.cache.is_dir())
 
 
 class HttpSurface(unittest.TestCase):

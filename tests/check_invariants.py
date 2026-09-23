@@ -624,6 +624,53 @@ def _same_origin_only():
     return problems
 
 
+@check("PRODUCT  every URL known only at runtime goes through sameOrigin()")
+def _runtime_urls_guarded():
+    """The half of the air-gap a literal scan cannot see, made structural.
+
+    Codex review round 9 on PR #1: `fetch(modelUrl)` fetched whatever the
+    ?model= query named -- `?model=https://example.com/x.glb` made an
+    off-machine request in a real browser -- and passed every check, because
+    the same-origin check only judged QUOTED arguments. Probing the class found
+    a second route nobody named: a .gltf's buffer and image uris, which
+    GLTFLoader fetches, so opening a supplier's file could reach the network.
+
+    A value known only at runtime cannot be judged statically, so the check
+    does not try. It inverts the question: every runtime URL must pass through
+    one guard, sameOrigin() in src/app/10-load.js, which tests/viewer.test.mjs
+    exercises. Here that means: a fetch() target is a quoted literal (judged by
+    _same_origin_only) or a sameOrigin() call -- anything else is a target the
+    check cannot vouch for; three.js's default loading manager routes every
+    loader URL through the guard; and no loader gets a manager of its own,
+    which would bypass it.
+    """
+    problems = []
+    hook = re.compile(r"THREE\.DefaultLoadingManager\.setURLModifier\(\s*sameOrigin\s*\)")
+    hooked = False
+    for rel in scanned_sources():
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        hooked = hooked or bool(hook.search(text))
+
+        def flag(m, why):
+            line = text.count("\n", 0, m.start()) + 1
+            problems.append(f"{rel}:{line} {why}")
+
+        for m in re.finditer(r"\bfetch\s*\(\s*", text):
+            rest = text[m.end():]
+            if rest[:1] in ("'", '"', "`") or re.match(r"sameOrigin\s*\(", rest):
+                continue
+            flag(m, f"fetch({rest[:30].split(')')[0]}...) -- a target known only at runtime "
+                    f"must be passed through sameOrigin()")
+        for m in re.finditer(r"\bnew\s+THREE\.LoadingManager\b", text):
+            flag(m, "creates a LoadingManager, whose loaders would bypass the sameOrigin() hook")
+        for m in re.finditer(r"\bnew\s+THREE\.\w*Loader\s*\(\s*[^)\s]", text):
+            flag(m, "gives a loader its own manager, bypassing the sameOrigin() hook")
+    if not hooked:
+        problems.append("no shipped source installs THREE.DefaultLoadingManager.setURLModifier("
+                        "sameOrigin) -- a .gltf's buffer and image uris would be fetched unchecked")
+    return problems
+
+
 @check("PRODUCT  no shipped source contains a remote URL, outside an inert context")
 def _no_remote_url_literal():
     """The class-level guarantee. It inverts the enumeration.

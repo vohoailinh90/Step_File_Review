@@ -1,6 +1,23 @@
 // ── Load ─────────────────────────────────────────────────────
 const gltfLoader = new THREE.GLTFLoader(), stlLoader = new THREE.STLLoader();
 
+// The viewer is air-gapped. tests/check_invariants.py checks every URL written
+// in source; a URL that only exists at RUNTIME -- a ?model= query, a buffer or
+// image uri inside a dropped .gltf -- is checked here, and every such route goes
+// through this one function. Local means data:, blob:, a file: path with no host
+// (file://server/share is SMB on Windows), or this page's own origin.
+function sameOrigin(url){
+  const u = new URL(url, location.href);
+  const local = u.protocol === 'data:' || u.protocol === 'blob:' ||
+    (u.protocol === 'file:' ? u.host === '' : u.origin === location.origin);
+  if (!local) throw new Error('blocked a request to another host: ' + u.href);
+  return u.href;
+}
+// Every three.js loader resolves the URLs it fetches through the default
+// loading manager, so this one hook covers every uri a glTF can carry. The throw
+// rejects the load, and fail() shows the user which host was refused.
+THREE.DefaultLoadingManager.setURLModifier(sameOrigin);
+
 function sniff(buf){
   const head = new Uint8Array(buf, 0, Math.min(128, buf.byteLength));
   const ascii = String.fromCharCode.apply(null, head);
