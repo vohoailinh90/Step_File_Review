@@ -15,7 +15,12 @@ internet.
 enormous amount of context on a minified library; editing it produces a change
 that the next `python build.py` silently discards and that
 `python build.py --check` then fails on in CI. A `PreToolUse` hook blocks the
-write once `.claude/settings.json` is installed.
+write once `.claude/settings.json` is installed — copy it from
+`.claude/settings.example.json`. The hook runs under `python`, the same command
+README.md tells users to run, because a python.org install on Windows provides
+`python.exe` and not `python3.exe`; a hook that cannot launch protects nothing and
+says nothing. On a machine that only has `python3`, change it in your local
+`settings.json` — that is a one-line local edit, not a change to make here.
 
 Never edit `vendor/` either. Those files are upstream libraries pinned by
 `vendor/SHA256SUMS`; patch around them in `src/app/`.
@@ -190,7 +195,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 37 mutations, all currently caught. When you ship a fix with a
+suite to notice — 38 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -221,6 +226,16 @@ inputs from `build.py`'s own template directives — what ships is what is scann
 so a new source is covered the moment it is included — and is pinned by 34 probes
 and 7 mutations. **Do not list the places a problem can appear. Decide what the
 problem looks like, then derive where to look from what actually ships.**
+
+**The harness must never destroy what it did not create.** `mutation_check.py`
+edits the working tree on purpose. Its `create` field first shipped overwriting a
+pre-existing file at the fixture path and then deleting it — reporting the
+mutation as *caught* while destroying a contributor's uncommitted work, which git
+cannot recover because the file was untracked. It now refuses any fixture path
+that already exists (reported as DRIFT, nothing touched), creates files
+exclusively, and removes only the files and directories it made.
+`tests/test_mutation_harness.py` pins all of that — including by restoring the
+original destructive behaviour and confirming the tests fail.
 
 ## Verification rule
 

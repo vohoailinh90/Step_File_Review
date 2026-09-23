@@ -21,7 +21,14 @@ behaviour gets pinned -- the defect only exists when a file that did not exist
 before is included in the build.
 
 Every edit is reverted in a finally block, including on Ctrl-C, and every created
-file is removed. Nothing is left modified on disk.
+file and directory is removed. Nothing is left modified on disk.
+
+The harness NEVER touches a path that existed before the run. A `create` path
+that is already occupied is reported as DRIFT and the mutation is skipped:
+overwriting a contributor's file and then deleting it would destroy uncommitted
+work, and git cannot bring back an untracked file. Found by Codex review round 4
+on PR #1 -- the first version of `create` did exactly that while reporting the
+mutation as caught. tests/test_mutation_harness.py pins the guard.
 
 When you ship a fix with a test, add the mutation that would have caught it.
 """
@@ -138,6 +145,13 @@ MUTATIONS = [
          replace="@@INCLUDE:src/ui/layout.html@@@@INCLUDE:src/ui/probe.html@@",
          create={"src/ui/probe.html":
                  '<div style="background:url(https://example.com/probe.png)"></div>\n'},
+         must_fail=INVARIANTS),
+
+    dict(name="product/hook-uses-undocumented-interpreter",
+         behaviour="the hook must run under the interpreter README documents",
+         file=".claude/settings.example.json",
+         find='"command": "python \\"${CLAUDE_PROJECT_DIR}',
+         replace='"command": "python3 \\"${CLAUDE_PROJECT_DIR}',
          must_fail=INVARIANTS),
 
     # ---- the geometry the viewer reports to an engineer ---------------------
@@ -289,6 +303,65 @@ def run(cmd) -> int:
     return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True).returncode
 
 
+def occupied(m) -> list:
+    """`create` paths that already exist -- never ours to overwrite or delete."""
+    return [rel for rel in (m.get("create") or {}) if (ROOT / rel).exists()]
+
+
+def apply_one(m) -> tuple:
+    """Apply one mutation, run its check, revert everything.
+
+    Returns (status, detail) with status "caught", "escaped" or "drift".
+    """
+    target = ROOT / m["file"]
+    original = target.read_bytes()
+    occurrences = original.count(m["find"].encode())
+    if occurrences != 1:
+        return "drift", (f"{m['file']}: `find` matched {occurrences} times, expected "
+                         f"exactly 1. The code moved -- until this is updated it proves nothing.")
+    taken = occupied(m)
+    if taken:
+        return "drift", ("fixture path(s) already exist and were not touched: "
+                         + ", ".join(taken) + ". Move them aside or rename the fixture.")
+
+    mutated = original.replace(m["find"].encode(), m["replace"].encode(), 1)
+    created_files, created_dirs, target_written = [], [], False
+    rc = 0
+    try:
+        try:
+            for rel, content in (m.get("create") or {}).items():
+                extra = ROOT / rel
+                # record each directory this run has to make, so cleanup removes it
+                missing, d = [], extra.parent
+                while not d.exists():
+                    missing.append(d)
+                    d = d.parent
+                for d in reversed(missing):
+                    d.mkdir()
+                    created_dirs.append(d)
+                # "x" = exclusive create: if something appeared at this path since
+                # occupied() looked, fail rather than overwrite it.
+                with open(extra, "x", encoding="utf-8") as fh:
+                    fh.write(content)
+                created_files.append(extra)
+        except FileExistsError as e:
+            return "drift", f"fixture path appeared mid-run and was not touched: {e.filename}"
+        target.write_bytes(mutated)
+        target_written = True
+        rc = run(m["must_fail"])
+    finally:
+        if target_written:
+            target.write_bytes(original)
+        for f in created_files:
+            f.unlink(missing_ok=True)
+        for d in reversed(created_dirs):          # deepest first
+            try:
+                d.rmdir()
+            except OSError:
+                pass                              # not empty: someone else's, leave it
+    return ("caught" if rc != 0 else "escaped"), ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Prove the checks can fail")
     ap.add_argument("--list", action="store_true", help="show the manifest and exit")
@@ -307,41 +380,20 @@ def main() -> int:
 
     print(f"Running {len(entries)} mutation(s). Each must make its check FAIL.\n")
     caught, escaped, drifted = [], [], []
-
     for m in entries:
-        target = ROOT / m["file"]
-        original = target.read_bytes()
-        occurrences = original.count(m["find"].encode())
-        if occurrences != 1:
-            drifted.append(m["name"])
-            print(f"DRIFT {m['name']}")
-            print(f"      {m['file']}: `find` matched {occurrences} times, expected exactly 1")
-            print(f"      The code moved. Update this mutation -- until then it proves nothing.")
-            continue
-
-        mutated = original.replace(m["find"].encode(), m["replace"].encode(), 1)
-        created = []
-        try:
-            for rel, content in (m.get("create") or {}).items():
-                extra = ROOT / rel
-                extra.parent.mkdir(parents=True, exist_ok=True)
-                extra.write_text(content, encoding="utf-8")
-                created.append(extra)
-            target.write_bytes(mutated)
-            rc = run(m["must_fail"])
-        finally:
-            target.write_bytes(original)
-            for extra in created:
-                extra.unlink(missing_ok=True)
-
-        if rc != 0:
+        status, detail = apply_one(m)
+        if status == "caught":
             caught.append(m["name"])
             print(f"ok    {m['name']:44s} caught")
-        else:
+        elif status == "escaped":
             escaped.append(m["name"])
             print(f"MISS  {m['name']:44s} NOT caught")
             print(f"      {m['behaviour']}")
             print(f"      {' '.join(m['must_fail'])} still passed with the behaviour broken.")
+        else:
+            drifted.append(m["name"])
+            print(f"DRIFT {m['name']}")
+            print(f"      {detail}")
 
     print()
     print(f"caught {len(caught)}/{len(entries)}"

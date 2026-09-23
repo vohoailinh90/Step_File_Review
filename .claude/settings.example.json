@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/no_direct_viewer_edit.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/no_direct_viewer_edit.py\"",
             "timeout": 10
           }
         ]

@@ -352,12 +352,14 @@ def _min_python():
     """
     import ast
     problems = []
-    for rel in ("stepview.py", "build.py", ".claude/hooks/no_direct_viewer_edit.py",
-                "tests/check_invariants.py", "tests/mutation_check.py",
-                "tests/run_checks.py", "tests/test_stepview.py"):
-        f = ROOT / rel
-        if not f.is_file():
+    # Derived, not listed: every Python file in the repo outside vendor/ and git
+    # internals. An earlier version named seven files, so a new test module would
+    # have gone unchecked -- the same enumeration mistake the offline check made.
+    skip = {".git", "vendor", "__pycache__", "node_modules"}
+    for f in sorted(ROOT.rglob("*.py")):
+        if skip & set(f.relative_to(ROOT).parts):
             continue
+        rel = f.relative_to(ROOT).as_posix()
         tree = ast.parse(f.read_text(encoding="utf-8"), filename=rel)
         postponed = any(
             isinstance(n, ast.ImportFrom) and n.module == "__future__"
@@ -383,6 +385,43 @@ def _min_python():
                             f"in an annotation without `from __future__ import "
                             f"annotations` -- Python 3.9 raises TypeError on import")
                         break
+    return problems
+
+
+@check("PRODUCT  the hook runs under the interpreter README tells users to run")
+def _hook_interpreter():
+    """A hook that cannot launch protects nothing, silently.
+
+    Found by Codex review round 4 on PR #1: settings.example.json invoked
+    `python3`, but a standard python.org install on Windows -- the platform this
+    tool is run on -- provides `python.exe` and the `py` launcher, not
+    `python3.exe`. Copied into place, the hook would fail to start and the
+    generated-file and vendor protection it advertises would never run.
+
+    The interpreter names are DERIVED from README.md's own command lines rather
+    than listed here: if the README's instructions work on a machine, the hook
+    works there too, and if the README ever switches interpreter, this follows.
+    """
+    import json
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    documented = set(re.findall(r"(?m)^[ \t]*(python3?|py)[ \t]", readme))
+    if not documented:
+        return ["README.md documents no python/python3/py command to compare against"]
+    settings_f = ROOT / ".claude" / "settings.example.json"
+    if not settings_f.is_file():
+        return []
+    problems = []
+    settings = json.loads(settings_f.read_text(encoding="utf-8"))
+    for event, groups in (settings.get("hooks") or {}).items():
+        for group in groups:
+            for hook in group.get("hooks", []):
+                parts = (hook.get("command") or "").split()
+                exe = parts[0] if parts else ""
+                if re.fullmatch(r"python[0-9.]*|py", exe) and exe not in documented:
+                    problems.append(
+                        f".claude/settings.example.json {event} hook runs `{exe}`, but "
+                        f"README.md tells users to run {sorted(documented)} -- on a "
+                        f"machine where only those exist the hook never starts")
     return problems
 
 
