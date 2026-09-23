@@ -552,6 +552,35 @@ def _stdlib_only():
     return problems
 
 
+@check("PRODUCT  stepview.py's text is ASCII, so no Windows locale can crash it")
+def _launcher_text_is_ascii():
+    """Redirected output on Windows is encoded with the locale's ANSI code page.
+
+    On Python 3.6+ a print() to a real console uses the Unicode console API and
+    cannot fail. Redirect it -- `> setup.log`, a pipe, a CI log -- and Python
+    encodes with the locale's code page instead: cp1252 Western, cp1258
+    Vietnamese, cp932 Japanese. No non-ASCII character is in all of them. The em
+    dash is fine in cp1252 and cp1258 and raises UnicodeEncodeError in cp932, so
+    `python stepview.py --check > setup.log` crashed on Japanese Windows instead
+    of reporting. Six em dashes shipped in stepview.py's messages until this
+    check existed; guidance written earlier claimed it already printed ASCII only.
+
+    Every string literal is checked, not just print() arguments: messages reach
+    stdout through exceptions and f-strings too, and a literal is cheap to keep
+    ASCII. Comments are not string literals and are not checked.
+    """
+    import ast
+    src = (ROOT / "stepview.py").read_text(encoding="utf-8")
+    problems = []
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            for ch in sorted({c for c in node.value if ord(c) > 127}):
+                problems.append(
+                    f"stepview.py:{node.lineno} has {ch!r} (U+{ord(ch):04X}) in a string -- "
+                    f"use ASCII: redirected output on some Windows locale cannot encode it")
+    return problems
+
+
 @check("PRODUCT  stepview.py uses its socket to listen, never to connect")
 def _socket_listens_only():
     """`socket` is allowed because the server binds with it -- and it can dial out.

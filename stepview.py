@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-stepview.py — quick local STEP viewer launcher.
+stepview.py -- quick local STEP viewer launcher.
 
 Usage:
     python stepview.py                             # open the viewer, then drag & drop STEP files
@@ -9,7 +9,7 @@ Usage:
     python stepview.py assembly.step --convert-only
     python stepview.py --warm folder/              # pre-convert every STEP in a folder
 
-Once the viewer is open you can drop .step / .stp files straight onto it — the
+Once the viewer is open you can drop .step / .stp files straight onto it -- the
 conversion runs in this local process, not in the browser and not in the cloud.
 First open of a big assembly pays the one-time tessellation cost; every open
 after that comes from the local cache and is near-instant.
@@ -65,7 +65,7 @@ def check_engine(fatal: bool = True) -> bool:
             "  Or download the wheel on a machine with access and install it offline:\n"
             f"      \"{sys.executable}\" -m pip install cascadio-0.1.1-cp312-abi3-win_amd64.whl\n\n"
             "  Wheels exist for Windows/macOS/Linux on Python 3.9-3.13 (64-bit).\n"
-            "  GLB / GLTF / STL files still open without it — only STEP needs the engine.\n"
+            "  GLB / GLTF / STL files still open without it -- only STEP needs the engine.\n"
         )
         if fatal:
             sys.exit(msg)
@@ -78,7 +78,7 @@ def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
         import cascadio
     except ImportError:
         raise RuntimeError(
-            "the tessellation engine is not installed — run:  "
+            "the tessellation engine is not installed -- run:  "
             f'"{sys.executable}" -m pip install cascadio'
         ) from None
     tmp = out.with_suffix(".partial")
@@ -90,7 +90,7 @@ def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
     except Exception as e:
         tmp.unlink(missing_ok=True)
         raise RuntimeError(
-            f"could not read '{label or src.name}' as STEP — the file may be corrupt, "
+            f"could not read '{label or src.name}' as STEP -- the file may be corrupt, "
             f"incomplete, or not a STEP file ({e})"
         ) from None
 
@@ -286,7 +286,12 @@ def main():
     if args.check:
         ok = check_engine(fatal=False)
         print(f"  viewer.html present: {VIEWER.exists()}   cache: {CACHE_DIR}")
-        print("  Setup OK — STEP conversion available." if ok else "  STEP conversion unavailable.")
+        print("  Setup OK -- STEP conversion available." if ok else "  STEP conversion unavailable.")
+        # A check has to be able to fail. Installers, scripts and CI read the exit
+        # status, not the text, and --check used to return 0 even when cascadio
+        # could not be imported -- including a Windows DLL-load failure.
+        if not ok:
+            sys.exit(1)
         return
 
     qname = "fine" if args.fine else "coarse" if args.coarse else "normal"

@@ -374,6 +374,28 @@ MUTATIONS = [
          replace="    name = Path(file_path).name",
          must_fail=UNIT_PY),
 
+    # ---- exit statuses that automation acts on ----------------------------
+    dict(name="checks/not-run-reported-as-success",
+         behaviour="a stage that could not run must not produce exit 0",
+         file="tests/run_checks.py",
+         find='    if "not-run" in statuses:\n        return EXIT_NOT_RUN',
+         replace='    if "not-run" in statuses:\n        return EXIT_OK',
+         must_fail=UNIT_PY),
+    dict(name="launcher/check-cannot-fail",
+         behaviour="stepview.py --check must exit non-zero when the engine is unavailable",
+         file="stepview.py",
+         find="        if not ok:\n            sys.exit(1)\n",
+         replace="",
+         must_fail=UNIT_PY),
+
+    dict(name="launcher/non-ascii-message",
+         expect="text is ASCII, so no Windows locale can crash it",
+         behaviour="an em dash in a message crashes redirected output on Japanese Windows",
+         file="stepview.py",
+         find='"  Setup OK -- STEP conversion available."',
+         replace='"  Setup OK \u2014 STEP conversion available."',
+         must_fail=INVARIANTS),
+
     # ---- the launcher ------------------------------------------------------
     dict(name="launcher/breaks-on-oldest-supported-python",
          expect="oldest Python README promises",
@@ -469,7 +491,7 @@ def apply_one(m) -> tuple:
 
     mutated = original.replace(m["find"].encode(), m["replace"].encode(), 1)
     created_files, created_dirs, target_written = [], [], False
-    rc, output = 0, ""
+    rc, output, not_run = 0, "", None
     rebuild = m.get("rebuild", True)
     # saved only after the early returns, so a refused mutation touches nothing
     viewer_original = VIEWER.read_bytes() if rebuild else None
@@ -496,8 +518,11 @@ def apply_one(m) -> tuple:
         target_written = True
         if rebuild:
             subprocess.run([PY, "build.py"], cwd=ROOT, capture_output=True)
-        res = subprocess.run(m["must_fail"], cwd=ROOT, capture_output=True, text=True)
-        rc, output = res.returncode, res.stdout
+        try:
+            res = subprocess.run(m["must_fail"], cwd=ROOT, capture_output=True, text=True)
+            rc, output = res.returncode, res.stdout
+        except FileNotFoundError:
+            not_run = m["must_fail"][0]
     finally:
         if target_written:
             target.write_bytes(original)
@@ -510,6 +535,10 @@ def apply_one(m) -> tuple:
                 d.rmdir()
             except OSError:
                 pass                              # not empty: someone else's, leave it
+    if not_run:
+        # Not a pass and not a crash: a mutation whose check cannot run proves
+        # nothing, and the run as a whole must not look green because of it.
+        return "drift", f"could not run: `{not_run}` was not found"
     if rc == 0:
         return "escaped", ""
     expect = m.get("expect")

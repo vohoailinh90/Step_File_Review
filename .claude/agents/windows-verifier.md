@@ -40,11 +40,18 @@ honest "this needs a Windows run to confirm" beats a fabricated pass.
   produces a `viewer.html` that no longer matches source. Check `git`'s
   `core.autocrlf` exposure too: a checkout that converts line endings would
   break `build.py --check` for everyone on Windows.
-- **Console encoding.** A Windows console defaults to `cp1252`. A `print()` of a
-  non-ASCII character (`×`, `—`, `→`, a box-drawing rule) raises
-  `UnicodeEncodeError` and kills the run. `stepview.py` currently prints ASCII
-  only (`->`); keep it that way, and flag any new non-ASCII in a `print()`.
-  Non-ASCII inside `viewer.html` is fine — that is UTF-8 in a browser.
+- **Console encoding.** Print ASCII only from Python -- but know the real reason,
+  because the obvious one is wrong. On Python 3.6+ a `print()` to an actual console
+  goes through the Unicode console API and cannot fail. The failure is when stdout
+  is **redirected** (`> setup.log`, a pipe, a CI log): Python then encodes with the
+  locale's ANSI code page, which differs by locale -- cp1252 Western, cp1258
+  Vietnamese, cp932 Japanese. No non-ASCII character is in all of them: the em dash
+  is fine in cp1252 and cp1258 and raises `UnicodeEncodeError` in cp932; `→`, box
+  rules and `✓` fail in cp1252 itself. So only ASCII is portable.
+  `tests/check_invariants.py` enforces it on every string literal in `stepview.py`.
+  An earlier version of this file claimed stepview.py already printed ASCII only;
+  it did not -- four messages carried em dashes, including `--check`'s. They are
+  ASCII now. Non-ASCII inside `viewer.html` is fine: that is UTF-8 in a browser.
 - **File locking.** Windows refuses to replace a file another process holds
   open. A STEP file open in SolidWorks, or a `.glb` being read by the browser
   while `--force` rewrites it, is a real scenario. `_tessellate()` writes

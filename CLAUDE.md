@@ -125,10 +125,9 @@ What it means in practice:
   it, and do not let it block a review. Portability is not a requirement of
   this project, so it never becomes a review finding on its own.
 - **Windows behavior is fully in scope** — console encoding (`cp1252` vs
-  UTF-8, so print ASCII only), CRLF line endings (which is why `build.py` does
-  binary I/O), file locking, UNC paths such as `\\server\projects\`, the
-  `~/.stepview_cache` location under a Windows user profile, and path-length
-  limits. These are where this tool actually breaks.
+  UTF-8), CRLF line endings, file locking, UNC paths such as
+  `\\server\projects\`, the `~/.stepview_cache` location under a Windows user
+  profile, and path-length limits. These are where this tool actually breaks.
 - **Existing cross-platform code stays as it is.** This rule stops new effort;
   it is not a licence to strip working non-Windows branches, drop the
   macOS/Linux wheels, or narrow the packaging. Removing them is a behavior
@@ -208,7 +207,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 53 mutations, all currently caught. When you ship a fix with a
+suite to notice — 56 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught

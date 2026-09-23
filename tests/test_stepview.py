@@ -13,7 +13,9 @@ is also what CI has.
 Weighting follows CLAUDE.md: Windows is the platform this tool is run on, so the
 filename, path-length and encoding cases are Windows cases.
 """
+import contextlib
 import hashlib
+import io
 import json
 import sys
 import tempfile
@@ -341,6 +343,36 @@ class EngineCheck(unittest.TestCase):
         self.assertIn(sys.executable, msg, "must name the exact interpreter to fix")
         self.assertIn("pip install cascadio", msg)
         self.assertIn("proxy", msg.lower(), "corporate-proxy hint must survive")
+
+
+class CheckCommandExitStatus(unittest.TestCase):
+    """`stepview.py --check` must be able to fail.
+
+    It used to print "STEP conversion unavailable." and exit 0, so the CI job that
+    exists to confirm the engine imports could never go red -- a cascadio that
+    installs but cannot load (a Windows DLL-load failure, say) passed. Codex review
+    round 7 on PR #1. check_engine is stubbed so both branches run everywhere,
+    whether or not cascadio is installed here.
+    """
+
+    def run_check(self, engine_ok):
+        real_engine, real_argv = stepview.check_engine, sys.argv
+        stepview.check_engine = lambda fatal=True: engine_ok
+        sys.argv = ["stepview.py", "--check"]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                stepview.main()
+            return 0
+        except SystemExit as e:
+            return e.code
+        finally:
+            stepview.check_engine, sys.argv = real_engine, real_argv
+
+    def test_a_missing_engine_exits_nonzero(self):
+        self.assertNotEqual(self.run_check(False), 0, "--check reported success without an engine")
+
+    def test_a_working_engine_exits_zero(self):
+        self.assertIn(self.run_check(True), (0, None))
 
 
 class HttpSurface(unittest.TestCase):

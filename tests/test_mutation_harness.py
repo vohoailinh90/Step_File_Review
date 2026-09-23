@@ -136,5 +136,17 @@ class CaughtByTheRightCheck(unittest.TestCase):
         self.assertEqual(viewer.read_bytes(), before, "the rebuilt viewer.html was left behind")
 
 
+class ACheckThatCannotRunIsNotAPass(unittest.TestCase):
+    def test_a_missing_executable_is_drift_and_the_tree_is_restored(self):
+        target = mc.ROOT / TEMPLATE
+        before = target.read_bytes()
+        e = entry(replace=ANCHOR + "<!--mutated-->")
+        e["must_fail"] = ["definitely-not-an-installed-binary-7f3a"]
+        status, detail = mc.apply_one(e)
+        self.assertEqual(status, "drift", "a check that could not run must not count as caught")
+        self.assertIn("could not run", detail)
+        self.assertEqual(target.read_bytes(), before, "the mutation was left applied")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

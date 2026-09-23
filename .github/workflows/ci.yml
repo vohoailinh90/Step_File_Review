@@ -73,6 +73,12 @@ jobs:
   # cascadio ships prebuilt wheels; confirm the documented install still works
   # and that a real STEP conversion path is importable. Separate job so a PyPI
   # outage cannot fail the checks above.
+  #
+  # `stepview.py --check` exits 1 when cascadio cannot be imported. It used to
+  # exit 0 regardless, so this job could not go red even for a wheel that
+  # installs but fails to load its DLL. The job stays non-blocking
+  # (continue-on-error) so a PyPI outage does not fail a PR, but its result is
+  # now truthful: red means the documented install is broken.
   engine:
     name: cascadio install (windows)
     runs-on: windows-latest

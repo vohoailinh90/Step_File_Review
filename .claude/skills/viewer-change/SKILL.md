@@ -56,8 +56,9 @@ it, so rebuild in the same commit.
   The viewer must work air-gapped. `tests/check_invariants.py` enforces this.
 - **Keep modules under 250 lines.** Add `70-<name>.js` and a template entry
   rather than growing one past the budget.
-- **Print ASCII only** from Python; a Windows console is `cp1252` and a stray `×`
-  raises `UnicodeEncodeError`.
+- **Print ASCII only** from Python. Redirected output on Windows is encoded with
+  the locale's code page, and no non-ASCII character survives all of them -- an
+  em dash fails on Japanese Windows. `tests/check_invariants.py` enforces it.
 
 ## If the change affects a reported number
 
