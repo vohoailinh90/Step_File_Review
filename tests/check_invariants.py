@@ -46,10 +46,74 @@ URL_ATTRS = ("src", "srcset", "href", "poster", "data", "action", "formaction",
              "background", "manifest", "cite", "longdesc", "profile", "archive",
              "codebase", "xlink:href")
 
-# Absolute remote, or protocol-relative ("//host/x" inherits the page scheme).
-# `data:` and `blob:` never leave the page, so they do not break the air-gap and
-# are allowed -- an inline data: icon is a legitimate way to stay self-contained.
-REMOTE_URL = re.compile(r"^\s*(?:https?:|ftps?:|wss?:|//)", re.I)
+# The URL standard's "special" schemes: the only ones a browser resolves to a
+# host and connects to. A closed set, defined by the WHATWG URL standard rather
+# than by this file. `data:` and `blob:` never leave the page, so they do not
+# break the air-gap -- an inline data: icon is a legitimate way to stay
+# self-contained. `file:` is here because file://server/share is SMB on Windows.
+NETWORK_SCHEMES = frozenset({"http", "https", "ws", "wss", "ftp", "file"})
+_SCHEME = re.compile(r"([a-zA-Z][a-zA-Z0-9+.-]*):")
+# Code points the URL parser refuses in a host. A candidate whose "host" holds
+# one (a space, most often) fails to parse, so it cannot be fetched.
+_FORBIDDEN_HOST = frozenset(" \t\n\r\x00#/:<>?@[\\]^|")
+_C0_AND_SPACE = "".join(map(chr, range(0x21)))
+
+
+def resolves_off_page(ref: str) -> bool:
+    """True if a browser would resolve `ref` to a host other than the page's own.
+
+    Models what the URL parser does to a reference BEFORE it picks a host, rather
+    than pattern-matching one spelling of it. Codex review round 8 on PR #1:
+    `//intranet/leak` passed every check because the old test wanted a dotted
+    hostname -- and probing the class found twelve more spellings a browser
+    resolves to another host, all passing, among them: `//[::1]`, `//u@evil.com`,
+    `//%65vil.com`, `///evil.com`, `\\\\evil.com`, `/\\evil.com`, `' //evil.com'`,
+    `'/\\t/evil.com'`, `https:evil.com`, `https:\\\\evil.com`, and `src="\\\\evil"`.
+    Every one is a consequence of four parser rules, so the rules are modelled:
+
+      1. leading and trailing C0 controls and spaces are stripped
+      2. every tab, CR and LF is removed, wherever it is
+      3. for a special scheme, or relative to a special base, `\\` is `/`
+      4. a special scheme's authority is found by skipping ANY run of `/` and
+         `\\` -- so `https:evil.com`, `https:///evil.com` and `////evil.com`
+         all name the host evil.com
+
+    Then: is there a host? A relative reference with no leading `//` resolves
+    against the page and cannot change host. Deliberately fail-closed: `http:x`
+    is same-origin on the http:// page but `http://x/` when viewer.html is opened
+    from disk, so it counts.
+    """
+    s = re.sub(r"[\t\n\r]", "", ref.strip(_C0_AND_SPACE))
+    m = _SCHEME.match(s)
+    if m:
+        scheme, rest = m.group(1).lower(), s[m.end():]
+        if scheme not in NETWORK_SCHEMES:
+            return False
+        if scheme == "file":
+            # file: skips no slashes: its host is exactly what sits between the
+            # first two and the next one. file:///C:/x has none; file://server/
+            # share is SMB on Windows.
+            if not (len(rest) >= 2 and set(rest[:2]) <= set("/\\")):
+                return False
+            rest = rest[2:]
+        else:
+            rest = rest.lstrip("/\\")
+    elif len(s) >= 2 and set(s[:2]) <= set("/\\"):
+        # Relative to the page. Against an http:// page extra slashes are skipped;
+        # against a file:// page they are not (\\\\server\\share is UNC). Skipping
+        # them names a host in every case the other reading does, so it is the one
+        # used.
+        scheme, rest = None, s.lstrip("/\\")
+    else:
+        return False
+    authority = re.split(r"[/\\?#]", rest, maxsplit=1)[0]
+    host = authority.rpartition("@")[2]              # drop user:pass@
+    host = re.sub(r":[^\]:]*$", "", host)           # drop :port, never an IPv6 colon
+    if not host.strip(".") or (scheme == "file" and host.lower() == "localhost"):
+        return False                                 # no label (".", ".."): no machine
+    if host.startswith("[") and host.endswith("]"):  # IPv6 literal
+        return True
+    return not (set(host) & _FORBIDDEN_HOST)
 
 # CSS can fetch from a .css file, a style="" attribute, an inline <style> block,
 # or a JS string assigned to .style.*. So the CSS scan runs over EVERY source
@@ -69,25 +133,52 @@ def scanned_sources() -> list[str]:
     shipped a remote url() past all 13 checks -- the same enumeration mistake the
     two earlier fixes made one level down.
 
-    vendor/ is excluded because it is upstream code pinned by vendor/SHA256SUMS:
-    any change there already fails that check, and its spec links and comments
-    would produce constant false positives. A bundled library added OUTSIDE
-    vendor/ is therefore scanned, which is the right default -- a new third-party
-    blob in the app tree should be looked at, not waved through.
+    vendor/ is excluded here because its spec links and comments would produce
+    constant false positives; vendor_sources() covers it through vendor/URLS
+    instead. A bundled library added OUTSIDE vendor/ is therefore scanned, which
+    is the right default -- a new third-party blob in the app tree should be
+    looked at, not waved through.
     """
     import build
-    rels = [p for p in build.parts() if not p.startswith("vendor/")]
+    rels = [p for p in build.parts() if not _in_vendor(p)]
     rels.append("src/viewer.template.html")   # the shell is not in its own list
     return sorted(set(rels))
 
 
-# A remote URL with a scheme, and a protocol-relative one inside a string literal.
-# "//host" only counts when a quote opens it and a dotted hostname follows, so
-# JS comments ("// note") and path joins ("a + '/' + b") do not match. Codex
-# review round 6: the backstop once recognised only the first form, and
-# fetch(new Request('//example.com/leak')) passed every check.
+def _in_vendor(rel: str) -> bool:
+    """By where the path RESOLVES, not how it is spelled: `./vendor/x.js` and, on
+    Windows, `Vendor\\x.js` are vendored too. The two sets partition the build,
+    so every shipped file is scanned by exactly one of them."""
+    return (ROOT / rel).resolve().is_relative_to(VENDOR.resolve())
+
+
+def vendor_sources() -> list[str]:
+    """Every vendored file, as a path under vendor/ -- the names SHA256SUMS uses.
+
+    Derived, at any depth: every vendor/ include build.py ships, plus every .js
+    under vendor/ however deeply nested. Codex review round 8 on PR #1: all three
+    vendor checks globbed `vendor/*.js`, so an included `vendor/lib/probe.js`
+    carrying a fetch shipped past every check -- unhashed, its URLs unreviewed,
+    and excluded from the ordinary offline scans because it is under vendor/.
+    The same enumeration mistake scanned_sources() was built to end, one
+    directory down.
+    """
+    import build
+    shipped = {(ROOT / p).resolve().relative_to(VENDOR.resolve()).as_posix()
+               for p in build.parts() if _in_vendor(p)}
+    on_disk = {f.relative_to(VENDOR).as_posix() for f in VENDOR.rglob("*.js")}
+    return sorted(shipped | on_disk)
+
+
+# Two ways a remote URL is found. REMOTE_LITERAL: a spelled-out `scheme://host`
+# ANYWHERE in the text, comments included. QUOTED: every string a quote opens,
+# up to the next same quote, judged by resolves_off_page() -- which is what
+# catches `//host`, `\\\\host` and `https:host`. Every quote is tried as an
+# opener, so a closing quote misread as an opening one can only add a
+# candidate, never hide one. Codex review round 6 found the backstop missing
+# protocol-relative URLs; round 8 found it still wanting a DOTTED hostname.
 REMOTE_LITERAL = re.compile(r"""(?:https?|wss?|ftps?)://[^\s'"`)<>\\]+""", re.I)
-PROTOCOL_RELATIVE = re.compile(r"""(['"`])(//[a-z0-9-]+(?:\.[a-z0-9-]+)+[^'"`\s]*)""", re.I)
+QUOTED = re.compile(r"""(?=(['"`])((?:(?!\1).)*))""")
 
 # The only XML namespaces the viewer could legitimately declare. A namespace URI
 # names a vocabulary and is never fetched -- but only as a markup attribute.
@@ -101,13 +192,58 @@ KNOWN_XML_NAMESPACES = frozenset({
 })
 
 
-_JS_ESCAPE = re.compile(r"\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})")
+_JS_ESCAPE = re.compile(r"\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})"
+                        r"|\\([tnrv\\'\"`/])")
+# Only the single-character escapes that can change a URL: the three the URL
+# parser deletes, and the ones that yield a slash, backslash or quote. `\b` and
+# `\f` are left alone because they are also CSS hex escapes.
+_JS_SINGLE = {"t": "\t", "n": "\n", "r": "\r", "v": "\v"}
+
+
+def _js_escape(m) -> str:
+    if m.group(4) is not None:
+        return _JS_SINGLE.get(m.group(4), m.group(4))
+    return _codepoint(next(g for g in m.groups()[:3] if g), m.group(0))
 _CSS_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})\s?")
 
 
 def _codepoint(value: str, original: str) -> str:
     n = int(value, 16)
     return chr(n) if n <= 0x10FFFF else original
+
+
+def _decode_js(line: str) -> str:
+    return _JS_ESCAPE.sub(_js_escape, line)
+
+
+def _decode_css(line: str) -> str:
+    return _CSS_ESCAPE.sub(lambda m: _codepoint(m.group(1), m.group(0)), line)
+
+
+DECODERS = (_decode_js, _decode_css, html.unescape)
+
+
+def decodings(text: str) -> set:
+    """`text` as it reads after every ordering of every subset of the decoders.
+
+    A decoder applied to text it does not belong to is NOT harmless: CSS reads
+    `\\e` as a hex escape, so the JS literal '\\\\\\\\evil.com' -- which is
+    `\\\\evil.com` at runtime, a host -- lost a backslash to the CSS pass and
+    escaped. Which decoders apply, and in what order, depends on nesting (an
+    onclick="" is HTML-decoded then JS-decoded; an innerHTML string the other
+    way round), so all of them are tried, raw text included. A URL found in any
+    reading counts. That is what makes over-decoding fail closed.
+    """
+    out = {text}
+    frontier = [(text, ())]
+    while frontier:
+        cur, used = frontier.pop()
+        for d in DECODERS:
+            if d not in used:
+                nxt = d(cur)
+                out.add(nxt)
+                frontier.append((nxt, used + (d,)))
+    return out
 
 
 def decode_literal_escapes(line: str) -> str:
@@ -117,19 +253,23 @@ def decode_literal_escapes(line: str) -> str:
     the JS engine decodes `\\x68ttps`, `\\u0068ttps`, `\\u{68}ttps` and `https:\\/\\/`;
     the CSS parser decodes `\\68ttps`; the HTML parser decodes `&#104;ttps`,
     `&#x68;ttps` and `https&colon;//`. All seven passed every check until this
-    function existed. There are exactly three decoders -- JS, CSS, HTML -- so
-    applying all three makes the literal scan complete for literals. What is
-    left is a URL assembled at runtime, which no static scan can see.
+    function existed. There are three decoders -- JS, CSS, HTML -- and a fourth
+    transformation after them, the URL parser itself, which resolves_off_page()
+    models. What is left is a URL assembled at runtime, which no static scan can
+    see.
 
-    Applying all three to every source is deliberately over-eager: a decoder that
-    does not apply to a file can only turn escape sequences into characters, and
-    that cannot remove a URL that is already spelled out -- so it can add a flag,
-    never hide one.
+    This is ONE ordering of the decoders, for callers that want a single string.
+    The scans use decodings(), which tries every ordering and the raw text too:
+    applying all three in a fixed order is not harmless, because a decoder that
+    does not belong to a file can eat a backslash the URL parser would have read
+    as a slash.
     """
-    line = line.replace("\\/", "/")
-    line = _JS_ESCAPE.sub(lambda m: _codepoint(next(g for g in m.groups() if g), m.group(0)), line)
-    line = _CSS_ESCAPE.sub(lambda m: _codepoint(m.group(1), m.group(0)), line)
-    return html.unescape(line)
+    return html.unescape(_decode_css(_decode_js(line)))
+
+
+def remote_reference(value: str) -> bool:
+    """True if any decoding of an attribute, url() or argument value is remote."""
+    return any(resolves_off_page(v) for v in decodings(value))
 
 
 def remote_urls(text: str) -> list:
@@ -141,13 +281,52 @@ def remote_urls(text: str) -> list:
     """
     out, start = [], 0
     for number, line in enumerate(text.split("\n"), 1):
-        decoded = decode_literal_escapes(line)
-        urls = [m.group(0) for m in REMOTE_LITERAL.finditer(decoded)]
-        urls += [m.group(2) for m in PROTOCOL_RELATIVE.finditer(decoded)]
-        for url in urls:
+        urls = []
+        for decoded in sorted(decodings(line)):
+            urls += [m.group(0) for m in REMOTE_LITERAL.finditer(decoded)]
+            urls += [m.group(2) for m in QUOTED.finditer(decoded) if resolves_off_page(m.group(2))]
+        for url in dict.fromkeys(urls):
             at = line.find(url)
             out.append((number, url, start + at if at != -1 else None))
         start += len(line) + 1
+    return out
+
+
+_URL_ATTR_NAMES = "|".join(a.replace(":", r"\:") for a in URL_ATTRS)
+_ATTR_RE = re.compile(
+    rf"""\b({_URL_ATTR_NAMES})\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>'"`]+))""", re.I)
+_SETATTR_RE = re.compile(
+    rf"""setAttribute\(\s*(['\"])({_URL_ATTR_NAMES})\1\s*,\s*(['\"`])([^'\"`]*)\3""", re.I)
+
+
+def remote_resource_references(text: str) -> list:
+    """(offset, what, value) for every remote value in a URL-bearing position.
+
+    URL attributes (quoted or not -- which also catches `.src = "https://"` in JS
+    and an attribute inside an innerHTML string), setAttribute(), CSS url() and
+    @import, wherever they sit. These positions matter because an UNQUOTED value
+    -- `url(//host/x)`, `src=//host/x` -- is invisible to the quoted-literal scan
+    in remote_urls(). One function, so the app scan and the vendor review read a
+    file the same way: Codex review round 8 found a nested vendored stylesheet's
+    `url(//intranet/p.png)` passing the vendor review, which used only the other.
+    """
+    out = []
+    for m in _ATTR_RE.finditer(text):
+        attr = m.group(1)
+        raw = next(g for g in m.groups()[1:] if g is not None)
+        for cand in (raw.split(",") if attr.lower() == "srcset" else [raw]):
+            url = cand.strip().split()[0] if cand.strip() else ""
+            if remote_reference(url):
+                out.append((m.start(), f"{attr}=", url))
+    for m in _SETATTR_RE.finditer(text):
+        if remote_reference(m.group(4)):
+            out.append((m.start(), f"setAttribute({m.group(2)})", m.group(4)))
+    for m in CSS_URL.finditer(text):
+        if remote_reference(m.group(2)):
+            out.append((m.start(), "css url()", m.group(2).strip()))
+    for m in CSS_IMPORT.finditer(text):
+        if remote_reference(m.group(1)):
+            out.append((m.start(), "css @import", m.group(1)))
     return out
 
 
@@ -310,9 +489,9 @@ def _vendor_intact():
                 f"vendor/{name} was modified. Vendored libraries are upstream "
                 f"code -- patch around them in src/app/, or upgrade deliberately "
                 f"and refresh SHA256SUMS in the same commit.")
-    for f in sorted(VENDOR.glob("*.js")):
-        if f.name not in seen:
-            problems.append(f"vendor/{f.name} is untracked by SHA256SUMS")
+    for name in vendor_sources():
+        if name not in seen:
+            problems.append(f"vendor/{name} is untracked by SHA256SUMS")
     return problems
 
 
@@ -339,11 +518,16 @@ def _vendor_urls_reviewed():
     reviewed = {ln.strip() for ln in baseline.read_text(encoding="utf-8").splitlines()
                 if ln.strip() and not ln.lstrip().startswith("#")}
     problems = []
-    for f in sorted(VENDOR.glob("*.js")):
+    for name in vendor_sources():
+        f = VENDOR / name
+        if not f.is_file():
+            continue                          # a missing include fails the build check
         text = f.read_text(encoding="utf-8", errors="replace")
-        for url in sorted({u for _, u, _ in remote_urls(text)} - reviewed):
+        found = {u for _, u, _ in remote_urls(text)}
+        found |= {v for _, _, v in remote_resource_references(text)}
+        for url in sorted(found - reviewed):
             problems.append(
-                f"vendor/{f.name} contains a remote URL not in vendor/URLS: {url!r}. "
+                f"vendor/{name} contains a remote URL not in vendor/URLS: {url!r}. "
                 f"Read the code around it: if it is a doc link or an XML namespace, add "
                 f"it to vendor/URLS; if code can fetch it, the upgrade breaks the air-gap")
     return problems
@@ -372,8 +556,10 @@ def _no_cdn():
     problems = []
     # derived from what ships, plus vendor/ (pinned, but a CDN host there is still
     # worth naming). An earlier version globbed src/app and src/ui by hand.
-    targets = [ROOT / r for r in scanned_sources()] + sorted(VENDOR.glob("*.js"))
+    targets = [ROOT / r for r in scanned_sources()] + [VENDOR / n for n in vendor_sources()]
     for p in targets:
+        if not p.is_file():
+            continue
         text = p.read_text(encoding="utf-8", errors="replace")
         for host in CDN_HOSTS:
             if host in text:
@@ -400,43 +586,14 @@ def _no_remote_resources_in_source():
     live. So every scan below runs over every source file's full text.
     """
     problems = []
-    names = "|".join(a.replace(":", r"\:") for a in URL_ATTRS)
-    attr_re = re.compile(
-        rf"""\b({names})\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>'"`]+))""", re.I)
-    setattr_re = re.compile(
-        rf"""setAttribute\(\s*(['\"])({names})\1\s*,\s*(['\"`])([^'\"`]*)\3""", re.I)
-
-    def scan(rel: str, text: str):
-        def flag(idx, what, value):
-            line = text.count("\n", 0, idx) + 1
-            problems.append(f"{rel}:{line} {what} points at a remote URL: {value!r}")
-
-        # URL-bearing attributes, quoted or not. Also catches `.src = "https://"`
-        # in JS, and an attribute inside an innerHTML string literal.
-        for m in attr_re.finditer(text):
-            attr = m.group(1)
-            raw = next(g for g in m.groups()[1:] if g is not None)
-            for cand in (raw.split(",") if attr.lower() == "srcset" else [raw]):
-                url = cand.strip().split()[0] if cand.strip() else ""
-                if REMOTE_URL.match(url):
-                    flag(m.start(), f"{attr}=", url)
-        for m in setattr_re.finditer(text):
-            if REMOTE_URL.match(m.group(4)):
-                flag(m.start(), f"setAttribute({m.group(2)})", m.group(4))
-        # CSS url() and @import, wherever they sit: stylesheet, style attribute,
-        # inline <style> block, or a JS string.
-        for m in CSS_URL.finditer(text):
-            if REMOTE_URL.match(m.group(2)):
-                flag(m.start(), "css url()", m.group(2).strip())
-        for m in CSS_IMPORT.finditer(text):
-            if REMOTE_URL.match(m.group(1)):
-                flag(m.start(), "css @import", m.group(1))
-
     # build.parts() already lists src/app/*.js, so one loop covers everything.
     for rel in scanned_sources():
         f = ROOT / rel
         if f.is_file():
-            scan(rel, f.read_text(encoding="utf-8"))
+            text = f.read_text(encoding="utf-8")
+            for idx, what, value in remote_resource_references(text):
+                line = text.count("\n", 0, idx) + 1
+                problems.append(f"{rel}:{line} {what} points at a remote URL: {value!r}")
     return problems
 
 
@@ -455,7 +612,7 @@ def _same_origin_only():
         text = (ROOT / rel).read_text(encoding="utf-8")
         for m in re.finditer(r"""(fetch|importScripts|import)\s*\(\s*[`"']([^`"')]*)""", text):
             url = m.group(2)
-            if re.match(r"[a-z]+:", url) or url.startswith("//"):
+            if re.match(r"[a-z]+:", url) or remote_reference(url):
                 line = text.count("\n", 0, m.start()) + 1
                 problems.append(f"{rel}:{line} fetches an absolute URL: {url!r}")
         for pattern, api in NETWORK_APIS:
@@ -492,9 +649,11 @@ def _no_remote_url_literal():
     The namespace exemption is narrow on purpose -- see is_namespace_declaration.
     Protocol-relative "//host" literals are matched here too; an earlier version
     said the attribute, CSS and fetch scans covered them, and new Request('//...')
-    fell between all three. Every literal is first run through
-    decode_literal_escapes(), so an HTML character reference, a CSS escape or a
-    JS escape cannot smuggle a scheme past the match.
+    fell between all three. Every line is read under every ordering of the
+    decoders (decodings()), so an HTML character reference, a CSS escape or a JS
+    escape cannot smuggle a scheme past the match, and every quoted string is
+    judged by resolves_off_page(), so neither can a spelling the URL parser
+    normalises: `//intranet`, `\\\\host`, `https:host`, a leading tab.
 
     One limit, stated rather than hidden: a URL assembled at runtime from
     fragments ("ht" + "tps://") cannot be seen by any static check. NETWORK_APIS

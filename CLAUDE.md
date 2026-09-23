@@ -211,7 +211,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 64 mutations, all currently caught. When you ship a fix with a
+suite to notice — 73 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -264,15 +264,36 @@ attribute, inside an open tag in a markup file. JS gets no exemption at all.
 **Where the static checks end.** A URL does not have to be spelled `https://` to be
 fetched: the JS engine decodes `\x68ttps`, `\u0068ttps`, `\u{68}ttps`; the CSS
 parser decodes `\68ttps`; the HTML parser decodes `&#104;ttps` and
-`https&colon;//`. All seven passed every check. There are exactly three decoders,
-so `decode_literal_escapes()` applies all three before scanning — which makes the
-scan complete *for literals*, and each decoder is pinned by a mutation that
-escapes if it is removed. What remains is a URL **assembled at runtime**
+`https&colon;//`. All seven passed every check. There are three decoders, and
+the scan reads every line under every ordering of them, raw text included — not
+one fixed order, because a decoder that does not belong to a file can *hide* a URL:
+CSS reads `\e` as a hex escape, so the JS literal `'\\\\evil.com'` (at runtime
+`\\evil.com`, a host) lost a backslash to it and escaped. After the decoders comes
+a fourth transformation, the **URL parser**, and round 8 found the check still
+pattern-matching one spelling of its output: it wanted a dotted host after `//`, so
+`//intranet/leak` passed — and so did `//[::1]`, `//u@host`, `///host`,
+`\\host`, `/\host`, `' //host'`, `https:host` and `https:\\host`, thirteen
+escapes in all. `resolves_off_page()` now models the parser's own rules (strip
+C0 and space, delete tab/CR/LF, `\` is `/`, skip any run of slashes before a
+special scheme's host) and asks one question — *is there a host?* — for every
+quoted string, attribute, `url()` and `@import`. **Model the consumer, don't
+match its input.** What remains is a URL **assembled at runtime**
 (`"ht" + "tps://"`, `String.fromCharCode`), which no static scan can see. That is
 not a gap to keep patching; it is the boundary of what static analysis can do.
 The fix beyond it is a Content-Security-Policy in `viewer.html`, so the browser
 itself refuses every off-origin connection — a change to the shipped artifact,
 and so a decision for the maintainer rather than a check to add here.
+
+Round 8 also found the vendor side of `scanned_sources()`'s old mistake, still
+open: the three vendor checks globbed `vendor/*.js`, so an included
+`vendor/lib/probe.js` carrying a fetch was unhashed, its URLs unreviewed, and —
+being under `vendor/` — skipped by the ordinary scans too. `vendor_sources()` now
+derives the vendor set the same way: every `vendor/` include the build ships, by
+resolved path, plus every `.js` under `vendor/` at any depth. The vendor review
+also reads `url()` and attributes the way the app scan does, through one shared
+extractor; with only the quoted-literal scan it missed `url(//host/x)` in a
+vendored stylesheet. **A derivation fixed in one place is an enumeration
+everywhere it was not applied.**
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a
