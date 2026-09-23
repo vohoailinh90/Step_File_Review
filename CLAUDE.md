@@ -41,7 +41,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 ## Where the code lives
 
-846 lines of application code, in one shared closure, split by concern:
+862 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
@@ -49,7 +49,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 | `src/app/10-load.js`     | 121 | `sameOrigin()` runtime URL guard, format sniffing, GLB/GLTF/STL load, dispose, load status |
 | `src/app/20-parts.js`    | 42  | part list, visibility, isolate, hover |
 | `src/app/30-select.js`   | 155 | pick modes, raycast, face flood-fill (20° break angle) |
-| `src/app/40-geometry.js` | 180 | edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
+| `src/app/40-geometry.js` | 196 | edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
 | `src/app/50-section.js`  | 144 | section planes, plane-from-circle, stencil caps |
 | `src/app/60-io.js`       | 135 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
 | `src/ui/viewer.css`      | 92  | all styling |
@@ -93,6 +93,12 @@ enforces the ones a script can:
   a quoted literal or a `sameOrigin()` call and nothing else, and three.js's
   default loading manager resolves every loader URL through it. Both are enforced
   by an invariant, and the guard itself is tested in `tests/viewer.test.mjs`.
+  Element **sinks** are held to a closed safe set of values: a URL sink (`.src`,
+  `.href`, `setAttribute('src', …)`, `location =`) takes a literal, `sameOrigin()`
+  or `URL.createObjectURL()`; a markup sink (`innerHTML`, `insertAdjacentHTML`,
+  `.style.*`) takes only markup written in source, UPPER_CASE constants and the
+  number formatters `L`/`A2`/`fmt`. **Text from a model file — a part name — goes in
+  through `textContent`, never markup.**
 - **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
   bundler, `package.json`, TypeScript or a preprocessor.
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
@@ -223,7 +229,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 85 mutations, all currently caught. When you ship a fix with a
+suite to notice — 89 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -316,6 +322,12 @@ vendored stylesheet. **A derivation fixed in one place is an enumeration
 everywhere it was not applied.** Round 10 found it once more: the runtime-API scan
 (`NETWORK_APIS`) covered app code only, so a vendored `new WebSocket('ws' + 's://…')`
 passed all 20 checks. It now has a vendor counterpart, `vendor/NETWORK_APIS`.
+Round 11 found the sink side: `img.src = location.hash` passed all 22 checks, and
+probing it found a live route on `main` — `showInfo()` joined a part name from the
+model file into `innerHTML`, and a `.gltf` part named
+`<style>@import'\68ttps\3a…'</style>` (it survives three.js's name sanitiser)
+fetched off the machine when clicked, in a real browser. Sinks are an open set, so
+the check lists the safe *values* instead.
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a

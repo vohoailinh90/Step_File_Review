@@ -191,3 +191,26 @@ test('every three.js loader URL is routed through sameOrigin', () => {
   assert.equal(hook, io.sameOrigin, 'DefaultLoadingManager has no sameOrigin URL hook');
   assert.throws(() => hook('https://example.com/geo.bin'), /another host/);
 });
+
+// ---------------------------------------------------------------------------
+// The info panel (src/app/40-geometry.js). A part name comes from the model
+// file. Codex review round 11 on PR #1 led to a .gltf whose part was named
+// <style>@import'\\68ttps...'</style>: showInfo() joined it into innerHTML, and
+// clicking the part fetched off the machine. Text from a model must arrive as
+// text -- every value goes in through textContent, and nothing is parsed.
+// ---------------------------------------------------------------------------
+const panel = loadViewer(['src/app/00-scene.js', 'src/app/40-geometry.js'], ['showInfo']);
+
+function texts(node) {
+  return [typeof node === 'string' ? node : node.textContent || '',
+          ...((node && node.children) || []).flatMap(texts)];
+}
+
+test('showInfo puts a model-supplied name in as text, never as markup', () => {
+  const hostile = "<style>@import'\\68ttps\\3a\\2f\\2fexample'</style><img src=https://example.com/x>";
+  const el = runInContext("$('info')", panel.ctx);
+  el.innerHTML = 'UNTOUCHED';
+  panel.showInfo({ title: 'PART', rows: [['name', hostile]], foot: 'foot' });
+  assert.equal(el.innerHTML, 'UNTOUCHED', 'showInfo wrote markup through innerHTML');
+  assert.ok(texts(el).includes(hostile), 'the name should be present, verbatim, as text');
+});

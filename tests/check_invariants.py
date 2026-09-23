@@ -756,6 +756,106 @@ def _runtime_urls_guarded():
     return problems
 
 
+def _rhs(text: str, start: int) -> str:
+    """The expression starting at `start`, up to a `;`, `)` or `,` at depth 0.
+
+    Quote-aware, so a `;` inside a string does not end it. Used to read what a
+    sink is assigned or passed without parsing JS: the sink checks accept only a
+    closed set of shapes, so a misread can only reject, never admit.
+    """
+    depth, i, quote = 0, start, None
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "'\"`":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+        elif c in ";," and depth == 0:
+            break
+        i += 1
+    return text[start:i].strip()
+
+
+_STRING_LITERAL = re.compile(r"""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\$])*`""")
+# Number formatters: their output is digits, sign and a decimal point, so a value
+# passed through one cannot carry markup or a URL.
+_NUMBER_CALL = re.compile(r"\b(?:L|A2|fmt)\((?:[^()]|\([^()]*\))*\)")
+URL_SINK = re.compile(
+    r"(?:\.(?:src|srcset|href|poster|action|formAction|data|background|codebase)"
+    r"|(?<![\w.])location(?:\.href)?)\s*=(?!=)\s*"
+    r"|setAttribute\(\s*['\"](?:src|srcset|href|poster|action|formaction|data|background|xlink:href)['\"]\s*,\s*",
+    re.I)
+MARKUP_SINK = re.compile(
+    r"\.(?:innerHTML|outerHTML|cssText)\s*\+?=(?!=)\s*"
+    r"|\.style\.[A-Za-z]+\s*=(?!=)\s*"
+    r"|(?:insertAdjacentHTML\(\s*['\"][a-z]+['\"]\s*,|document\.write(?:ln)?\(|setProperty\(\s*['\"][^'\"]+['\"]\s*,)\s*")
+
+
+@check("PRODUCT  every URL and markup sink takes only what the source vouches for")
+def _sinks_take_vouched_values():
+    """The sink side of the runtime half of the air-gap, as a closed safe set.
+
+    Codex review round 11 on PR #1: `img.src = location.hash.slice(1)` passed all
+    22 checks -- the sameOrigin() rule covered fetch() and three.js loaders, not
+    the element properties that fetch just as well. Probing the class found a
+    live route on main: showInfo() joined a part name -- from the model file --
+    into innerHTML, and a .gltf part named `<style>@import'\\68ttps\\3a...'`
+    (it survives three.js's name sanitiser) made an off-machine request the
+    moment the part was clicked, in a real browser.
+
+    Listing sinks is listing an open set, so the check lists the safe VALUES:
+
+      URL sink     (.src, .href, setAttribute('src', ...), location = ...)
+                   a string literal, sameOrigin(...), URL.createObjectURL(...),
+                   or a new THREE.* object (scene.background)
+      markup sink  (innerHTML, insertAdjacentHTML, document.write, .style.*,
+                   cssText) only markup written in source: string literals,
+                   UPPER_CASE constants, and the number formatters L/A2/fmt.
+                   Text from a model goes in through textContent.
+
+    Literals are still judged by the remote-URL checks; this one only refuses
+    what no check can judge.
+    """
+    problems = []
+    for rel in shipped_js() + [r for r in scanned_sources() if r.endswith(".html")]:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+
+        def flag(m, what, value):
+            line = text.count("\n", 0, m.start()) + 1
+            problems.append(f"{rel}:{line} {what} is given {value[:50]!r}, which the source "
+                            f"cannot vouch for")
+
+        for m in URL_SINK.finditer(text):
+            value = _rhs(text, m.end())
+            bare = _STRING_LITERAL.sub("", value).strip()
+            if bare == "" and value:
+                continue                          # a literal: the remote-URL checks judge it
+            if re.fullmatch(r"(?:sameOrigin|URL\.createObjectURL)\((?:.|\n)*\)", value):
+                continue
+            # scene.background = new THREE.Color(...): a three.js object, never a
+            # URL string. `.background` stays a sink -- body.background fetches.
+            if re.fullmatch(r"new\s+THREE\.\w+\((?:.|\n)*\)", value):
+                continue
+            flag(m, "a URL sink", value)
+        for m in MARKUP_SINK.finditer(text):
+            value = _rhs(text, m.end())
+            rest = _NUMBER_CALL.sub("", _STRING_LITERAL.sub("", value))
+            if re.fullmatch(r"[\s+()A-Z0-9_]*", rest):
+                continue
+            flag(m, "a markup sink", value)
+    return problems
+
+
 @check("PRODUCT  no shipped source contains a remote URL, outside an inert context")
 def _no_remote_url_literal():
     """The class-level guarantee. It inverts the enumeration.

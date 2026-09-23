@@ -6090,13 +6090,29 @@ function fmt(v){
   if (a >= 0.1) return v.toFixed(3);
   return v.toPrecision(3);
 }
+// Built with textContent, never innerHTML: a part name comes from the model file,
+// and a supplier's .gltf named a part <style>@import'\68ttps...'</style> -- which
+// fetched off the machine the moment the part was clicked.
+function infoLine(cls, text){
+  const d = document.createElement(cls ? 'span' : 'div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  return d;
+}
 function showInfo(data){
   const el = $('info');
-  if (!data){ el.classList.remove('show'); el.innerHTML = ''; return; }
-  let html = '<div class="hd">' + data.title + '</div>';
-  data.rows.forEach(([k,v]) => { html += '<div><span class="k">' + k + '</span> <span class="v">' + v + '</span></div>'; });
-  if (data.foot) html += '<div class="k" style="margin-top:5px">' + data.foot + '</div>';
-  el.innerHTML = html; el.classList.add('show');
+  el.replaceChildren();
+  if (!data){ el.classList.remove('show'); return; }
+  const hd = infoLine(null, data.title); hd.className = 'hd'; el.append(hd);
+  data.rows.forEach(([k,v]) => {
+    const row = document.createElement('div');
+    row.append(infoLine('k', k), ' ', infoLine('v', v));
+    el.append(row);
+  });
+  if (data.foot){
+    const f = infoLine(null, data.foot); f.className = 'k'; f.style.marginTop = '5px'; el.append(f);
+  }
+  el.classList.add('show');
 }
 
 // ── Edges ────────────────────────────────────────────────────

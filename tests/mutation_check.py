@@ -405,6 +405,37 @@ MUTATIONS = [
          replace="(u.protocol === 'file:' ? true :",
          must_fail=JS),
 
+    # Codex review round 11: sameOrigin() covered fetch() and loaders, not the
+    # element properties and markup sinks that load just as well. A part name
+    # from the model file reached innerHTML and fetched off the machine.
+    dict(name="product/url-sink-runtime-value",
+         expect="every URL and markup sink takes only what the source vouches for",
+         behaviour="an image .src set from a runtime value must be refused",
+         file="src/app/60-io.js",
+         find="function openPicker()",
+         replace="function peek(){ const img = new Image(); img.src = location.hash.slice(1); }\nfunction openPicker()",
+         must_fail=INVARIANTS),
+    dict(name="product/markup-sink-model-text",
+         expect="every URL and markup sink takes only what the source vouches for",
+         behaviour="text from a model file must never reach innerHTML",
+         file="src/app/60-io.js",
+         find="function openPicker()",
+         replace="function label(p){ $('info').innerHTML = p.name; }\nfunction openPicker()",
+         must_fail=INVARIANTS),
+    dict(name="product/style-sink-runtime-url",
+         expect="every URL and markup sink takes only what the source vouches for",
+         behaviour="a style url() assembled from a runtime value must be refused",
+         file="src/app/60-io.js",
+         find="function openPicker()",
+         replace="function bg(u){ document.body.style.backgroundImage = 'url(' + u + ')'; }\nfunction openPicker()",
+         must_fail=INVARIANTS),
+    dict(name="viewer/info-panel-parses-markup",
+         behaviour="showInfo must put every value in as text, never parse it",
+         file="src/app/40-geometry.js",
+         find="  d.textContent = text;",
+         replace="  d.innerHTML = text;",
+         must_fail=JS),
+
     # Codex review round 8: the vendor checks globbed vendor/*.js, so a nested
     # vendored include was unhashed and its URLs unreviewed.
     dict(name="vendor/nested-include-unreviewed",

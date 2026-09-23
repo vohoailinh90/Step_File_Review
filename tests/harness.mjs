@@ -76,6 +76,9 @@ function stubElement() {
     style: {}, textContent: '', value: '', checked: false, dataset: {},
     children: [], classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
     addEventListener() {}, removeEventListener() {}, appendChild() {}, remove() {},
+    // Records children, so a test can read what was built with textContent.
+    append(...nodes) { this.children.push(...nodes); },
+    replaceChildren(...nodes) { this.children = [...nodes]; },
     querySelector: () => stubElement(), querySelectorAll: () => [],
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
     scrollIntoView() {}, focus() {}, click() {}, insertAdjacentHTML() {},
