@@ -252,6 +252,30 @@ MUTATIONS = [
          replace="def _dial():\n    return socket.create_connection(('example.com', 443))\n\n\ndef check_engine(",
          must_fail=INVARIANTS),
 
+    # One per decoder. Each is caught only because decode_literal_escapes()
+    # undoes that encoding -- remove a decoder and its mutation escapes.
+    dict(name="product/html-entity-encoded-url",
+         expect="remote URL, outside an inert context",
+         behaviour="&#104;ttps is decoded by the HTML parser and must be caught",
+         file="src/ui/layout.html",
+         find='<div id="info"></div>',
+         replace='<img src="&#104;ttps://example.com/t.png"><div id="info"></div>',
+         must_fail=INVARIANTS),
+    dict(name="product/css-escape-encoded-url",
+         expect="remote URL, outside an inert context",
+         behaviour="\\68ttps is decoded by the CSS parser and must be caught",
+         file="src/ui/viewer.css",
+         find="#hintbar{color:var(--dim)}",
+         replace="#hintbar{color:var(--dim);background:url(\\68ttps://example.com/p.png)}",
+         must_fail=INVARIANTS),
+    dict(name="product/js-escape-encoded-url",
+         expect="remote URL, outside an inert context",
+         behaviour="\\x68ttps is decoded by the JS engine and must be caught",
+         file="src/app/60-io.js",
+         find="function openPicker()",
+         replace="function req(){ return new Request('\\x68ttps://example.com/r'); }\nfunction openPicker()",
+         must_fail=INVARIANTS),
+
     # ---- the geometry the viewer reports to an engineer ---------------------
     dict(name="geometry/rms-gate-loosened",
          behaviour="loosening the rms gate lets a bad circle fit be reported",

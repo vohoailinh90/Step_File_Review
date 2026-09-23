@@ -17,6 +17,7 @@ sometimes miss it; this never will.
 Stdlib only. Exit 0 = all checks passed.
 """
 import hashlib
+import html
 import re
 import sys
 from pathlib import Path
@@ -100,17 +101,54 @@ KNOWN_XML_NAMESPACES = frozenset({
 })
 
 
-def unescape_slashes(text: str) -> str:
-    """`"https:\\/\\/host"` in a JS string evaluates to https://host."""
-    return text.replace("\\/", "/")
+_JS_ESCAPE = re.compile(r"\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})")
+_CSS_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})\s?")
+
+
+def _codepoint(value: str, original: str) -> str:
+    n = int(value, 16)
+    return chr(n) if n <= 0x10FFFF else original
+
+
+def decode_literal_escapes(line: str) -> str:
+    """Undo every encoding a browser applies to a literal before it can fetch it.
+
+    A URL can reach the network without ever being spelled "https://" in source:
+    the JS engine decodes `\\x68ttps`, `\\u0068ttps`, `\\u{68}ttps` and `https:\\/\\/`;
+    the CSS parser decodes `\\68ttps`; the HTML parser decodes `&#104;ttps`,
+    `&#x68;ttps` and `https&colon;//`. All seven passed every check until this
+    function existed. There are exactly three decoders -- JS, CSS, HTML -- so
+    applying all three makes the literal scan complete for literals. What is
+    left is a URL assembled at runtime, which no static scan can see.
+
+    Applying all three to every source is deliberately over-eager: a decoder that
+    does not apply to a file can only turn escape sequences into characters, and
+    that cannot remove a URL that is already spelled out -- so it can add a flag,
+    never hide one.
+    """
+    line = line.replace("\\/", "/")
+    line = _JS_ESCAPE.sub(lambda m: _codepoint(next(g for g in m.groups() if g), m.group(0)), line)
+    line = _CSS_ESCAPE.sub(lambda m: _codepoint(m.group(1), m.group(0)), line)
+    return html.unescape(line)
 
 
 def remote_urls(text: str) -> list:
-    """(offset, url) for every remote URL in text: schemed, and quoted protocol-relative."""
-    text = unescape_slashes(text)
-    found = [(m.start(), m.group(0)) for m in REMOTE_LITERAL.finditer(text)]
-    found += [(m.start(2), m.group(2)) for m in PROTOCOL_RELATIVE.finditer(text)]
-    return sorted(found)
+    """(line, url, offset) for every remote URL in text, after decoding escapes.
+
+    Scanned line by line so decoding cannot shift line numbers. `offset` is the
+    URL's position in the ORIGINAL text when it is spelled out literally there,
+    else None -- an encoded URL can never be a genuine namespace declaration.
+    """
+    out, start = [], 0
+    for number, line in enumerate(text.split("\n"), 1):
+        decoded = decode_literal_escapes(line)
+        urls = [m.group(0) for m in REMOTE_LITERAL.finditer(decoded)]
+        urls += [m.group(2) for m in PROTOCOL_RELATIVE.finditer(decoded)]
+        for url in urls:
+            at = line.find(url)
+            out.append((number, url, start + at if at != -1 else None))
+        start += len(line) + 1
+    return out
 
 
 def is_namespace_declaration(text: str, offset: int, url: str) -> bool:
@@ -303,7 +341,7 @@ def _vendor_urls_reviewed():
     problems = []
     for f in sorted(VENDOR.glob("*.js")):
         text = f.read_text(encoding="utf-8", errors="replace")
-        for url in sorted({u for _, u in remote_urls(text)} - reviewed):
+        for url in sorted({u for _, u, _ in remote_urls(text)} - reviewed):
             problems.append(
                 f"vendor/{f.name} contains a remote URL not in vendor/URLS: {url!r}. "
                 f"Read the code around it: if it is a doc link or an XML namespace, add "
@@ -454,7 +492,9 @@ def _no_remote_url_literal():
     The namespace exemption is narrow on purpose -- see is_namespace_declaration.
     Protocol-relative "//host" literals are matched here too; an earlier version
     said the attribute, CSS and fetch scans covered them, and new Request('//...')
-    fell between all three. Escaped slashes ("https:\\/\\/") are unescaped first.
+    fell between all three. Every literal is first run through
+    decode_literal_escapes(), so an HTML character reference, a CSS escape or a
+    JS escape cannot smuggle a scheme past the match.
 
     One limit, stated rather than hidden: a URL assembled at runtime from
     fragments ("ht" + "tps://") cannot be seen by any static check. NETWORK_APIS
@@ -464,12 +504,10 @@ def _no_remote_url_literal():
     problems = []
     for rel in scanned_sources():
         raw = (ROOT / rel).read_text(encoding="utf-8")
-        text = unescape_slashes(raw)          # same length per line: offsets stay valid
         markup = rel.endswith(".html")
-        for offset, url in remote_urls(raw):
-            if markup and is_namespace_declaration(text, offset, url):
+        for line, url, offset in remote_urls(raw):
+            if markup and offset is not None and is_namespace_declaration(raw, offset, url):
                 continue
-            line = text.count("\n", 0, offset) + 1
             problems.append(f"{rel}:{line} contains a remote URL {url!r}. If it is a "
                             f"reference in a comment, drop the scheme; if the code uses it, "
                             f"the viewer is no longer air-gapped")

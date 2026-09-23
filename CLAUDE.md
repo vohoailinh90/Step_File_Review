@@ -208,7 +208,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 50 mutations, all currently caught. When you ship a fix with a
+suite to notice — 53 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -257,6 +257,19 @@ fetch(xmlns)` passed. An allowlist is only as narrow as its matching. It now
 requires all three of: a known W3C namespace URI, as the value of an `xmlns`
 attribute, inside an open tag in a markup file. JS gets no exemption at all.
 **Enumerating the safe side only helps if "safe" is recognised precisely.**
+
+**Where the static checks end.** A URL does not have to be spelled `https://` to be
+fetched: the JS engine decodes `\x68ttps`, `\u0068ttps`, `\u{68}ttps`; the CSS
+parser decodes `\68ttps`; the HTML parser decodes `&#104;ttps` and
+`https&colon;//`. All seven passed every check. There are exactly three decoders,
+so `decode_literal_escapes()` applies all three before scanning — which makes the
+scan complete *for literals*, and each decoder is pinned by a mutation that
+escapes if it is removed. What remains is a URL **assembled at runtime**
+(`"ht" + "tps://"`, `String.fromCharCode`), which no static scan can see. That is
+not a gap to keep patching; it is the boundary of what static analysis can do.
+The fix beyond it is a Content-Security-Policy in `viewer.html`, so the browser
+itself refuses every off-origin connection — a change to the shipped artifact,
+and so a decision for the maintainer rather than a check to add here.
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a
