@@ -30,8 +30,14 @@ exactly why the hash cannot vet an upgrade: it is re-baselined on the very commi
 that brings in new third-party code. `vendor/URLS` lists every remote URL in
 `vendor/`, each reviewed; `tests/check_invariants.py` fails on any URL not listed,
 by name. So an upgrade that adds a network endpoint shows up as a readable line in
-the diff rather than an opaque hash change. **Add only the URLs the check names,
-after reading the code around each** — never regenerate the file wholesale.
+the diff rather than an opaque hash change. `vendor/NETWORK_APIS` does the same for
+network-capable APIs — `fetch`, `WebSocket`, `Worker`, an image's `.src` — counted
+per file, because a URL assembled at runtime is invisible to `vendor/URLS` while the
+API that would carry it is not. A loader path is safe only when its URL goes through
+`manager.resolveURL()`, which `src/app/10-load.js` routes through `sameOrigin()`.
+**Add only the URLs and counts the checks name, after reading the code around
+each** — never regenerate either file wholesale. The `PreToolUse` hook must let an
+upgrade edit every metadata file in `vendor/`; an invariant asks it about each one.
 
 ## Where the code lives
 
@@ -217,7 +223,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 81 mutations, all currently caught. When you ship a fix with a
+suite to notice — 85 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -307,7 +313,9 @@ resolved path, plus every `.js` under `vendor/` at any depth. The vendor review
 also reads `url()` and attributes the way the app scan does, through one shared
 extractor; with only the quoted-literal scan it missed `url(//host/x)` in a
 vendored stylesheet. **A derivation fixed in one place is an enumeration
-everywhere it was not applied.**
+everywhere it was not applied.** Round 10 found it once more: the runtime-API scan
+(`NETWORK_APIS`) covered app code only, so a vendored `new WebSocket('ws' + 's://…')`
+passed all 20 checks. It now has a vendor counterpart, `vendor/NETWORK_APIS`.
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a

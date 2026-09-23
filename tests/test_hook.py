@@ -51,10 +51,11 @@ class VendorIsProtectedButUpgradable(unittest.TestCase):
         for p in ("vendor/three.min.js", "vendor/GLTFLoader.js", "VENDOR/STLLoader.js"):
             self.assertTrue(denied(p), p)
 
-    def test_the_two_upgrade_metadata_files_are_allowed(self):
-        # An upgrade must refresh SHA256SUMS and record new URLs in URLS; denying
-        # either makes the documented procedure impossible to follow.
-        for p in ("vendor/SHA256SUMS", "vendor/URLS", "vendor/urls", "VENDOR/Sha256Sums"):
+    def test_the_upgrade_metadata_files_are_allowed(self):
+        # An upgrade must refresh SHA256SUMS and record new URLs and network APIs
+        # in URLS and NETWORK_APIS; denying any makes the procedure impossible.
+        for p in ("vendor/SHA256SUMS", "vendor/URLS", "vendor/urls", "VENDOR/Sha256Sums",
+                  "vendor/NETWORK_APIS", "Vendor/network_apis"):
             self.assertFalse(denied(p), f"{p} must stay editable for a vendor upgrade")
 
     def test_a_metadata_name_outside_vendor_is_not_special(self):

