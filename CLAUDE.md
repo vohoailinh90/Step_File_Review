@@ -109,6 +109,13 @@ enforces the ones a script can:
   `srcdoc`, `setHTMLUnsafe`) takes only markup written in source, UPPER_CASE
   constants and the number formatters `L`/`A2`/`fmt`. **Text from a model file — a part name — goes in
   through `textContent`, never markup.**
+  Behind all of that, the browser enforces it: `src/viewer.template.html` opens
+  `<head>` with a **Content-Security-Policy** — `default-src 'none'`, and every
+  directive limited to `'self'`, `data:`, `blob:` and inline code — so a URL built
+  at runtime that no scan could see is still refused. An invariant holds the
+  policy to that closed set of sources and to its place ahead of anything it
+  governs. Loosening it (a host, a scheme, `*`, a `report-uri`) reopens the
+  network; there is no feature here that needs one.
 - **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
   bundler, `package.json`, TypeScript or a preprocessor.
 - **Local only.** The helper server binds `127.0.0.1`. Tessellation happens in
@@ -239,7 +246,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 121 mutations, all currently caught. When you ship a fix with a
+suite to notice — 130 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -317,8 +324,8 @@ every such value to pass through `sameOrigin()`, which *is* checked — statical
 that it is used, and by a test that it refuses other hosts. **What a scan cannot
 judge, route through one thing it can.**
 The fix beyond it is a Content-Security-Policy in `viewer.html`, so the browser
-itself refuses every off-origin connection — a change to the shipped artifact,
-and so a decision for the maintainer rather than a check to add here.
+itself refuses every off-origin connection. It changes the shipped artifact, so it
+waited for the maintainer; round 15 is where they took it (see below).
 
 Round 8 also found the vendor side of `scanned_sources()`'s old mistake, still
 open: the three vendor checks globbed `vendor/*.js`, so an included
@@ -356,8 +363,15 @@ write whose name a scan can read is now judged by that name, and a name it canno
 read gets the strictest judge. One form stays past static reach: `x[k] = v` with
 `k` computed, which here is also how plain objects and typed arrays are filled
 (`o[key] = s[key]…` in `33-surfaces.js`), and `Object.assign(el, obj)` with `obj`
-built elsewhere. Those are the runtime boundary described above; only the
-Content-Security-Policy closes them.
+built elsewhere. Those are the runtime boundary described above. Round 15 duly
+found both — `img[key] = url` and `new Audio(url)`, an API nobody had listed —
+and the maintainer took the fix the static checks had been pointing at: the
+Content-Security-Policy. A probe in headless Chromium, served by `stepview.py`
+and opened from disk, sent img, Audio, fetch, EventSource, CSS `url()`,
+sendBeacon, an iframe and a prefetch off the machine without it and none with
+it, and PR #3's 20 browser tests pass under it. **Static checks catch the
+spellings; the policy catches the class. Keep both — the checks say *where* a
+mistake is, the policy stops it shipping.**
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a

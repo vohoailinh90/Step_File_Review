@@ -641,6 +641,109 @@ def _no_external_resources():
     return problems
 
 
+# The only sources a policy in viewer.html may name: the page's own origin, data:
+# and blob: (they never leave the page), inline code (the whole app is inline),
+# and 'none'. Closed on purpose -- a host, a scheme, `*` or a report-uri is how a
+# policy lets the network back in.
+CSP_SAFE_SOURCES = frozenset({"'none'", "'self'", "'unsafe-inline'", "data:", "blob:"})
+# Where a document or code is loaded from, data: and blob: are not inert: a data:
+# script runs, a data: frame is a document. These directives take no scheme at all.
+CSP_NO_SCHEME = frozenset({"script-src", "script-src-elem", "script-src-attr", "object-src",
+                           "base-uri", "frame-src", "child-src", "form-action"})
+
+
+@check("PRODUCT  viewer.html's Content-Security-Policy refuses every off-origin connection")
+def _csp_closes_the_network():
+    """The runtime half of the air-gap, enforced by the browser.
+
+    Codex review on PR #1, round 4 after merging #2: `img[key] = url` with a
+    computed key, and `new Audio(url)`, passed all 23 checks. Neither can be
+    caught statically -- a computed key is also how this code fills arrays, and
+    the APIs that open a connection are an open set. Rounds 1-14 each closed a
+    spelling; this closes the class. A probe in headless Chromium, served and
+    opened from disk, sent img, Audio, fetch, EventSource, CSS url(),
+    sendBeacon, an iframe and a prefetch off the machine without the policy,
+    and none of them with it; PR #3's 20 browser tests pass under it.
+
+    What it must be: a <meta http-equiv> policy in <head>, ahead of everything a
+    policy governs (a meta policy only covers what follows it), whose every
+    source is in CSP_SAFE_SOURCES, with `default-src 'none'` so a directive
+    nobody wrote falls back to nothing. Not covered, and not claimed: top-level
+    navigation (`location = ...`, a clicked link), which CSP does not govern --
+    the URL-sink check holds `location =` to vouched values.
+    """
+    from html.parser import HTMLParser
+
+    class Scan(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.in_head, self.governed, self.policies, self.late = False, False, [], []
+            self.inert = 0                  # inside <noscript>/<template>: never applied
+            self.duplicated = []
+
+        def handle_starttag(self, tag, attrs):
+            # The HTML tokenizer keeps the FIRST of a repeated attribute and drops the
+            # rest; a dict built from attrs would keep the last. Code review on PR #1:
+            # content="connect-src *" content="<safe policy>" passed on the last.
+            a = {}
+            for k, v in attrs:
+                if k.lower() in a:
+                    self.duplicated.append((self.getpos()[0], k.lower()))
+                a.setdefault(k.lower(), v or "")
+            if tag == "head":
+                self.in_head = True
+            elif tag == "body":
+                self.in_head = False
+            if tag in ("noscript", "template"):
+                self.inert += 1
+            if tag == "meta" and a.get("http-equiv", "").lower() == "content-security-policy":
+                line = self.getpos()[0]
+                if not self.in_head or self.governed or self.inert:
+                    self.late.append(line)
+                else:
+                    self.policies.append((line, a.get("content", "")))
+            elif tag not in ("html", "head", "meta", "title"):
+                self.governed = True        # style, link, script, img...: must come after
+
+        def handle_endtag(self, tag):
+            if tag in ("noscript", "template") and self.inert:
+                self.inert -= 1
+
+    scan = Scan()
+    scan.feed(VIEWER.read_text(encoding="utf-8", errors="replace"))
+    problems = [f"viewer.html:{n} a Content-Security-Policy <meta> after content it would "
+                f"govern, outside <head>, or in <noscript>/<template>, is ignored or partial"
+                for n in scan.late]
+    problems += [f"viewer.html:{n} repeats the {k!r} attribute; a browser keeps the first, "
+                 f"so what this check reads may not be what applies" for n, k in scan.duplicated
+                 if k in ("content", "http-equiv")]
+    if not scan.policies:
+        return problems + ["viewer.html has no Content-Security-Policy <meta> at the top of "
+                           "<head> -- nothing stops a URL built at runtime from being fetched"]
+    closed = False
+    for line, policy in scan.policies:
+        directives = {}
+        for part in policy.split(";"):
+            words = part.split()
+            if words:
+                directives.setdefault(words[0].lower(), [w.lower() for w in words[1:]])
+        for name, sources in directives.items():
+            for s in sources:
+                if name in CSP_NO_SCHEME and s in ("data:", "blob:"):
+                    problems.append(f"viewer.html:{line} CSP {name} allows {s!r}: there it loads "
+                                    f"a script, frame or base the page did not write")
+                elif s not in CSP_SAFE_SOURCES:
+                    problems.append(f"viewer.html:{line} CSP {name} allows {s!r}; only "
+                                    f"{', '.join(sorted(CSP_SAFE_SOURCES))} keep it on the machine")
+            if not sources:
+                problems.append(f"viewer.html:{line} CSP {name} has no sources")
+        closed = closed or directives.get("default-src") == ["'none'"]
+    if not closed:
+        problems.append("viewer.html's CSP lacks `default-src 'none'`: a directive it does not "
+                        "name (media-src, manifest-src...) would allow everything")
+    return problems
+
+
 @check("PRODUCT  no CDN hostname appears in source or vendor")
 def _no_cdn():
     problems = []
@@ -1042,8 +1145,8 @@ def _no_remote_url_literal():
 
     One limit, stated rather than hidden: a URL assembled at runtime from
     fragments ("ht" + "tps://") cannot be seen by any static check. NETWORK_APIS
-    catches the APIs that would carry one; a Content-Security-Policy in
-    viewer.html is what would actually close it.
+    catches the APIs that would carry one, and viewer.html's
+    Content-Security-Policy (_csp_closes_the_network) closes it in the browser.
     """
     problems = []
     for rel in scanned_sources():
