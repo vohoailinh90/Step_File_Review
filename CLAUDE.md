@@ -239,7 +239,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 114 mutations, all currently caught. When you ship a fix with a
+suite to notice — 121 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -349,7 +349,15 @@ because it began with the guard. Both judges now read the whole expression — o
 literal, or one guard call whose closing parenthesis ends it. The same round
 found `.style = …` (it sets `cssText`), `srcdoc`, `setHTMLUnsafe` and
 `createContextualFragment` missing from the markup sinks. **A value is safe as a
-whole or not at all.**
+whole or not at all.** Round 14 found the sink recognised by one *spelling* of its
+name: `img.setAttribute(key, location.hash)` with `const key = 'src'` passed, and
+so did `img['src'] = …`, `Reflect.set` and `Object.assign(img, {src: …})`. Every
+write whose name a scan can read is now judged by that name, and a name it cannot
+read gets the strictest judge. One form stays past static reach: `x[k] = v` with
+`k` computed, which here is also how plain objects and typed arrays are filled
+(`o[key] = s[key]…` in `33-surfaces.js`), and `Object.assign(el, obj)` with `obj`
+built elsewhere. Those are the runtime boundary described above; only the
+Content-Security-Policy closes them.
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a

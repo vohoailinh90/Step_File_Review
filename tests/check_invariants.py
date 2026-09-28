@@ -863,6 +863,93 @@ MARKUP_SINK = re.compile(
     r"|(?:insertAdjacentHTML\(\s*['\"][a-z]+['\"]\s*,|document\.write(?:ln)?\(|setProperty\(\s*['\"][^'\"]+['\"]\s*,"
     r"|setHTMLUnsafe\(|parseHTMLUnsafe\(|createContextualFragment\()\s*")
 
+# Every sink by name, whatever syntax reaches it. Codex review on PR #1, round 3:
+# `img.setAttribute(key, location.hash)` with `const key = 'src'` passed all 23
+# checks -- the name was in a variable -- and so did `img['src'] = ...`,
+# `e["innerHTML"] = ...`, `Reflect.set(img, 'src', ...)` and
+# `Object.assign(img, {src: ...})`. Those forms name the sink in a way this check
+# can read, so they are judged by that name. A name known only at runtime cannot
+# be read, so it is held to the strictest judge: the value must be one literal or
+# wrapped whole by the guard.
+_MARKUP_PROPS = ("innerHTML", "outerHTML", "cssText", "srcdoc", "style")
+_SINK_KIND = {**{a.lower(): "URL" for a in URL_ATTRS},
+              **{p.lower(): "markup" for p in _MARKUP_PROPS}}
+
+
+def _vouched(kind: str, value: str) -> bool:
+    """The closed safe set of values for a sink of `kind` (see the check)."""
+    if kind == "markup":
+        rest = _NUMBER_CALL.sub("", _STRING_LITERAL.sub("", value))
+        return bool(re.fullmatch(r"[\s+()A-Z0-9_]*", rest))
+    return (_one_literal(value) or _whole_call(value, _GUARD_CALLS)
+            or _whole_call(value, r"new\s+THREE\.\w+"))
+
+
+def _call_args(text: str, start: int) -> list[str]:
+    """The top-level arguments of the call whose `(` is just before `start`."""
+    args, depth, i, quote, begin = [], 0, start, None, start
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "'\"`":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            if depth == 0:
+                args.append(text[begin:i].strip())
+                return args
+            depth -= 1
+        elif c == "," and depth == 0:
+            args.append(text[begin:i].strip())
+            begin = i + 1
+        i += 1
+    return args
+
+
+def _literal_name(arg: str):
+    """The string an argument spells, when it is one plain literal; else None."""
+    return arg.strip()[1:-1] if _one_literal(arg) else None
+
+
+def _named_sink_writes(text: str):
+    """(match, what, kind, value) for every sink write whose name a scan can read,
+    or cannot: setAttribute/setAttributeNS with a computed name, a bracketed
+    literal key, Reflect.set, and the keys of an object literal in Object.assign."""
+    for m in re.finditer(r"\bsetAttribute(NS)?\s*\(", text):
+        args = _call_args(text, m.end())[1 if m.group(1) else 0:]
+        if len(args) < 2 or _literal_name(args[0]) is not None:
+            continue                      # a literal name: URL_SINK / MARKUP_SINK judge it
+        yield m, "setAttribute with a name known only at runtime", "URL", args[1]
+    for m in re.finditer(r"\[\s*(['\"`])(\w+)\1\s*\]\s*\+?=(?!=)\s*", text):
+        kind = _SINK_KIND.get(m.group(2).lower())
+        if kind:
+            yield m, f"[{m.group(1)}{m.group(2)}{m.group(1)}] (a {kind} sink)", kind, _rhs(text, m.end())
+    for m in re.finditer(r"\bReflect\.set\s*\(", text):
+        args = _call_args(text, m.end())
+        if len(args) < 3:
+            continue
+        name = _literal_name(args[1])
+        kind = "URL" if name is None else _SINK_KIND.get(name.lower())
+        if kind:
+            yield m, "Reflect.set on a sink", kind, args[2]
+    for m in re.finditer(r"\bObject\.assign\s*\(", text):
+        for arg in _call_args(text, m.end())[1:]:
+            if not arg.startswith("{"):
+                continue
+            body = arg[1:-1]
+            for k in re.finditer(r"(?:^|,)\s*(['\"]?)(\w+)\1\s*(:|(?=,|$))", body):
+                kind = _SINK_KIND.get(k.group(2).lower())
+                if not kind:
+                    continue
+                value = _rhs(body, k.end()) if k.group(3) == ":" else k.group(2)
+                yield m, f"Object.assign setting {k.group(2)}", kind, value
+
 
 @check("PRODUCT  every URL and markup sink takes only what the source vouches for")
 def _sinks_take_vouched_values():
@@ -916,6 +1003,9 @@ def _sinks_take_vouched_values():
             if re.fullmatch(r"[\s+()A-Z0-9_]*", rest):
                 continue
             flag(m, "a markup sink", value)
+        for m, what, kind, value in _named_sink_writes(text):
+            if not _vouched(kind, value):
+                flag(m, what, value)
     return problems
 
 
