@@ -16,13 +16,24 @@ const {launch, openModel, setCam, click, panel, hideAllBut, check} = L;
       dims: __qs.annotItems().filter(i => i.type === 'dim').length}));
     check('raw: status bar says raw', raw.label, /^raw$/);
     check('raw: panel has no mm', raw.panel, /^(?!.*mm).*centre distance.*0\.0500/);
-    // dimension labels drawn on the overlay: read them back through the same formatter the screenshot uses
-    const dimTexts = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 400; c.height = 300; const ctx = c.getContext('2d');
-      const seen = []; const orig = ctx.fillText.bind(ctx); ctx.fillText = (t, x, y) => { seen.push(t); orig(t, x, y); };
-      return seen; });
+    // the labels actually drawn on the overlay canvas (what screenshots burn in): capture fillText over a redraw
+    const drawn = () => pg.evaluate(async () => {
+      const ctx = document.getElementById('annot').getContext('2d'), seen = [], orig = ctx.fillText;
+      ctx.fillText = function(t, ...a){ seen.push(String(t)); return orig.call(this, t, ...a); };
+      __qs.controls.dispatchEvent({type: 'change'});
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      delete ctx.fillText;
+      return seen.join(' | ');
+    });
+    const rawDrawn = await drawn();
+    console.log('   drawn (raw):', rawDrawn);
+    check('raw: drawn dimension has no mm', rawDrawn, /^(?!.*mm)(?=.*\b0\.0500\b)/);
     await pg.click('#unitToggle');
     const mmAgain = await pg.evaluate(() => document.getElementById('measbody').textContent);
     check('mm again after toggling back', mmAgain, /centre distance50\.00 mm/);
+    const mmDrawn = await drawn();
+    console.log('   drawn (mm):', mmDrawn);
+    check('mm: drawn dimension back in mm', mmDrawn, /\b50\.00 mm\b/);
     // toggle to raw, then load another model: back to mm
     await pg.click('#unitToggle');
     const buf = require('fs').readFileSync(L.MODELS + 'plate.stl');

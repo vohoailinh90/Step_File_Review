@@ -24,6 +24,7 @@ const {launch, openModel, check} = L;
     return {shared, res};
   });
   console.log('  distinct bolt geometries:', r.shared); r.res.forEach(x => console.log('  ' + x));
+  check('the 400 bolts share one geometry', String(r.shared), /^1$/);
   r.res.forEach(x => check('bolt coaxial in its hole, 0.1 mm clearance', x, /centre distance 0 \(coaxial\) \| radial clearance 0\.100 mm/));
   console.log(L.failures() ? L.failures() + ' FAILURES' : 'ALL PASS');
   await browser.close();
