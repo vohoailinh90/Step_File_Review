@@ -238,7 +238,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 101 mutations, all currently caught. When you ship a fix with a
+suite to notice — 105 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -336,7 +336,12 @@ probing it found a live route on `main` — `showInfo()` joined a part name from
 model file into `innerHTML`, and a `.gltf` part named
 `<style>@import'\68ttps\3a…'</style>` (it survives three.js's name sanitiser)
 fetched off the machine when clicked, in a real browser. Sinks are an open set, so
-the check lists the safe *values* instead.
+the check lists the safe *values* instead. Round 12 found the sink *names* kept
+twice: the markup scan and the JS sink check each had their own attribute list,
+they had drifted apart, and neither had `ping` — which posts to its URLs when a
+link is followed — so `a.ping = location.hash` passed all 23 checks, and so did
+`setAttributeNS(…, 'href', …)`. There is now one list, `URL_ATTRS`, and both
+checks derive from it. **Two copies of a list are two lists.**
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a

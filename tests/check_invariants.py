@@ -39,12 +39,17 @@ CDN_HOSTS = ("//cdn.", "//cdnjs.", "//unpkg.", "//jsdelivr.", "//cdn.jsdelivr.",
              "//fonts.googleapis.", "//ajax.googleapis.", "//code.jquery.",
              "//esm.sh", "//skypack.dev")
 
-# HTML attributes whose value the browser FETCHES. `xmlns` and `xmlns:xlink` are
-# namespace declarations, not loads, so they are deliberately absent -- flagging
-# them would fail any inline SVG for no reason.
-URL_ATTRS = ("src", "srcset", "href", "poster", "data", "action", "formaction",
+# HTML attributes whose value the browser FETCHES, or sends a request to. `xmlns`
+# and `xmlns:xlink` are namespace declarations, not loads, so they are
+# deliberately absent -- flagging them would fail any inline SVG for no reason.
+# `ping` posts to every URL it lists when a link is followed (Codex review on
+# PR #1, after the merge of #2: `a.ping = location.hash` passed all 23 checks).
+# This is the ONE list: the markup scan and the JS sink check (URL_SINK) are both
+# derived from it. They used to keep separate copies, which had drifted apart --
+# `manifest` or `cite` set from JS was never a sink.
+URL_ATTRS = ("src", "srcset", "href", "ping", "poster", "data", "action", "formaction",
              "background", "manifest", "cite", "longdesc", "profile", "archive",
-             "codebase", "xlink:href")
+             "codebase", "icon", "imagesrcset", "lowsrc", "dynsrc", "xlink:href")
 
 # The URL standard's "special" schemes: the only ones a browser resolves to a
 # host and connects to. A closed set, defined by the WHATWG URL standard rather
@@ -790,10 +795,14 @@ _STRING_LITERAL = re.compile(r"""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`
 # Number formatters: their output is digits, sign and a decimal point, so a value
 # passed through one cannot carry markup or a URL.
 _NUMBER_CALL = re.compile(r"\b(?:L|A2|fmt)\((?:[^()]|\([^()]*\))*\)")
+# A JS property is the attribute's name (case aside: formAction, imageSrcset);
+# setAttribute/setAttributeNS take the attribute name itself, namespace or not.
+_URL_PROPS = "|".join(re.escape(a) for a in URL_ATTRS if ":" not in a)
+_URL_ATTRS_ANY = "|".join(re.escape(a) for a in URL_ATTRS)
 URL_SINK = re.compile(
-    r"(?:\.(?:src|srcset|href|poster|action|formAction|data|background|codebase)"
+    rf"(?:\.(?:{_URL_PROPS})"
     r"|(?<![\w.])location(?:\.href)?)\s*=(?!=)\s*"
-    r"|setAttribute\(\s*['\"](?:src|srcset|href|poster|action|formaction|data|background|xlink:href)['\"]\s*,\s*",
+    rf"|setAttribute(?:\(|NS\(\s*[^,()]*,)\s*['\"](?:{_URL_ATTRS_ANY})['\"]\s*,\s*",
     re.I)
 MARKUP_SINK = re.compile(
     r"\.(?:innerHTML|outerHTML|cssText)\s*\+?=(?!=)\s*"
