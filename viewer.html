@@ -6891,7 +6891,11 @@ function describe(e){
       items.push({type:'tag', a:{part:e.part, p:e.hit.clone()}, value:g.len});
       break;
   }
-  if (e.kind === 'face') rows.push(['area (mesh)', A2(e.area) + MM2()]);      // summed over the triangles, even when exact
+  if (e.kind === 'face'){
+    rows.push(['area (mesh)', A2(e.area) + MM2()]);      // summed over the triangles, even when exact
+    // a plane or freeform face has no other size: label its area, so Keep and screenshots carry it
+    if (!items.length) items.push({type:'tag', a:{part:e.part, p:e.hit.clone()}, prefix:'area ', value:e.area, area:true});
+  }
   rows.push(['source', SOURCES[provenance(e)]]);
   return {title, short, rows, items, marks};
 }
@@ -7314,7 +7318,7 @@ function toScreen(p, part, W, H){
 function dimText(it){
   const a = it.a.part, b = it.b && it.b.part;
   const split = a && b && a !== b && !a.offset.equals(b.offset);      // parts drawn apart, value is assembled
-  return (it.text || (it.prefix || '') + L(it.value) + MM()) + (split ? ' (assembled)' : '');
+  return (it.text || (it.prefix || '') + (it.area ? A2(it.value) + MM2() : L(it.value) + MM())) + (split ? ' (assembled)' : '');
 }
 // s: canvas pixels per CSS pixel, so lines and text keep their size in hi-res screenshots
 function drawAnnotations(ctx, W, H, s, items){

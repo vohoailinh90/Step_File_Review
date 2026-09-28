@@ -65,7 +65,7 @@ Lengths are shown in millimetres. OpenCASCADE writes glTF in metres whatever uni
 
 **Measure** (`4` or `M`) opens the measure panel. Click a face or an edge: within a few pixels of an edge the edge is picked, anywhere else the face.
 
-*One pick* gives its size, in the panel and drawn on the model: the **diameter** and **radius** of a cylinder (hole or boss), circle or arc — an arc also reports its angle and length, so the corner round of a plate reads as R5, 90° — a sphere's diameter, a cone's included angle and diameter range, a torus's tube radius (the fillet round a shaft shoulder), a straight edge's length, a plane's normal and area.
+*One pick* gives its size, in the panel and drawn on the model: the **diameter** and **radius** of a cylinder (hole or boss), circle or arc — an arc also reports its angle and length, so the corner round of a plate reads as R5, 90° — a sphere's diameter, a cone's included angle and diameter range, a torus's tube radius (the fillet round a shaft shoulder), a straight edge's length, a plane's normal and area; a plane or freeform face has its area drawn on the model.
 
 *Two picks* give the distances between them, the headline figure first; an angle is drawn on the model as well:
 
