@@ -6310,11 +6310,23 @@ function shapeSurface(s, P, tris, topo, pos){
   }
   Object.assign(s, {h0, h1, rMin:r0, rMax:r1});
 }
-// a local surface description carried into world space by a part's matrix
+// A local surface description carried into world space by a part's matrix. A plane survives
+// any affine map (its normal goes through the inverse transpose); circles only survive a
+// similarity — rotation, mirror and one uniform scale — so under a non-uniform scale or a shear
+// a curved surface is reported as freeform rather than with a wrong radius.
+const _nm = new THREE.Matrix3();
+function isSimilarity(m){
+  const e = m.elements, c = [0, 4, 8].map(i => new THREE.Vector3(e[i], e[i+1], e[i+2])), l = c.map(v => v.length());
+  const tol = 1e-6 * Math.max(l[0], l[1], l[2]);
+  return Math.abs(l[0] - l[1]) <= tol && Math.abs(l[0] - l[2]) <= tol &&
+         Math.abs(c[0].dot(c[1])) <= tol * l[0] && Math.abs(c[0].dot(c[2])) <= tol * l[0] && Math.abs(c[1].dot(c[2])) <= tol * l[1];
+}
 function surfToWorld(s, m){
+  if (s.type === 'plane') return {type:'plane', p:s.p.clone().applyMatrix4(m), n:s.n.clone().applyMatrix3(_nm.getNormalMatrix(m)).normalize()};
+  if (s.type === 'surface' || !isSimilarity(m)) return {type:'surface'};
   const k = Math.cbrt(Math.abs(m.determinant())) || 1, o = Object.assign({}, s);
   ['p', 'c', 'apex'].forEach(key => { if (s[key]) o[key] = s[key].clone().applyMatrix4(m); });
-  ['n', 'a'].forEach(key => { if (s[key]) o[key] = s[key].clone().transformDirection(m); });
+  if (s.a) o.a = s.a.clone().transformDirection(m);
   ['r', 'R', 'h0', 'h1', 'rMin', 'rMax'].forEach(key => { if (s[key] !== undefined) o[key] = s[key] * k; });
   return o;
 }
@@ -6334,7 +6346,8 @@ function faceEntity(part, f, hit){
     e2.set(prims[i+6]-prims[i], prims[i+7]-prims[i+1], prims[i+8]-prims[i+2]);
     area += e1.cross(e2).length() / 2;
   }
-  return {kind:'face', part, key:'f' + f, geom:surfToWorld(info.surf, m), exact:info.exact, area,
+  const geom = surfToWorld(info.surf, m);
+  return {kind:'face', part, key:'f' + f, geom, exact:info.exact && geom.type === info.surf.type, area,
           prims, stride:9, count:tris.length, hit: hit ? hit.clone() : new THREE.Vector3(prims[0], prims[1], prims[2])};
 }
 function entityOverlay(ent, color){
@@ -6616,8 +6629,8 @@ function edgeChain(topo, geo, h0){
 function edgeEntity(part, h, hit){
   const geo = part.mesh.geometry, topo = topology(geo), ch = edgeChain(topo, geo, h), m = part.restMatrix;
   const pts = ch.pts.map(p => p.applyMatrix4(m));
-  const surfs = ch.faces.map(f => { const i = faceInfo(geo, f); return Object.assign(surfToWorld(i.surf, m), {exact:i.exact}); });
-  const geom = classifyEdge(pts, ch.closed, surfs, topo.source === 'brep');
+  const surfs = ch.faces.map(f => { const i = faceInfo(geo, f), w = surfToWorld(i.surf, m); return Object.assign(w, {exact:i.exact && w.type === i.surf.type}); });
+  const geom = classifyEdge(pts, ch.closed, surfs);
   const nSeg = pts.length - (ch.closed ? 0 : 1), prims = new Float64Array(nSeg * 6);
   for (let i = 0; i < nSeg; i++){
     const p = pts[i], q = pts[(i+1) % pts.length];
@@ -6637,9 +6650,10 @@ function closestOnPolyline(pts, closed, q){
   return best;
 }
 // What an edge is: a circle or arc (exact when it runs round an adjacent cylinder, cone,
-// torus or sphere), a straight line, or some other curve. `brep`: the part has STEP B-rep
-// faces, so a straight edge's end points are its exact B-rep vertices.
-function classifyEdge(pts, closed, surfs, brep){
+// torus or sphere), a straight line, or some other curve. A line is exact only when its B-rep
+// faces make it straight — two planes meeting, or a ruling of a cylinder or cone; a curved edge
+// meshed as one chord looks just as straight.
+function classifyEdge(pts, closed, surfs){
   const n = pts.length;
   let len = 0;
   for (let i = 1; i < n; i++) len += pts[i].distanceTo(pts[i-1]);
@@ -6651,7 +6665,7 @@ function classifyEdge(pts, closed, surfs, brep){
       const d = p1.clone().sub(p0).divideScalar(l);
       let dev = 0;
       for (const p of pts){ _t.subVectors(p, p0); dev = Math.max(dev, _t.addScaledVector(d, -_t.dot(d)).length()); }
-      if (dev <= 1e-5 * l) return {type:'line', p0:p0.clone(), p1:p1.clone(), d, len:l, exact:brep};
+      if (dev <= 1e-5 * l) return {type:'line', p0:p0.clone(), p1:p1.clone(), d, len:l, exact:straightByFaces(surfs, p0, d, l)};
     }
   }
   if (n >= 4 || (closed && n >= 3)){
@@ -6668,6 +6682,12 @@ function classifyEdge(pts, closed, surfs, brep){
     }
   }
   return {type:'curve', len, exact:false};
+}
+function straightByFaces(surfs, p0, d, l){
+  const ex = surfs.filter(s => s.exact);
+  if (ex.length === 2 && ex[0].type === 'plane' && ex[1].type === 'plane') return true;
+  return ex.some(s => (s.type === 'cylinder' && Math.abs(s.a.dot(d)) >= PAR) ||
+                      (s.type === 'cone' && _t.subVectors(p0, s.apex).cross(d).length() <= 1e-6 * (l + p0.distanceTo(s.apex))));
 }
 function circleOn(s, pts){
   if (s.type === 'cylinder' || s.type === 'cone' || s.type === 'torus'){
