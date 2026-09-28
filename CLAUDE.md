@@ -429,7 +429,10 @@ modules load into one `node:vm` context against THREE and DOM stubs, in filename
 order, exactly as `build.py` concatenates them. Its `Vector3` must keep three.js
 semantics (mutate in place, return `this`); an unfaithful stub would silently
 void every test that uses it. Nothing there renders, so nothing there proves a
-pixel — that needs headless Chromium and belongs to `test-engineer`.
+pixel — that needs headless Chromium: `tests/browser/` runs the built
+`viewer.html` in it on fixture models of known dimensions (`node
+tests/browser/run.js`, setup in its README). It is not in CI; run it for a change
+to what the viewer draws or reports, and extend it rather than building another.
 
 ## Scope of this file
 

@@ -20,12 +20,14 @@ harness, and not in your reasoning. Say so and stop.
 
 ## What legitimately needs designing here
 
-- **Anything that renders.** No check in this repo opens a WebGL context. Face
-  picking, section caps (a stencil pass), screenshot output and the part-list
-  highlight are all unverified by construction. A real harness means headless
-  Chromium via Playwright, a fixture GLB, and a pixel or draw-call assertion.
-  Chromium is available in this environment at `/opt/pw-browsers/chromium`; do
-  not run `playwright install`.
+- **Anything that renders.** Only `tests/browser/` opens a WebGL context:
+  headless Chromium via Playwright, driving the built `viewer.html` on fixture
+  models of known dimensions (`node tests/browser/run.js`; its README lists what
+  each test covers — picking, measurements, explode, section caps, the overlay
+  and a real `/convert`). Extend it rather than starting a second harness.
+  What it does not assert — the part-list highlight, screenshot pixels beyond
+  the overlay — is still unverified. Chromium is available in this environment
+  at `/opt/pw-browsers/chromium`; do not run `playwright install`.
 - **Large-assembly behavior.** The 400-part cap on caps, triangle-count
   reporting, frame cost with thousands of meshes. Needs a generated fixture with
   a known part count, and a measured number rather than an impression.

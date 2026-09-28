@@ -1,0 +1,46 @@
+const L = require('./lib.js');
+const {launch, openModel, check} = L;
+// Codex round 11: distance between parallel straight edges is to the picked segments, not their lines
+(async () => {
+  const browser = await launch();
+  const {pg, errors} = await openModel(browser, 'sheet_rect.stl', 'sheet_rect.stl');
+  const run = (a0, a1, b0, b1, hit) => pg.evaluate(([a0, a1, b0, b1, hit]) => {
+    const T = __qs.THREE, part = __qs.parts[0], V = a => new T.Vector3(...a);
+    const line = (p0, p1) => { const l = p0.distanceTo(p1); return {type:'line', p0, p1, d:p1.clone().sub(p0).divideScalar(l), len:l, exact:false}; };
+    const ent = (g, h) => ({kind:'edge', part, hit:h, geom:g, exact:false, key:Math.random()});
+    const A = ent(line(V(a0), V(a1)), V(hit || a0)), B = ent(line(V(b0), V(b1)), V(b0));
+    const r = __qs.relate(A, B, null);
+    const d = r.items.find(i => i.type === 'dim');
+    const tag = r.items.find(i => i.type === 'tag');
+    return {tag:tag ? tag.text : null, rows:r.rows.map(x => x.join(' ')).join(' | '), dim:d ? [d.a.p.toArray().map(v => +v.toFixed(3)), d.b.p.toArray().map(v => +v.toFixed(3)), +d.value.toFixed(4)] : null};
+  }, [a0, a1, b0, b1, hit]);
+  let r;
+  r = await run([0,0,0], [40,0,0], [10,20,0], [30,20,0], [2,0,0]);
+  console.log('   overlap:', JSON.stringify(r));
+  check('overlapping: 20 (parallel)', r.rows, /^distance 20\.00 mm \(parallel\)/);
+  check('overlapping: dim inside the overlap', JSON.stringify(r.dim), /^\[\[10,0,0\],\[10,20,0\],20\]$/);
+  r = await run([0,0,0], [10,0,0], [30,5,0], [50,5,0]);
+  console.log('   offset disjoint:', JSON.stringify(r));
+  check('offset disjoint: end to end', r.rows, /^distance 20\.62 mm \(end to end\) \| line separation 5\.000 mm \(parallel\)/);
+  check('offset disjoint: dim end to end', JSON.stringify(r.dim), /^\[\[10,0,0\],\[30,5,0\],20\.6155\]$/);
+  r = await run([0,0,0], [10,0,0], [50,5,0], [30,5,0]);
+  console.log('   reversed:', JSON.stringify(r));
+  check('reversed B: same ends', JSON.stringify(r.dim), /^\[\[10,0,0\],\[30,5,0\],20\.6155\]$/);
+  r = await run([0,0,0], [10,0,0], [20,0,0], [30,0,0]);
+  console.log('   collinear disjoint:', JSON.stringify(r));
+  check('collinear disjoint: 10, not 0', r.rows, /^distance 10\.00 mm \(end to end\) \| line separation 0 \(collinear\)/);
+  check('collinear disjoint: dim drawn', JSON.stringify(r.dim), /^\[\[10,0,0\],\[20,0,0\],10\]$/);
+  r = await run([30,0,0], [40,0,0], [0,3,0], [10,3,0]);
+  console.log('   B before A:', JSON.stringify(r));
+  check('B before A: nearest ends', JSON.stringify(r.dim), /^\[\[30,0,0\],\[10,3,0\],20\.2237\]$/);
+  r = await run([0,0,0], [20,0,0], [10,0,0], [30,0,0]);
+  console.log('   collinear overlap:', JSON.stringify(r));
+  check('collinear overlap: 0 (collinear), labelled', r.rows + JSON.stringify(r.dim), /^distance 0 \(collinear\) \| source mesh(null)$/);
+  check('collinear overlap: zero label kept', String(r.tag), /^0 \(collinear\)$/);
+  r = await run([0,0,0], [10,0,0], [10,4,0], [20,4,0]);
+  console.log('   ends meet at a point:', JSON.stringify(r));
+  check('touching ends: square across', r.rows, /^distance 4\.000 mm \(parallel\)/);
+  console.log('   errors:', errors.filter(x => !/Failed to load resource/.test(x)));
+  console.log(L.failures() ? L.failures() + ' FAILURES' : 'ALL PASS');
+  await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });
