@@ -65,6 +65,27 @@ def check_engine(fatal: bool = True) -> bool:
         return False
 
 
+def _step_to_glb(cascadio, src: Path, tmp: Path, tol: tuple):
+    """Tessellate, keeping the exact B-rep surfaces the viewer measures with.
+
+    include_brep adds a per-triangle face index plus the analytic parameters of
+    every plane, cylinder, cone, sphere and torus face (glTF extension
+    TM_brep_faces), so diameters and distances come from the CAD geometry
+    rather than a fit to the mesh. Older cascadio builds don't take the
+    argument, and a file it trips over still deserves a mesh — so fall back to
+    the plain conversion.
+    """
+    try:
+        cascadio.step_to_glb(str(src), str(tmp), tol_linear=tol[0], tol_angular=tol[1],
+                             include_brep=True)
+        if tmp.exists() and tmp.stat().st_size > 0:
+            return
+    except Exception:
+        pass
+    tmp.unlink(missing_ok=True)
+    cascadio.step_to_glb(str(src), str(tmp), tol_linear=tol[0], tol_angular=tol[1])
+
+
 def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
     try:
         import cascadio
@@ -75,7 +96,7 @@ def _tessellate(src: Path, out: Path, tol: tuple, label: str | None = None):
         ) from None
     tmp = out.with_suffix(".partial")
     try:
-        cascadio.step_to_glb(str(src), str(tmp), tol_linear=tol[0], tol_angular=tol[1])
+        _step_to_glb(cascadio, src, tmp, tol)
         if not tmp.exists() or tmp.stat().st_size == 0:
             raise RuntimeError("no geometry produced")
         tmp.replace(out)      # atomic: a failed run never leaves a bad cache entry

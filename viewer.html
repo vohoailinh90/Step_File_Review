@@ -77,15 +77,32 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #info .v{color:var(--txt)}
 #info .hd{color:var(--pick);margin-bottom:3px;letter-spacing:.06em}
 
-#sectionpanel{position:absolute;bottom:14px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:11px 13px;width:288px;display:none;z-index:7}
-#sectionpanel.show{display:block}
-#sectionpanel .row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
-#sectionpanel .row:last-child{margin-bottom:0}
-#sectionpanel .row .lbl{width:44px;flex-shrink:0}
-#sectionpanel input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
-#sectionpanel .val{font-family:var(--mono);font-size:11px;color:var(--accent);width:58px;text-align:right;flex-shrink:0}
-#sectionpanel .hint{font-size:11px;color:var(--dim);line-height:1.55}
+#sectionpanel,#explodepanel{position:absolute;bottom:14px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:11px 13px;width:288px;display:none;z-index:7}
+#explodepanel{left:auto;right:10px}
+#sectionpanel.show,#explodepanel.show{display:block}
+#sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+#sectionpanel .row:last-child,#explodepanel .row:last-child{margin-bottom:0}
+#sectionpanel .row .lbl,#explodepanel .row .lbl{width:44px;flex-shrink:0}
+#sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
+#sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent);width:58px;text-align:right;flex-shrink:0}
+#sectionpanel .hint,#explodepanel .hint{font-size:11px;color:var(--dim);line-height:1.55}
 #sectionpanel .hint b{color:var(--pick)}
+
+#measurepanel{position:absolute;top:10px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-family:var(--mono);font-size:11px;line-height:1.7;width:310px;max-height:calc(100% - 20px);overflow-y:auto;display:none;z-index:7}
+#measurepanel.show{display:block}
+#measurepanel .mhead{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+#measurepanel .mhead .hd{color:var(--pick);letter-spacing:.06em;flex:1}
+#measurepanel .mhead .btn{font-size:11px;padding:2px 9px}
+#measurepanel .ent{display:flex;align-items:baseline;gap:6px;min-width:0}
+#measurepanel .ent i{width:9px;height:9px;border-radius:2px;flex-shrink:0;align-self:center}
+#measurepanel .ent .nm{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#measurepanel .r{display:flex;justify-content:space-between;gap:12px}
+#measurepanel .r .k{color:var(--dim);flex-shrink:0}
+#measurepanel .r .v{text-align:right;overflow-wrap:anywhere}
+#measurepanel .r.main .v{color:var(--warn)}
+#measurepanel .div{border-top:1px solid var(--line);margin:5px 0}
+#measurepanel .hint{font-family:var(--sans);color:var(--dim);line-height:1.5;margin-top:6px}
+#annot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
 
 #spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(17,19,24,.55);z-index:10;font-family:var(--mono);color:var(--accent)}
 #spin.show{display:flex}
@@ -96,7 +113,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #statusbar b{color:var(--txt);font-weight:500}
 #hintbar{color:var(--dim)}
 @media (prefers-reduced-motion: reduce){.btn{transition:none}#toast{transition:none}}
-@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel{width:250px}}
+@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel,#explodepanel{width:250px}#measurepanel{width:260px}}
 </style>
 </head>
 <body>
@@ -112,10 +129,12 @@ select.btn option{background:var(--panel2);color:var(--txt)}
       <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
       <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
       <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
+      <button class="btn" data-mode="measure" title="Measure diameters, radii and distances between faces and edges (4 / M)">Measure</button>
     </div>
     <span class="sep"></span>
 
     <button class="btn" id="btnSection" title="Section views (X)">Section</button>
+    <button class="btn" id="btnExplode" title="Exploded view (V)">Explode</button>
     <button class="btn" id="btnParts" title="Show or hide part list">Parts</button>
     <div class="btn-group" role="group" aria-label="Standard views">
       <button class="btn" data-view="iso">Iso</button>
@@ -148,8 +167,40 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 
     <div id="viewport">
       <canvas id="canvas3d"></canvas>
+      <canvas id="annot"></canvas>
 
       <div id="info"></div>
+
+      <div id="measurepanel">
+        <div class="mhead">
+          <span class="hd">MEASURE</span>
+          <button class="btn" id="btnMeasKeep" title="Keep this measurement on screen while you take the next (K)">Keep</button>
+          <button class="btn" id="btnMeasClear" title="Remove all measurements (Del)">Clear</button>
+        </div>
+        <div id="measbody"></div>
+        <div class="hint" id="meashint">Click a face or an edge for its size — Ø and R of cylinders, circles and arcs.
+          Click a second one to measure between them. Esc clears.</div>
+      </div>
+
+      <div id="explodepanel">
+        <div class="row">
+          <span class="lbl">amount</span>
+          <input type="range" id="expAmount" min="0" max="100" step="1" value="0">
+          <span class="val" id="expAmountVal">0 %</span>
+        </div>
+        <div class="row">
+          <span class="lbl">along</span>
+          <div class="btn-group" role="group" aria-label="Explode direction">
+            <button class="btn active" data-exp="all" title="Away from the assembly centre">All</button>
+            <button class="btn" data-exp="x">X</button>
+            <button class="btn" data-exp="y">Y</button>
+            <button class="btn" data-exp="z">Z</button>
+          </div>
+          <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
+        </div>
+        <div class="row"><span class="hint">Parts slide away from the assembly centre. Measurements keep
+          using the assembled positions.</span></div>
+      </div>
 
       <div id="sectionpanel">
         <div class="row">
@@ -209,7 +260,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
     <span>bbox <b id="stBbox">–</b></span>
     <span id="unitToggle" style="cursor:pointer" title="Click if the scale looks wrong">units <b id="stUnits">mm</b></span>
     <span class="spacer"></span>
-    <span id="hintbar">LMB rotate · RMB pan · wheel zoom · click to select · H hide · I isolate</span>
+    <span id="hintbar">LMB rotate · RMB pan · wheel zoom · click to select · H hide · I isolate · M measure</span>
   </div>
 </div>
 
@@ -5556,6 +5607,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 "use strict";
 const $ = id => document.getElementById(id);
 const canvas = $('canvas3d'), viewport = $('viewport');
+const annotCanvas = $('annot'), annotCtx = annotCanvas.getContext('2d');
 
 // ── Renderer / scene ─────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true, stencil:true});
@@ -5592,10 +5644,12 @@ function resize(){
   const w = viewport.clientWidth, h = viewport.clientHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
+  annotCanvas.width = Math.round(w * renderer.getPixelRatio());
+  annotCanvas.height = Math.round(h * renderer.getPixelRatio());
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
-renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); });
+renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
 
 // ── Framing ──────────────────────────────────────────────────
 function computeBBox(){
@@ -5604,7 +5658,7 @@ function computeBBox(){
   return box.isEmpty() ? null : box;
 }
 function frame(dir){
-  const box = bboxCached || computeBBox();
+  const box = (explodeAmt > 0 ? computeBBox() : bboxCached) || computeBBox();
   if (!box) return;
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
@@ -5625,6 +5679,32 @@ $('btnFit').addEventListener('click', ()=> frame());
 
 // ── Load ─────────────────────────────────────────────────────
 const gltfLoader = new THREE.GLTFLoader(), stlLoader = new THREE.STLLoader();
+// stepview.py asks cascadio for include_brep: each primitive then carries a B-rep face
+// index per triangle plus the exact plane / cylinder / cone / sphere / torus of each face
+// (glTF extension TM_brep_faces, mesh-local metres). Registered as a plugin so the loader
+// doesn't copy it into userData — and deep-clone it for every instance of a part — but
+// hangs it once on the shared geometry.
+gltfLoader.register(parser => ({
+  name:'TM_brep_faces',
+  afterRoot(result){
+    const jobs = [];
+    result.scene.traverse(o => {
+      if (!o.isMesh || o.geometry.userData.brep !== undefined) return;
+      const geo = o.geometry, ref = parser.associations.get(o);
+      geo.userData.brep = null;
+      const meshDef = ref && ref.meshes !== undefined ? parser.json.meshes[ref.meshes] : null;
+      const prim = meshDef && meshDef.primitives[ref.primitives || 0];
+      const ext = prim && prim.extensions && prim.extensions.TM_brep_faces;
+      if (!ext || ext.faceIndices === undefined) return;
+      jobs.push(parser.getDependency('accessor', ext.faceIndices).then(attr => {
+        const nTri = (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
+        if (!attr.isInterleavedBufferAttribute && attr.count === nTri)
+          geo.userData.brep = {tri:attr.array, faces:Array.isArray(ext.faces) ? ext.faces : []};
+      }, () => {}));
+    });
+    return Promise.all(jobs);
+  }
+}));
 
 function sniff(buf){
   const head = new Uint8Array(buf, 0, Math.min(128, buf.byteLength));
@@ -5639,7 +5719,7 @@ function sniff(buf){
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
-  clearSelection(); sectionOff(); disposeCaps();
+  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode();
   if (modelRoot){ scene.remove(modelRoot); disposeTree(modelRoot); modelRoot = null; }
   if (edgeRoot){ scene.remove(edgeRoot); disposeTree(edgeRoot); edgeRoot = null; }
   edgesOn = false; $('btnEdges').classList.remove('active');
@@ -5695,9 +5775,17 @@ function afterLoad(name, bytes, ms){
       n.material.side = THREE.DoubleSide;
       const t = n.geometry.index ? n.geometry.index.count/3 : n.geometry.attributes.position.count/3;
       tris += t;
+      // restMatrix: where the part sits assembled. Exploding only moves it by `offset`,
+      // and measurements are always taken on the assembled geometry.
       parts.push({mesh:n, name:n.name || (n.parent && n.parent.name) || ('part_'+parts.length),
-                  tris:t, visible:true, rowEl:null, edges:null});
+                  tris:t, visible:true, rowEl:null, edges:null,
+                  restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3()});
     }
+  });
+  parts.forEach(p=>{
+    const g = p.mesh.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    g.boundingBox.getCenter(p.restCenter).applyMatrix4(p.restMatrix);
   });
   bboxCached = computeBBox();
   if (bboxCached){
@@ -5774,17 +5862,32 @@ let mode = 'part';
 let selected = null;            // selected part
 let faceOverlay = null, edgeOverlay = null;
 let pickedCircle = null;        // {center, axis, radius}
+const followers = new Set();    // highlight meshes that move with their part in an exploded view
 
 document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', ()=> setMode(b.dataset.mode)));
 function setMode(m){
+  const was = mode;
   mode = m;
   document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
-  if (m === 'edge' && !edgesOn) toggleEdges();          // edges must exist to be picked
+  if ((m === 'edge' || m === 'measure') && !edgesOn) toggleEdges();   // edges must exist to be picked
   clearSubSelection();
+  if (was === 'measure' && m !== 'measure') measureClear(true);
+  $('measurepanel').classList.toggle('show', m === 'measure');
+  if (m === 'measure') renderMeasure();
+}
+// `base` is the part offset the highlight was built at (null: built at the assembled position)
+function follow(o, part, base){
+  o.userData.follow = {part, base: base ? base.clone() : new THREE.Vector3()};
+  o.position.copy(part.offset).sub(o.userData.follow.base);
+  followers.add(o);
+}
+function disposeOverlay(o){
+  scene.remove(o); followers.delete(o);
+  o.geometry.dispose(); o.material.dispose();
 }
 function clearSubSelection(){
-  if (faceOverlay){ scene.remove(faceOverlay); faceOverlay.geometry.dispose(); faceOverlay.material.dispose(); faceOverlay = null; }
-  if (edgeOverlay){ scene.remove(edgeOverlay); edgeOverlay.geometry.dispose(); edgeOverlay.material.dispose(); edgeOverlay = null; }
+  if (faceOverlay){ disposeOverlay(faceOverlay); faceOverlay = null; }
+  if (edgeOverlay){ disposeOverlay(edgeOverlay); edgeOverlay = null; }
   showInfo(null);
 }
 function clearSelection(){
@@ -5828,8 +5931,8 @@ function notClipped(pt){ return !sectionActive || sectionPlane.distanceToPoint(p
 function pick(e){
   if (!modelRoot) return;
   setRay(e);
-  if (circlePickMode) return pickCircle();
-  if (mode === 'edge') return pickEdge();
+  if (circlePickMode || mode === 'edge') return pickEdge();
+  if (mode === 'measure') return pickMeasure(e);
 
   const meshes = parts.filter(p=>p.visible).map(p=>p.mesh);
   const hits = raycaster.intersectObjects(meshes, false).filter(h => notClipped(h.point));
@@ -5838,90 +5941,423 @@ function pick(e){
   const part = parts.find(p => p.mesh === hit.object);
   clearSubSelection();
   selectPart(part);
-  if (mode === 'face') selectFace(part, hit.faceIndex);
+  if (mode === 'face') selectFace(part, hit.faceIndex, hit.point.clone().sub(part.offset));
   else showInfo({title:'PART', rows:[['name', part.name], ['triangles', part.tris.toLocaleString()],
                                      ['visible', part.visible ? 'yes' : 'no']],
                  foot:'H hides it · I isolates it · click its row to toggle'});
 }
 
-// ── Face detection: flood fill over triangles with continuous normals
-function triAdjacency(geo){
-  if (geo.userData._adj) return geo.userData._adj;
-  const pos = geo.attributes.position;
-  const idx = geo.index ? geo.index.array : null;
-  const nTri = idx ? idx.length/3 : pos.count/3;
-  const q = Math.max(modelSize * 1e-6, 1e-9);
-  const vkey = i => {
-    const j = idx ? idx[i] : i;
-    return Math.round(pos.getX(j)/q)+'_'+Math.round(pos.getY(j)/q)+'_'+Math.round(pos.getZ(j)/q);
-  };
-  const edgeMap = new Map(), adj = new Array(nTri);
-  for (let t=0; t<nTri; t++){
-    adj[t] = [];
-    const k = [vkey(t*3), vkey(t*3+1), vkey(t*3+2)];
-    for (let s=0; s<3; s++){
-      const a = k[s], b = k[(s+1)%3];
-      const ek = a < b ? a+'|'+b : b+'|'+a;
-      const other = edgeMap.get(ek);
-      if (other === undefined) edgeMap.set(ek, t);
-      else { adj[t].push(other); adj[other].push(t); }
+// ── Geometry helpers ─────────────────────────────────────────
+const _t = new THREE.Vector3();
+function anyPerp(a){
+  const u = Math.abs(a.x) < 0.9 ? new THREE.Vector3(1,0,0) : new THREE.Vector3(0,1,0);
+  return u.addScaledVector(a, -u.dot(a)).normalize();
+}
+function footOnLine(q, p, a){ return p.clone().addScaledVector(a, _t.subVectors(q, p).dot(a)); }
+function footOnPlane(q, p, n){ return q.clone().addScaledVector(n, -_t.subVectors(q, p).dot(n)); }
+// closest points of two infinite lines (unit directions)
+function closestLines(p1, a1, p2, a2){
+  const w = new THREE.Vector3().subVectors(p1, p2), b = a1.dot(a2), d = a1.dot(w), e = a2.dot(w), den = 1 - b*b;
+  const s = den > 1e-12 ? (b*e - d) / den : 0, t = den > 1e-12 ? (e - b*d) / den : e;
+  const c1 = p1.clone().addScaledVector(a1, s), c2 = p2.clone().addScaledVector(a2, t);
+  return {c1, c2, d:c1.distanceTo(c2)};
+}
+// Gaussian elimination with partial pivoting; null when singular
+function solveLin(A, b){
+  const n = b.length, M = A.map((r, i) => r.concat([b[i]]));
+  for (let c = 0; c < n; c++){
+    let piv = c;
+    for (let r = c+1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+    if (!(Math.abs(M[piv][c]) > 1e-300)) return null;
+    [M[c], M[piv]] = [M[piv], M[c]];
+    for (let r = c+1; r < n; r++){
+      const f = M[r][c] / M[c][c];
+      for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
     }
   }
-  geo.userData._adj = adj;
-  return adj;
-}
-function triNormal(geo, t, out, a, b, c){
-  const pos = geo.attributes.position, idx = geo.index ? geo.index.array : null;
-  const gi = i => idx ? idx[i] : i;
-  a.fromBufferAttribute(pos, gi(t*3)); b.fromBufferAttribute(pos, gi(t*3+1)); c.fromBufferAttribute(pos, gi(t*3+2));
-  return out.copy(c).sub(b).cross(a.clone().sub(b)).normalize();
-}
-function selectFace(part, faceIndex){
-  const geo = part.mesh.geometry;
-  const adj = triAdjacency(geo);
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
-  const n0 = triNormal(geo, faceIndex, new THREE.Vector3(), a, b, c).clone();
-  const nCur = new THREE.Vector3(), nNb = new THREE.Vector3();
-  const COS = Math.cos(THREE.MathUtils.degToRad(20));   // stays on one face, stops at real edges
-  const seen = new Set([faceIndex]), stack = [faceIndex], tris = [];
-  while (stack.length){
-    const t = stack.pop(); tris.push(t);
-    triNormal(geo, t, nCur, a, b, c);
-    for (const nb of adj[t]){
-      if (seen.has(nb)) continue;
-      triNormal(geo, nb, nNb, a, b, c);
-      if (Math.abs(nCur.dot(nNb)) > COS){ seen.add(nb); stack.push(nb); }
-    }
-    if (tris.length > 200000) break;
+  const x = new Array(n);
+  for (let r = n-1; r >= 0; r--){
+    let s = M[r][n];
+    for (let k = r+1; k < n; k++) s -= M[r][k] * x[k];
+    x[r] = s / M[r][r];
   }
-  // build overlay + measure area in world units
-  const pos = geo.attributes.position, idx = geo.index ? geo.index.array : null;
-  const gi = i => idx ? idx[i] : i;
-  const arr = new Float32Array(tris.length*9);
-  const m = part.mesh.matrixWorld;
-  let area = 0, flat = true;
-  const p0 = new THREE.Vector3(), p1 = new THREE.Vector3(), p2 = new THREE.Vector3();
-  tris.forEach((t, k)=>{
-    p0.fromBufferAttribute(pos, gi(t*3)).applyMatrix4(m);
-    p1.fromBufferAttribute(pos, gi(t*3+1)).applyMatrix4(m);
-    p2.fromBufferAttribute(pos, gi(t*3+2)).applyMatrix4(m);
-    arr.set([p0.x,p0.y,p0.z, p1.x,p1.y,p1.z, p2.x,p2.y,p2.z], k*9);
-    area += p1.clone().sub(p0).cross(p2.clone().sub(p0)).length()/2;
-    triNormal(geo, t, nCur, a, b, c);
-    if (Math.abs(nCur.dot(n0)) < 0.999) flat = false;
-  });
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-  faceOverlay = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-    color:0xff7a45, transparent:true, opacity:.5, side:THREE.DoubleSide,
-    depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
-  faceOverlay.renderOrder = 3;
-  scene.add(faceOverlay);
+  return x.every(Number.isFinite) ? x : null;
+}
+// eigen-decomposition of a symmetric 3×3 matrix (Jacobi), ascending eigenvalues
+function eigSym3(S){
+  const A = S.map(r => r.slice()), V = [[1,0,0],[0,1,0],[0,0,1]];
+  for (let sweep = 0; sweep < 50; sweep++){
+    const off = Math.abs(A[0][1]) + Math.abs(A[0][2]) + Math.abs(A[1][2]);
+    if (off <= 1e-15 * (Math.abs(A[0][0]) + Math.abs(A[1][1]) + Math.abs(A[2][2])) + 1e-300) break;
+    for (const [p, q] of [[0,1],[0,2],[1,2]]){
+      if (Math.abs(A[p][q]) < 1e-300) continue;
+      const th = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+      const t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th*th + 1));
+      const c = 1 / Math.sqrt(t*t + 1), s = t * c;
+      for (let k = 0; k < 3; k++){ const x = A[k][p], y = A[k][q]; A[k][p] = c*x - s*y; A[k][q] = s*x + c*y; }
+      for (let k = 0; k < 3; k++){ const x = A[p][k], y = A[q][k]; A[p][k] = c*x - s*y; A[q][k] = s*x + c*y; }
+      for (let k = 0; k < 3; k++){ const x = V[k][p], y = V[k][q]; V[k][p] = c*x - s*y; V[k][q] = s*x + c*y; }
+    }
+  }
+  const order = [0,1,2].sort((i, j) => A[i][i] - A[j][j]);
+  return {values:order.map(i => A[i][i]), vectors:order.map(i => new THREE.Vector3(V[0][i], V[1][i], V[2][i]))};
+}
+function centroid(P){ const c = new THREE.Vector3(); P.forEach(p => c.add(p)); return c.divideScalar(P.length || 1); }
+function fitPlane(P){
+  const c = centroid(P), M = [[0,0,0],[0,0,0],[0,0,0]];
+  for (const p of P){
+    const x = p.x-c.x, y = p.y-c.y, z = p.z-c.z;
+    M[0][0] += x*x; M[0][1] += x*y; M[0][2] += x*z; M[1][1] += y*y; M[1][2] += y*z; M[2][2] += z*z;
+  }
+  M[1][0] = M[0][1]; M[2][0] = M[0][2]; M[2][1] = M[1][2];
+  const n = eigSym3(M).vectors[0].normalize();
+  let dev = 0;
+  for (const p of P) dev = Math.max(dev, Math.abs(_t.subVectors(p, c).dot(n)));
+  return {c, n, dev};
+}
+// least-squares circle through 2D points: algebraic (Kåsa) start, geometric Gauss–Newton finish
+function fitCircle2(xs, ys){
+  const n = xs.length;
+  if (n < 3) return null;
+  let mx = 0, my = 0, s = 0;
+  for (let i = 0; i < n; i++){ mx += xs[i]; my += ys[i]; }
+  mx /= n; my /= n;
+  for (let i = 0; i < n; i++) s += Math.hypot(xs[i]-mx, ys[i]-my);
+  s /= n;
+  if (!(s > 0)) return null;
+  let Suu = 0, Suv = 0, Svv = 0, Su = 0, Sv = 0, Suz = 0, Svz = 0, Sz = 0;
+  for (let i = 0; i < n; i++){
+    const u = (xs[i]-mx)/s, v = (ys[i]-my)/s, z = u*u + v*v;
+    Suu += u*u; Suv += u*v; Svv += v*v; Su += u; Sv += v; Suz += u*z; Svz += v*z; Sz += z;
+  }
+  const k = solveLin([[Suu,Suv,Su],[Suv,Svv,Sv],[Su,Sv,n]], [-Suz,-Svz,-Sz]);
+  if (!k) return null;
+  let cx = -k[0]/2, cy = -k[1]/2, r = Math.sqrt(cx*cx + cy*cy - k[2]);
+  if (!Number.isFinite(r)) return null;
+  for (let it = 0; it < 20; it++){
+    const J = [[0,0,0],[0,0,0],[0,0,0]], g = [0,0,0];
+    for (let i = 0; i < n; i++){
+      const dx = (xs[i]-mx)/s - cx, dy = (ys[i]-my)/s - cy, d = Math.hypot(dx, dy) || 1e-12;
+      const j = [-dx/d, -dy/d, -1], res = d - r;
+      for (let a = 0; a < 3; a++){ g[a] -= j[a]*res; for (let b = 0; b < 3; b++) J[a][b] += j[a]*j[b]; }
+    }
+    const st = solveLin(J, g);
+    if (!st) break;
+    cx += st[0]; cy += st[1]; r += st[2];
+    if (Math.abs(st[0]) + Math.abs(st[1]) + Math.abs(st[2]) < 1e-13) break;
+  }
+  return {cx:mx + cx*s, cy:my + cy*s, r:Math.abs(r)*s};
+}
+// cylinder: its axis is the one direction every surface normal is perpendicular to
+function fitCylinder(P, N){
+  if (P.length < 4 || N.length < 3) return null;
+  const M = [[0,0,0],[0,0,0],[0,0,0]];
+  for (const n of N){
+    M[0][0] += n.x*n.x; M[0][1] += n.x*n.y; M[0][2] += n.x*n.z; M[1][1] += n.y*n.y; M[1][2] += n.y*n.z; M[2][2] += n.z*n.z;
+  }
+  M[1][0] = M[0][1]; M[2][0] = M[0][2]; M[2][1] = M[1][2];
+  const e = eigSym3(M);
+  if (!(e.values[1] > 0) || e.values[0] > 0.02 * e.values[1]) return null;
+  const a = e.vectors[0].normalize(), u = anyPerp(a), v = a.clone().cross(u);
+  const xs = [], ys = [];
+  let hm = 0;
+  for (const p of P){ xs.push(p.dot(u)); ys.push(p.dot(v)); hm += p.dot(a); }
+  const c = fitCircle2(xs, ys);
+  if (!c) return null;
+  let dev = 0;
+  for (let i = 0; i < P.length; i++) dev = Math.max(dev, Math.abs(Math.hypot(xs[i]-c.cx, ys[i]-c.cy) - c.r));
+  return {p:u.multiplyScalar(c.cx).addScaledVector(v, c.cy).addScaledVector(a, hm / P.length), a, r:c.r, dev};
+}
+function fitSphere(P){
+  const n = P.length;
+  if (n < 5) return null;
+  const m = centroid(P);
+  let s = 0;
+  for (const p of P) s += p.distanceTo(m);
+  s /= n;
+  if (!(s > 0)) return null;
+  const A = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], b = [0,0,0,0];
+  for (const p of P){
+    const x = (p.x-m.x)/s, y = (p.y-m.y)/s, z = (p.z-m.z)/s, w = -(x*x + y*y + z*z), row = [x, y, z, 1];
+    for (let i = 0; i < 4; i++){ b[i] += row[i]*w; for (let j = 0; j < 4; j++) A[i][j] += row[i]*row[j]; }
+  }
+  const k = solveLin(A, b);
+  if (!k) return null;
+  const cx = -k[0]/2, cy = -k[1]/2, cz = -k[2]/2, r2 = cx*cx + cy*cy + cz*cz - k[3];
+  if (!(r2 > 0)) return null;
+  const c = new THREE.Vector3(m.x + cx*s, m.y + cy*s, m.z + cz*s), r = Math.sqrt(r2) * s;
+  let dev = 0;
+  for (const p of P) dev = Math.max(dev, Math.abs(p.distanceTo(c) - r));
+  return {c, r, dev};
+}
 
-  const rows = [['part', part.name], ['triangles', tris.length.toLocaleString()],
-                ['type', flat ? 'planar' : 'curved'], ['area', A2(area) + ' mm²']];
-  if (flat) rows.push(['normal', [n0.x,n0.y,n0.z].map(v=>v.toFixed(3)).join(', ')]);
-  showInfo({title:'FACE', rows, foot:'Face is grown across triangles up to a 20° break angle.'});
+// ── Faces: topology and surface type ─────────────────────────
+// Built once per geometry: welded triangle neighbours and a face id per triangle. Face
+// ids come from the B-rep face index when cascadio wrote one; otherwise from index
+// connectivity — OpenCASCADE gives every B-rep face its own vertices, so triangles that
+// share vertex indices lie on one face; and for STL and other unindexed meshes from a
+// flood fill that stops at a 20° break.
+function topology(geo){
+  if (geo.userData._topo) return geo.userData._topo;
+  const pos = geo.attributes.position, idx = geo.index ? geo.index.array : null;
+  const nTri = Math.floor((idx ? idx.length : pos.count) / 3);
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const diag = geo.boundingBox.getSize(new THREE.Vector3()).length() || 1, q = diag * 1e-7;
+  const vert = new Int32Array(nTri*3);
+  for (let i = 0; i < nTri*3; i++) vert[i] = idx ? idx[i] : i;
+  const weld = new Int32Array(pos.count), rep = [], wmap = new Map();
+  for (let v = 0; v < pos.count; v++){
+    const k = Math.round(pos.getX(v)/q) + '_' + Math.round(pos.getY(v)/q) + '_' + Math.round(pos.getZ(v)/q);
+    let w = wmap.get(k);
+    if (w === undefined){ w = rep.length; wmap.set(k, w); rep.push(v); }
+    weld[v] = w;
+  }
+  const tn = new Float32Array(nTri*3), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < nTri; t++){
+    a.fromBufferAttribute(pos, vert[t*3]); b.fromBufferAttribute(pos, vert[t*3+1]); c.fromBufferAttribute(pos, vert[t*3+2]);
+    b.sub(a).cross(c.sub(a));
+    const l = b.length();
+    if (l > 0){ tn[t*3] = b.x/l; tn[t*3+1] = b.y/l; tn[t*3+2] = b.z/l; }
+  }
+  // A sliver with two corners on one point (as at a sphere's pole) borders nothing: pairing
+  // it would only steal its neighbours' edges.
+  const sliver = new Uint8Array(nTri);
+  for (let t = 0; t < nTri; t++){
+    const wa = weld[vert[t*3]], wb = weld[vert[t*3+1]], wc = weld[vert[t*3+2]];
+    sliver[t] = wa === wb || wb === wc || wa === wc ? 1 : 0;
+  }
+  // pair up half-edges across welded vertices; `shared` marks pairs that share vertex indices too
+  const nbr = new Int32Array(nTri*3).fill(-1), shared = new Uint8Array(nTri*3), emap = new Map(), W = rep.length;
+  let paired = 0, pairedShared = 0;
+  for (let h = 0; h < nTri*3; h++){
+    if (sliver[(h/3)|0]) continue;
+    const h2 = h - h%3 + (h%3 + 1)%3, va = vert[h], vb = vert[h2], wa = weld[va], wb = weld[vb];
+    const key = wa < wb ? wa*W + wb : wb*W + wa, o = emap.get(key);
+    if (o === undefined){ emap.set(key, h); continue; }
+    if (o < 0) continue;                      // a third triangle on one edge: leave it unpaired
+    emap.set(key, -1);
+    const o2 = o - o%3 + (o%3 + 1)%3;
+    nbr[h] = (o/3)|0; nbr[o] = (h/3)|0; paired++;
+    if ((vert[o] === vb && vert[o2] === va) || (vert[o] === va && vert[o2] === vb)){ shared[h] = shared[o] = 1; pairedShared++; }
+  }
+  const faceId = new Int32Array(nTri), brep = geo.userData.brep;
+  let nFace = 0, source;
+  const brepMax = brep && brep.tri.length === nTri ? brep.tri.reduce((m, v) => v > m ? v : m, 0) : -1;
+  if (brepMax >= 0 && brepMax < Math.max(nTri, brep.faces.length)){
+    for (let t = 0; t < nTri; t++) faceId[t] = brep.tri[t];
+    nFace = brepMax + 1; source = 'brep';
+  } else {
+    const byIndex = !!idx && pairedShared > paired * 0.05;
+    const cosLim = Math.cos(THREE.MathUtils.degToRad(byIndex ? 80 : 20));
+    const degen = t => tn[t*3] === 0 && tn[t*3+1] === 0 && tn[t*3+2] === 0;
+    const stack = [];
+    faceId.fill(-1);
+    for (let s = 0; s < nTri; s++){
+      if (faceId[s] >= 0) continue;
+      faceId[s] = nFace; stack.push(s);
+      while (stack.length){
+        const t = stack.pop();
+        for (let k = 0; k < 3; k++){
+          const h = t*3 + k, u = nbr[h];
+          if (u < 0 || faceId[u] >= 0 || (byIndex && !shared[h])) continue;
+          if (degen(t) || degen(u)){ if (!byIndex) continue; }
+          else if (Math.abs(tn[t*3]*tn[u*3] + tn[t*3+1]*tn[u*3+1] + tn[t*3+2]*tn[u*3+2]) < cosLim) continue;
+          faceId[u] = nFace; stack.push(u);
+        }
+      }
+      nFace++;
+    }
+    if (byIndex){                              // slivers join the face that owns their vertices
+      const vface = new Int32Array(pos.count).fill(-1);
+      for (let t = 0; t < nTri; t++) if (!sliver[t]) for (let k = 0; k < 3; k++) vface[vert[t*3+k]] = faceId[t];
+      for (let t = 0; t < nTri; t++) if (sliver[t])
+        for (let k = 0; k < 3; k++) if (vface[vert[t*3+k]] >= 0){ faceId[t] = vface[vert[t*3+k]]; break; }
+    }
+    source = byIndex ? 'index' : 'angle';
+  }
+  const fStart = new Int32Array(nFace + 1), fTris = new Int32Array(nTri);
+  for (let t = 0; t < nTri; t++) fStart[faceId[t] + 1]++;
+  for (let f = 0; f < nFace; f++) fStart[f+1] += fStart[f];
+  const fill = fStart.slice(0, nFace);
+  for (let t = 0; t < nTri; t++) fTris[fill[faceId[t]]++] = t;
+  return geo.userData._topo = {nTri, vert, weld, rep, tn, nbr, sliver, faceId, fStart, fTris, source, diag, info:new Map()};
+}
+function faceTris(topo, f){ return topo.fTris.subarray(topo.fStart[f], topo.fStart[f+1]); }
+
+// The surface of one face in the geometry's own frame: exact from the B-rep data when
+// cascadio supplied it and it agrees with the vertices, otherwise fitted to them.
+function faceInfo(geo, f){
+  const topo = topology(geo);
+  let info = topo.info.get(f);
+  if (!info){ info = analyzeFace(geo, topo, f); topo.info.set(f, info); }
+  return info;
+}
+function analyzeFace(geo, topo, f){
+  const tris = faceTris(topo, f), pos = geo.attributes.position;
+  const nrm = geo.index ? geo.attributes.normal : null;     // unindexed meshes only carry flat normals
+  // one entry per distinct vertex position: a vertex of this face and the normals around it
+  const byW = new Map(), rim = new Set();
+  for (let i = 0; i < tris.length; i++){
+    const t = tris[i];
+    for (let k = 0; k < 3; k++){
+      const v = topo.vert[t*3 + k], w = topo.weld[v], u = topo.nbr[t*3 + k];
+      let e = byW.get(w);
+      if (!e) byW.set(w, e = {v, n:new THREE.Vector3()});
+      e.n.x += topo.tn[t*3]; e.n.y += topo.tn[t*3+1]; e.n.z += topo.tn[t*3+2];
+      if (!topo.sliver[t] && (u < 0 || topo.faceId[u] !== f)){ rim.add(w); rim.add(topo.weld[topo.vert[t*3 + (k+1)%3]]); }
+    }
+  }
+  const P = [], N = [];
+  byW.forEach(e => {
+    P.push(new THREE.Vector3().fromBufferAttribute(pos, e.v));
+    N.push(nrm ? new THREE.Vector3().fromBufferAttribute(nrm, e.v).normalize() : e.n.normalize());
+  });
+  const size = new THREE.Box3().setFromPoints(P).getSize(new THREE.Vector3()).length();
+  const def = topo.source === 'brep' ? geo.userData.brep.faces[f] : null;
+  let surf = def ? surfFromBrep(def) : null;
+  if (surf && !onSurface(surf, P, size, topo.diag)) surf = null;    // data that doesn't fit the mesh is ignored
+  const exact = !!surf;
+  if (!surf) surf = fitSurface(P, N, !!nrm, byW.size > rim.size, size, topo.diag);
+  shapeSurface(surf, P, tris, topo, pos);
+  return {tris, surf, exact};
+}
+function surfFromBrep(d){
+  const V = a => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite) ? new THREE.Vector3(a[0], a[1], a[2]) : null;
+  const dir = a => { const v = V(a); return v && v.lengthSq() > 0 ? v.normalize() : null; };
+  const len = x => Number.isFinite(x) && x > 0;
+  if (d.type === 'plane'){ const p = V(d.origin), n = dir(d.normal); return p && n ? {type:'plane', p, n} : null; }
+  if (d.type === 'cylinder'){ const p = V(d.origin), a = dir(d.axis); return p && a && len(d.radius) ? {type:'cylinder', p, a, r:d.radius} : null; }
+  if (d.type === 'cone'){
+    const apex = V(d.apex), a = dir(d.axis);
+    return apex && a && Number.isFinite(d.semi_angle) && d.semi_angle !== 0 ? {type:'cone', apex, a, semi:Math.abs(d.semi_angle)} : null;
+  }
+  if (d.type === 'sphere'){ const c = V(d.center); return c && len(d.radius) ? {type:'sphere', c, r:d.radius} : null; }
+  if (d.type === 'torus'){
+    const c = V(d.center), a = dir(d.axis);
+    return c && a && len(d.major_radius) && len(d.minor_radius) ? {type:'torus', c, a, R:d.major_radius, r:d.minor_radius} : null;
+  }
+  return null;
+}
+function surfDist(s, v){
+  switch (s.type){
+    case 'plane': return Math.abs(_t.subVectors(v, s.p).dot(s.n));
+    case 'cylinder': { _t.subVectors(v, s.p); const h = _t.dot(s.a); return Math.abs(_t.addScaledVector(s.a, -h).length() - s.r); }
+    case 'cone': {
+      _t.subVectors(v, s.apex); const h = _t.dot(s.a), rho = _t.addScaledVector(s.a, -h).length();
+      return Math.abs(rho * Math.cos(s.semi) - Math.abs(h) * Math.sin(s.semi));
+    }
+    case 'sphere': return Math.abs(v.distanceTo(s.c) - s.r);
+    case 'torus': {
+      _t.subVectors(v, s.c); const h = _t.dot(s.a), rho = _t.addScaledVector(s.a, -h).length();
+      return Math.abs(Math.hypot(rho - s.R, h) - s.r);
+    }
+  }
+  return 0;
+}
+function onSurface(s, P, size, diag){
+  const tol = Math.max(1e-4 * (s.r || size), 1e-5 * size, 1e-6 * diag);
+  const step = Math.max(1, Math.floor(P.length / 64));
+  for (let i = 0; i < P.length; i += step) if (!(surfDist(s, P[i]) <= tol)) return false;
+  return true;
+}
+// Without B-rep data: plane, then cylinder, then sphere. OpenCASCADE puts mesh vertices
+// exactly on the surface, so the fits are held to tight tolerances, and where the mesh has
+// true vertex normals (smoothN) they must agree too. A sphere also needs a vertex inside the
+// face: a band whose vertices all sit on its two rims (a chamfer) fits a sphere as well.
+function fitSurface(P, N, smoothN, inner, size, diag){
+  if (P.length >= 3){
+    const pl = fitPlane(P);
+    if (pl.dev <= Math.max(1e-5 * size, 1e-6 * diag)) return {type:'plane', p:pl.c, n:pl.n};
+  }
+  const radial = (i, o, a) => { _t.subVectors(P[i], o); if (a) _t.addScaledVector(a, -_t.dot(a)); return _t.normalize(); };
+  const normalsFit = (o, a) => !smoothN || N.every((n, i) => Math.abs(n.dot(radial(i, o, a))) > 0.9994);   // within 2°
+  const cy = fitCylinder(P, N);
+  if (cy && cy.r < 1e3 * size && cy.dev <= Math.max(2e-4 * cy.r, 1e-6 * diag) && normalsFit(cy.p, cy.a))
+    return {type:'cylinder', p:cy.p, a:cy.a, r:cy.r};
+  const sp = inner ? fitSphere(P) : null;
+  if (sp && sp.r < 1e3 * size && sp.dev <= Math.max(2e-4 * sp.r, 1e-6 * diag) && normalsFit(sp.c, null))
+    return {type:'sphere', c:sp.c, r:sp.r};
+  return {type:'surface'};
+}
+// Which way a plane faces, whether a cylinder or sphere is convex (a boss) or concave
+// (a hole), and how far an axial surface runs along its axis and away from it.
+function shapeSurface(s, P, tris, topo, pos){
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  let facing = 0, bulge = 0;
+  if (s.type === 'plane' || s.type === 'cylinder' || s.type === 'sphere'){
+    for (let i = 0; i < tris.length; i++){
+      const t = tris[i]*3;
+      a.fromBufferAttribute(pos, topo.vert[t]); b.fromBufferAttribute(pos, topo.vert[t+1]); c.fromBufferAttribute(pos, topo.vert[t+2]);
+      n.subVectors(b, a).cross(_t.subVectors(c, a));          // normal scaled by twice the area
+      if (s.type === 'plane'){ facing += n.dot(s.n); continue; }
+      _t.addVectors(a, b).add(c).divideScalar(3);
+      if (s.type === 'cylinder'){ _t.sub(s.p); _t.addScaledVector(s.a, -_t.dot(s.a)); }
+      else _t.sub(s.c);
+      bulge += n.dot(_t);
+    }
+  }
+  if (s.type === 'plane' && facing < 0) s.n.negate();
+  if (s.type === 'cylinder' || s.type === 'sphere') s.hole = bulge < 0;
+  const o = s.type === 'cylinder' ? s.p : s.type === 'cone' ? s.apex : s.type === 'torus' ? s.c : null;
+  if (!o) return;
+  let h0 = Infinity, h1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+  for (const p of P){
+    _t.subVectors(p, o);
+    const h = _t.dot(s.a), rho = _t.addScaledVector(s.a, -h).length();
+    h0 = Math.min(h0, h); h1 = Math.max(h1, h); r0 = Math.min(r0, rho); r1 = Math.max(r1, rho);
+  }
+  Object.assign(s, {h0, h1, rMin:r0, rMax:r1});
+}
+// a local surface description carried into world space by a part's matrix
+function surfToWorld(s, m){
+  const k = Math.cbrt(Math.abs(m.determinant())) || 1, o = Object.assign({}, s);
+  ['p', 'c', 'apex'].forEach(key => { if (s[key]) o[key] = s[key].clone().applyMatrix4(m); });
+  ['n', 'a'].forEach(key => { if (s[key]) o[key] = s[key].clone().transformDirection(m); });
+  ['r', 'R', 'h0', 'h1', 'rMin', 'rMax'].forEach(key => { if (s[key] !== undefined) o[key] = s[key] * k; });
+  return o;
+}
+// A picked face in assembled world coordinates: its triangles, surface and area.
+// `hit` is the picked point, also in assembled coordinates.
+function faceEntity(part, f, hit){
+  const geo = part.mesh.geometry, topo = topology(geo), info = faceInfo(geo, f), m = part.restMatrix;
+  const pos = geo.attributes.position, tris = info.tris, prims = new Float64Array(tris.length * 9), v = new THREE.Vector3();
+  for (let i = 0; i < tris.length; i++) for (let k = 0; k < 3; k++){
+    v.fromBufferAttribute(pos, topo.vert[tris[i]*3 + k]).applyMatrix4(m);
+    prims[i*9 + k*3] = v.x; prims[i*9 + k*3 + 1] = v.y; prims[i*9 + k*3 + 2] = v.z;
+  }
+  let area = 0;
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+  for (let i = 0; i < prims.length; i += 9){
+    e1.set(prims[i+3]-prims[i], prims[i+4]-prims[i+1], prims[i+5]-prims[i+2]);
+    e2.set(prims[i+6]-prims[i], prims[i+7]-prims[i+1], prims[i+8]-prims[i+2]);
+    area += e1.cross(e2).length() / 2;
+  }
+  return {kind:'face', part, key:'f' + f, geom:surfToWorld(info.surf, m), exact:info.exact, area,
+          prims, stride:9, count:tris.length, hit: hit ? hit.clone() : new THREE.Vector3(prims[0], prims[1], prims[2])};
+}
+function entityOverlay(ent, color){
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ent.prims), 3));
+  const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color, transparent:true, opacity:.5, side:THREE.DoubleSide,
+    depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
+  o.renderOrder = 3;
+  follow(o, ent.part, null);
+  scene.add(o);
+  return o;
+}
+const FACE_FOOT = {
+  brep:'Exact B-rep face from the STEP file.',
+  index:'B-rep face recovered from the mesh; its surface is fitted to the vertices.',
+  angle:'Face is grown across triangles up to a 20° break angle.'
+};
+function selectFace(part, faceIndex, point){
+  const topo = topology(part.mesh.geometry);
+  const ent = faceEntity(part, topo.faceId[faceIndex], point);
+  faceOverlay = entityOverlay(ent, 0xff7a45);
+  const d = describe(ent);
+  showInfo({title:'FACE', rows:[['part', part.name], ['triangles', ent.count.toLocaleString()],
+                                ['type', d.title.toLowerCase()], ...d.rows], foot:FACE_FOOT[topo.source]});
 }
 
 // ── Edge picking + circle fitting ────────────────────────────
@@ -5938,7 +6374,7 @@ function pickEdge(){
 
   const chain = chainFrom(hit.object, hit.index);
   if (!chain){ toast('Could not trace that edge'); return; }
-  drawEdgeOverlay(chain.points);
+  drawEdgeOverlay(chain.points, part);
 
   const fit = fitCircle(chain.points);
   const len = polylineLength(chain.points, chain.closed);
@@ -6020,10 +6456,11 @@ function chainFrom(lineObj, hitIndex){
   if (closed) pts.pop();          // drop the duplicated closing point so it doesn't bias the fit
   return {points:pts, closed, count:total};
 }
-function drawEdgeOverlay(points){
+function drawEdgeOverlay(points, part){
   const g = new THREE.BufferGeometry().setFromPoints(points);
   edgeOverlay = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xff7a45, depthTest:false}));
   edgeOverlay.renderOrder = 4;
+  if (part) follow(edgeOverlay, part, part.offset);      // points are where the part is drawn now
   scene.add(edgeOverlay);
 }
 function polylineLength(pts, closed){
@@ -6073,13 +6510,783 @@ function fmt(v){
   if (a >= 0.1) return v.toFixed(3);
   return v.toPrecision(3);
 }
+// part names come from the file: never let them through as markup
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
 function showInfo(data){
   const el = $('info');
   if (!data){ el.classList.remove('show'); el.innerHTML = ''; return; }
-  let html = '<div class="hd">' + data.title + '</div>';
-  data.rows.forEach(([k,v]) => { html += '<div><span class="k">' + k + '</span> <span class="v">' + v + '</span></div>'; });
-  if (data.foot) html += '<div class="k" style="margin-top:5px">' + data.foot + '</div>';
+  let html = '<div class="hd">' + esc(data.title) + '</div>';
+  data.rows.forEach(([k,v]) => { html += '<div><span class="k">' + esc(k) + '</span> <span class="v">' + esc(v) + '</span></div>'; });
+  if (data.foot) html += '<div class="k" style="margin-top:5px">' + esc(data.foot) + '</div>';
   el.innerHTML = html; el.classList.add('show');
+}
+
+// ── Measure ──────────────────────────────────────────────────
+// Click a face or an edge (an edge wins within a few pixels of the cursor) for its size;
+// click a second one for the distances between the two. Everything is computed on the
+// assembled geometry, from the exact B-rep surfaces when the file carries them.
+const COL_A = '#ff7a45', COL_B = '#5aa7e8', EDGE_PX = 7;
+const PAR = Math.cos(THREE.MathUtils.degToRad(0.5)), PERP = Math.sin(THREE.MathUtils.degToRad(0.5));
+let measA = null, measB = null, measMd = null, measItems = [], keptItems = [];
+
+$('btnMeasKeep').addEventListener('click', measureKeep);
+$('btnMeasClear').addEventListener('click', ()=> measureClear(true));
+
+function meshHit(x, y, r){          // nearest visible, unclipped mesh under a viewport pixel
+  ndc.set(x / r.width * 2 - 1, -(y / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(parts.filter(p => p.visible).map(p => p.mesh), false);
+  return hits.find(h => notClipped(h.point)) || null;
+}
+function pickMeasure(e){
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let hit = meshHit(x, y, r);
+  const onFace = !!hit;
+  // a click just outside a silhouette can still land on the edge there
+  for (const [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]){ if (hit) break; hit = meshHit(x + dx*EDGE_PX, y + dy*EDGE_PX, r); }
+  if (!hit){ measureClear(false); return; }
+  const part = parts.find(p => p.mesh === hit.object);
+  const topo = topology(part.mesh.geometry), f = topo.faceId[hit.faceIndex];
+  const rest = hit.point.clone().sub(part.offset);
+  const near = nearestBoundary(part, topo, f, hit, x, y, r);
+  const ent = near && near.px <= EDGE_PX ? edgeEntity(part, near.h, rest) : onFace ? faceEntity(part, f, rest) : null;
+  if (!ent){ measureClear(false); return; }
+  addMeasureEntity(ent);
+}
+// The boundary segment of face f nearest the cursor (CSS px), ignoring segments clearly
+// behind the picked point — the far rim of a shaft seen from the side.
+function nearestBoundary(part, topo, f, hit, x, y, r){
+  const pos = part.mesh.geometry.attributes.position, m = part.mesh.matrixWorld;
+  const px = 2 * hit.distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / r.height;
+  const slack = Math.max(4 * EDGE_PX * px, hit.distance * 1e-3);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), sa = new THREE.Vector3(), sb = new THREE.Vector3(), q = new THREE.Vector3();
+  let best = null;
+  for (const t of faceTris(topo, f)) for (let k = 0; k < 3; k++){
+    const h = t*3 + k, u = topo.nbr[h];
+    if (topo.sliver[t] || (u >= 0 && topo.faceId[u] === f)) continue;   // inside the face, or the seam of a closed face
+    a.fromBufferAttribute(pos, topo.vert[h]).applyMatrix4(m);
+    b.fromBufferAttribute(pos, topo.vert[t*3 + (k+1)%3]).applyMatrix4(m);
+    sa.copy(a).project(camera); sb.copy(b).project(camera);
+    if (Math.abs(sa.z) > 1 || Math.abs(sb.z) > 1) continue;
+    const ax = (sa.x + 1) / 2 * r.width, ay = (1 - sa.y) / 2 * r.height;
+    const dx = (sb.x + 1) / 2 * r.width - ax, dy = (1 - sb.y) / 2 * r.height - ay, l2 = dx*dx + dy*dy;
+    const s = l2 > 0 ? Math.min(1, Math.max(0, ((x - ax)*dx + (y - ay)*dy) / l2)) : 0;
+    const d = Math.hypot(ax + s*dx - x, ay + s*dy - y);
+    if (best && d >= best.px) continue;
+    q.copy(a).lerp(b, s);
+    if (!notClipped(q) || q.distanceTo(camera.position) > hit.distance + slack) continue;
+    best = {px:d, h};
+  }
+  return best;
+}
+// The B-rep edge through boundary half-edge h0: every boundary segment of its face that
+// borders the same neighbouring face, walked into one ordered polyline (geometry frame).
+function edgeChain(topo, geo, h0){
+  const F = topo.faceId[(h0/3)|0], u0 = topo.nbr[h0], G = u0 >= 0 ? topo.faceId[u0] : -1;
+  const nx = h => h - h%3 + (h%3 + 1)%3, wv = h => topo.weld[topo.vert[h]], byV = new Map();
+  for (const t of faceTris(topo, F)) for (let k = 0; k < 3; k++){
+    const h = t*3 + k, u = topo.nbr[h];
+    if (topo.sliver[t] || (u >= 0 ? topo.faceId[u] : -1) !== G) continue;
+    for (const w of [wv(h), wv(nx(h))]){ let l = byV.get(w); if (!l) byV.set(w, l = []); l.push(h); }
+  }
+  const comp = new Set([h0]), stack = [h0];               // the connected run holding h0
+  while (stack.length){
+    const h = stack.pop();
+    for (const w of [wv(h), wv(nx(h))]) for (const o of byV.get(w)) if (!comp.has(o)){ comp.add(o); stack.push(o); }
+  }
+  const deg = w => byV.get(w).reduce((n, o) => n + comp.has(o), 0);
+  let start = h0, cur = wv(h0);                            // walk it from an open end if it has one
+  outer: for (const h of comp) for (const w of [wv(h), wv(nx(h))]) if (deg(w) === 1){ start = h; cur = w; break outer; }
+  const ids = [cur], used = new Set();
+  for (let h = start; h !== undefined; ){
+    used.add(h);
+    cur = wv(h) === cur ? wv(nx(h)) : wv(h);
+    ids.push(cur);
+    h = byV.get(cur).find(o => comp.has(o) && !used.has(o));
+  }
+  const closed = ids.length > 3 && ids[0] === ids[ids.length - 1];
+  if (closed) ids.pop();
+  const pos = geo.attributes.position;
+  return {pts:ids.map(w => new THREE.Vector3().fromBufferAttribute(pos, topo.rep[w])), closed,
+          faces:G >= 0 ? [F, G] : [F],
+          key:'e' + Math.min(F, G) + '_' + Math.max(F, G) + '_' + ids.reduce((m, w) => Math.min(m, w), Infinity)};
+}
+function edgeEntity(part, h, hit){
+  const geo = part.mesh.geometry, topo = topology(geo), ch = edgeChain(topo, geo, h), m = part.restMatrix;
+  const pts = ch.pts.map(p => p.applyMatrix4(m));
+  const surfs = ch.faces.map(f => { const i = faceInfo(geo, f); return Object.assign(surfToWorld(i.surf, m), {exact:i.exact}); });
+  const geom = classifyEdge(pts, ch.closed, surfs);
+  const nSeg = pts.length - (ch.closed ? 0 : 1), prims = new Float64Array(nSeg * 6);
+  for (let i = 0; i < nSeg; i++){
+    const p = pts[i], q = pts[(i+1) % pts.length];
+    prims.set([p.x, p.y, p.z, q.x, q.y, q.z], i*6);
+  }
+  return {kind:'edge', part, key:ch.key, geom, exact:!!geom.exact, prims, stride:6, count:nSeg,
+          pts, closed:ch.closed, hit:closestOnPolyline(pts, ch.closed, hit)};
+}
+function closestOnPolyline(pts, closed, q){
+  const best = pts[0].clone(), seg = new THREE.Line3(), c = new THREE.Vector3();
+  let bd = Infinity;
+  for (let i = 0; i < pts.length - (closed ? 0 : 1); i++){
+    seg.set(pts[i], pts[(i+1) % pts.length]).closestPointToPoint(q, true, c);
+    const d = c.distanceToSquared(q);
+    if (d < bd){ bd = d; best.copy(c); }
+  }
+  return best;
+}
+// What an edge is: a circle or arc (exact when it runs round an adjacent cylinder, cone,
+// torus or sphere), a straight line, or some other curve.
+function classifyEdge(pts, closed, surfs){
+  const n = pts.length;
+  let len = 0;
+  for (let i = 1; i < n; i++) len += pts[i].distanceTo(pts[i-1]);
+  if (closed) len += pts[n-1].distanceTo(pts[0]);
+  for (const s of surfs){ const c = circleOn(s, pts); if (c) return circleEdge(c, pts, closed, s.exact); }
+  if (!closed){
+    const p0 = pts[0], p1 = pts[n-1], l = p0.distanceTo(p1);
+    if (l > 0){
+      const d = p1.clone().sub(p0).divideScalar(l);
+      let dev = 0;
+      for (const p of pts){ _t.subVectors(p, p0); dev = Math.max(dev, _t.addScaledVector(d, -_t.dot(d)).length()); }
+      if (dev <= 1e-5 * l) return {type:'line', p0:p0.clone(), p1:p1.clone(), d, len:l, exact:true};
+    }
+  }
+  if (n >= 4 || (closed && n >= 3)){
+    const pl = fitPlane(pts), size = new THREE.Box3().setFromPoints(pts).getSize(new THREE.Vector3()).length();
+    if (pl.dev <= 1e-4 * size){
+      const u = anyPerp(pl.n), v = pl.n.clone().cross(u), xs = pts.map(p => p.dot(u)), ys = pts.map(p => p.dot(v));
+      const cf = fitCircle2(xs, ys);
+      let dev = 0;
+      if (cf) for (let i = 0; i < n; i++) dev = Math.max(dev, Math.abs(Math.hypot(xs[i]-cf.cx, ys[i]-cf.cy) - cf.r));
+      if (cf && dev <= 1e-3 * cf.r){
+        const c = u.multiplyScalar(cf.cx).addScaledVector(v, cf.cy).addScaledVector(pl.n, pl.c.dot(pl.n));
+        return circleEdge({c, a:pl.n, r:cf.r}, pts, closed, false);
+      }
+    }
+  }
+  return {type:'curve', len, exact:false};
+}
+function circleOn(s, pts){
+  if (s.type === 'cylinder' || s.type === 'cone' || s.type === 'torus'){
+    const o = s.type === 'cylinder' ? s.p : s.type === 'cone' ? s.apex : s.c;
+    let h0 = Infinity, h1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+    for (const p of pts){
+      _t.subVectors(p, o);
+      const h = _t.dot(s.a), rho = _t.addScaledVector(s.a, -h).length();
+      h0 = Math.min(h0, h); h1 = Math.max(h1, h); r0 = Math.min(r0, rho); r1 = Math.max(r1, rho);
+    }
+    const r = s.type === 'cylinder' ? s.r : (r0 + r1) / 2, tol = 1e-4 * r;
+    if (!(r > 0) || h1 - h0 > tol || r1 - r0 > tol || Math.abs(r0 - r) > tol) return null;
+    return {c:o.clone().addScaledVector(s.a, (h0 + h1) / 2), a:s.a.clone(), r};
+  }
+  if (s.type === 'sphere' && pts.length >= 3){
+    const pl = fitPlane(pts);
+    if (pl.dev > 1e-4 * s.r) return null;
+    const d = _t.subVectors(s.c, pl.c).dot(pl.n), r2 = s.r*s.r - d*d;
+    if (!(r2 > 0)) return null;
+    const c = s.c.clone().addScaledVector(pl.n, -d), r = Math.sqrt(r2);
+    if (pts.some(p => Math.abs(p.distanceTo(c) - r) > 1e-4 * s.r)) return null;
+    return {c, a:pl.n.clone(), r};
+  }
+  return null;
+}
+function circleEdge(c, pts, closed, exact){
+  let sweep = 2 * Math.PI;
+  if (!closed){
+    const u = anyPerp(c.a), v = c.a.clone().cross(u);
+    let prev = null;
+    sweep = 0;
+    for (const p of pts){
+      _t.subVectors(p, c.c);
+      const ang = Math.atan2(_t.dot(v), _t.dot(u));
+      if (prev !== null){ let d = ang - prev; if (d > Math.PI) d -= 2*Math.PI; else if (d < -Math.PI) d += 2*Math.PI; sweep += d; }
+      prev = ang;
+    }
+    sweep = Math.abs(sweep);
+  }
+  return {type:'circle', c:c.c, a:c.a, r:c.r, closed, sweep, len:c.r * sweep, exact:!!exact};
+}
+
+// dimension items: points in assembled coordinates, each with the part it rides on
+function radialDir(c, a, toward){
+  const u = toward ? toward.clone().sub(c) : new THREE.Vector3();
+  if (a) u.addScaledVector(a, -u.dot(a));
+  return u.lengthSq() > 1e-24 ? u.normalize() : anyPerp(a || new THREE.Vector3(0, 0, 1));
+}
+function diaDim(part, c, a, r, toward){
+  const u = radialDir(c, a, toward);
+  return {type:'dim', a:{part, p:c.clone().addScaledVector(u, -r)}, b:{part, p:c.clone().addScaledVector(u, r)}, value:2*r, prefix:'Ø'};
+}
+function radDim(part, c, a, r, toward){
+  const u = radialDir(c, a, toward);
+  return {type:'dim', a:{part, p:c.clone()}, b:{part, p:c.clone().addScaledVector(u, r)}, value:r, prefix:'R', single:true};
+}
+function axisMark(part, p, a, h0, h1){
+  const ext = 0.12 * (h1 - h0) + modelSize * 0.01;
+  return {type:'center', a:{part, p:p.clone().addScaledVector(a, h0 - ext)}, b:{part, p:p.clone().addScaledVector(a, h1 + ext)}};
+}
+
+// Size and type of one picked face or edge: panel rows plus the dimensions to draw.
+function describe(e){
+  const g = e.geom, rows = [], items = [], marks = [];
+  const lin = v => L(v) + ' mm', dir = v => [v.x, v.y, v.z].map(x => x.toFixed(3)).join(', ');
+  const at = v => [v.x, v.y, v.z].map(x => L(Math.abs(x) < modelSize * 1e-9 ? 0 : x)).join(', ');   // no -8e-16
+  const deg = r => (r * 180 / Math.PI).toFixed(2) + '°';
+  let title = 'Freeform surface', short = '';
+  if (e.kind === 'edge') marks.push({type:'edge', part:e.part, pts:e.pts, closed:e.closed, color:e.color || COL_A});
+  switch (g.type){
+    case 'plane':
+      title = 'Plane';
+      rows.push(['normal', dir(g.n)]);
+      break;
+    case 'cylinder':
+      title = g.hole ? 'Cylinder (hole)' : 'Cylinder (boss)'; short = 'Ø' + L(2*g.r);
+      rows.push(['diameter', 'Ø' + lin(2*g.r)], ['radius', 'R' + lin(g.r)], ['length', lin(g.h1 - g.h0)], ['axis', dir(g.a)]);
+      items.push(diaDim(e.part, footOnLine(e.hit, g.p, g.a), g.a, g.r, e.hit));
+      marks.push(axisMark(e.part, g.p, g.a, g.h0, g.h1));
+      break;
+    case 'cone':
+      title = 'Cone'; short = deg(2*g.semi);
+      rows.push(['included angle', deg(2*g.semi)], ['diameter', 'Ø' + L(2*g.rMin) + ' – Ø' + lin(2*g.rMax)],
+                ['length', lin(g.h1 - g.h0)], ['axis', dir(g.a)]);
+      marks.push(axisMark(e.part, g.apex, g.a, g.h0, g.h1));
+      break;
+    case 'sphere':
+      title = g.hole ? 'Sphere (socket)' : 'Sphere'; short = 'Ø' + L(2*g.r);
+      rows.push(['diameter', 'Ø' + lin(2*g.r)], ['radius', 'R' + lin(g.r)], ['centre', at(g.c)]);
+      items.push(diaDim(e.part, g.c, null, g.r, e.hit));
+      break;
+    case 'torus':
+      title = 'Torus'; short = 'R' + L(g.r);
+      rows.push(['tube radius', 'R' + lin(g.r)], ['ring radius', 'R' + lin(g.R)], ['axis', dir(g.a)]);
+      items.push(radDim(e.part, g.c.clone().addScaledVector(radialDir(g.c, g.a, e.hit), g.R), null, g.r, e.hit));
+      break;
+    case 'line':
+      title = 'Straight edge'; short = lin(g.len);
+      rows.push(['length', lin(g.len)], ['direction', dir(g.d)]);
+      items.push({type:'tag', a:{part:e.part, p:g.p0.clone().lerp(g.p1, .5)}, value:g.len});
+      break;
+    case 'circle':
+      title = g.closed ? 'Circle' : 'Arc'; short = g.closed ? 'Ø' + L(2*g.r) : 'R' + L(g.r);
+      rows.push(['diameter', 'Ø' + lin(2*g.r)], ['radius', 'R' + lin(g.r)], ['centre', at(g.c)], ['axis', dir(g.a)]);
+      if (!g.closed) rows.push(['arc angle', deg(g.sweep)], ['arc length', lin(g.len)]);
+      items.push(g.closed ? diaDim(e.part, g.c, g.a, g.r, e.hit) : radDim(e.part, g.c, g.a, g.r, e.hit));
+      break;
+    case 'curve':
+      title = 'Curve'; short = lin(g.len);
+      rows.push(['length', lin(g.len)]);
+      break;
+  }
+  if (e.kind === 'face') rows.push(['area', A2(e.area) + ' mm²']);
+  rows.push(['source', g.type === 'surface' || g.type === 'curve' ? 'mesh' : g.type === 'line' ? 'mesh vertices'
+                     : e.exact ? 'exact (STEP B-rep)' : 'fitted to the mesh']);
+  return {title, short, rows, items, marks};
+}
+
+function axisOf(g){
+  if (g.type === 'cylinder') return {p:g.p, a:g.a};
+  if (g.type === 'cone') return {p:g.apex, a:g.a};
+  if (g.type === 'torus' || g.type === 'circle') return {p:g.c, a:g.a};
+  return null;
+}
+// Distances and angles between two picks. The first row is the headline figure: the
+// normal distance between parallel planes, the centre distance of parallel axes, and so on.
+// The minimum distance between the actual picked geometry always closes the list.
+function relate(A, B, md){
+  const rows = [], items = [];
+  const RANK = {plane:0, cylinder:1, cone:1, torus:1, circle:1, sphere:2, line:3};
+  const rank = e => e.geom.type in RANK ? RANK[e.geom.type] : 9;
+  const [X, Y] = rank(B) < rank(A) ? [B, A] : [A, B];
+  const gx = X.geom, gy = Y.geom, ax = axisOf(gx), ay = axisOf(gy);
+  const eps = modelSize * 1e-7, lin = v => L(v) + ' mm', deg = r => (r * 180 / Math.PI).toFixed(2) + '°';
+  const row = (k, v) => rows.push([k, v]);
+  let drawn = false;
+  const dim = (e1, p1, e2, p2, value) => {
+    if (!(value > eps)) return;
+    items.push({type:'dim', a:{part:e1.part, p:p1.clone()}, b:{part:e2.part, p:p2.clone()}, value});
+    drawn = true;
+  };
+  const radius = g => g.type === 'cylinder' || g.type === 'circle' ? g.r : null;
+  const onAxis = (e, g, a) => g.type === 'circle' ? g.c.clone() : footOnLine(e.hit, a.p, a.a);   // axis point by the pick
+
+  if (gx.type === 'plane' && gy.type === 'plane'){
+    const c = Math.abs(gx.n.dot(gy.n));
+    if (c >= PAR){
+      const d = Math.abs(_t.subVectors(gy.p, gx.p).dot(gx.n));
+      row('distance', d <= eps ? '0 (coplanar)' : lin(d));
+      row('planes', 'parallel');
+      if (md && Math.abs(md.d - d) <= Math.max(eps, d * 1e-4)) dim(A, md.pa, B, md.pb, d);   // faces overlap: draw it there
+      else dim(X, X.hit, Y, footOnPlane(X.hit, gy.p, gy.n), d);
+    } else row('angle', deg(Math.acos(c)));
+  } else if (gx.type === 'plane' && ay){
+    const s = Math.abs(gx.n.dot(ay.a)), q = onAxis(Y, gy, ay), d = Math.abs(_t.subVectors(q, gx.p).dot(gx.n));
+    if (s <= PERP){                                       // axis parallel to the plane
+      row(gy.type === 'circle' ? 'centre to plane' : 'axis to plane', lin(d));
+      const r = radius(gy);
+      if (r !== null){
+        if (d >= r){ row('min to plane', lin(d - r)); row('max to plane', lin(d + r)); }
+        else row('plane', 'cuts through it');
+      }
+      dim(Y, q, X, footOnPlane(q, gx.p, gx.n), d);
+    } else if (s >= PAR){                                 // axis square to the plane
+      if (gy.type === 'circle' || gy.type === 'torus'){
+        const dc = Math.abs(_t.subVectors(gy.c, gx.p).dot(gx.n));
+        row('distance', lin(dc) + (gy.type === 'circle' ? ' (circle ∥ plane)' : ''));
+        dim(Y, gy.c, X, footOnPlane(gy.c, gx.p, gx.n), dc);
+      } else {
+        row('axis', 'square to the plane');
+        const hp = _t.subVectors(gx.p, ay.p).dot(gx.n) / ay.a.dot(gx.n), e0 = Math.abs(gy.h0 - hp), e1 = Math.abs(gy.h1 - hp);
+        row('far end to plane', lin(Math.max(e0, e1)));
+        row('near end to plane', lin(Math.min(e0, e1)));
+        const far = ay.p.clone().addScaledVector(ay.a, e0 > e1 ? gy.h0 : gy.h1);
+        dim(Y, far, X, footOnPlane(far, gx.p, gx.n), Math.max(e0, e1));
+      }
+    } else {
+      row('axis angle to plane', deg(Math.asin(Math.min(1, s))));
+      if (gy.type === 'circle'){ row('centre to plane', lin(d)); dim(Y, q, X, footOnPlane(q, gx.p, gx.n), d); }
+    }
+  } else if (gx.type === 'plane' && gy.type === 'sphere'){
+    const d = Math.abs(_t.subVectors(gy.c, gx.p).dot(gx.n));
+    row('centre to plane', lin(d));
+    if (d >= gy.r) row('min to plane', lin(d - gy.r)); else row('plane', 'cuts through it');
+    dim(Y, gy.c, X, footOnPlane(gy.c, gx.p, gx.n), d);
+  } else if (gx.type === 'plane' && gy.type === 'line'){
+    const s = Math.abs(gx.n.dot(gy.d));
+    if (s <= PERP){
+      const d = Math.abs(_t.subVectors(gy.p0, gx.p).dot(gx.n));
+      row('distance', lin(d) + ' (edge ∥ plane)');
+      dim(Y, Y.hit, X, footOnPlane(Y.hit, gx.p, gx.n), d);
+    } else {
+      row('angle to plane', deg(Math.asin(Math.min(1, s))));
+      const d0 = Math.abs(_t.subVectors(gy.p0, gx.p).dot(gx.n)), d1 = Math.abs(_t.subVectors(gy.p1, gx.p).dot(gx.n));
+      row('edge ends to plane', lin(Math.min(d0, d1)) + ' / ' + lin(Math.max(d0, d1)));
+    }
+  } else if (ax && ay){
+    const c = Math.abs(ax.a.dot(ay.a));
+    if (c >= PAR){                                        // parallel axes: centre distance
+      const q1 = onAxis(X, gx, ax), q2 = footOnLine(q1, ay.p, ay.a), d = q1.distanceTo(q2);
+      row('centre distance', d <= eps * 10 ? '0 (coaxial)' : lin(d));
+      if (gx.type === 'circle' && gy.type === 'circle' && gx.c.distanceTo(gy.c) - d > eps * 10){
+        row('centre to centre', lin(gx.c.distanceTo(gy.c)));
+        row('axial offset', lin(Math.abs(_t.subVectors(gy.c, gx.c).dot(ax.a))));
+      }
+      const r1 = radius(gx), r2 = radius(gy);
+      if (r1 !== null && r2 !== null){
+        if (d >= r1 + r2){ row('gap', lin(d - r1 - r2)); row('outside to outside', lin(d + r1 + r2)); }
+        else if (d <= Math.abs(r1 - r2)) row('radial clearance', lin(Math.abs(r1 - r2) - d));
+        else row('circles', 'overlap');
+      }
+      dim(X, q1, Y, q2, d);
+    } else {
+      row('angle between axes', deg(Math.acos(c)));
+      const cl = closestLines(ax.p, ax.a, ay.p, ay.a);
+      if (cl.d <= eps * 10) row('axes', 'intersect');
+      else { row('axis to axis', lin(cl.d)); dim(X, cl.c1, Y, cl.c2, cl.d); }
+    }
+  } else if (ax && gy.type === 'sphere'){
+    if (gx.type === 'circle'){ const d = gx.c.distanceTo(gy.c); row('centre to centre', lin(d)); dim(X, gx.c, Y, gy.c, d); }
+    else {
+      const f = footOnLine(gy.c, ax.p, ax.a), d = gy.c.distanceTo(f);
+      row('centre to axis', d <= eps * 10 ? '0 (on the axis)' : lin(d));
+      dim(Y, gy.c, X, f, d);
+    }
+  } else if (ax && gy.type === 'line'){
+    if (gx.type === 'circle'){
+      const f = footOnLine(gx.c, gy.p0, gy.d), d = gx.c.distanceTo(f);
+      row('centre to edge', lin(d));
+      if (d >= gx.r) row('circle to edge', lin(d - gx.r));
+      dim(X, gx.c, Y, f, d);
+    } else {
+      const c = Math.abs(ax.a.dot(gy.d));
+      let d, p1, p2;
+      if (c >= PAR){
+        p2 = Y.hit.clone(); p1 = footOnLine(p2, ax.p, ax.a); d = p1.distanceTo(p2);
+        row('axis to edge', lin(d));
+      } else {
+        const cl = closestLines(ax.p, ax.a, gy.p0, gy.d);
+        p1 = cl.c1; p2 = cl.c2; d = cl.d;
+        row('axis to edge line', d <= eps * 10 ? '0 (they meet)' : lin(d));
+        row('angle to edge', deg(Math.acos(c)));
+      }
+      const r = radius(gx);
+      if (r !== null && d >= r) row('surface to edge', lin(d - r));
+      dim(X, p1, Y, p2, d);
+    }
+  } else if (gx.type === 'sphere' && gy.type === 'sphere'){
+    const d = gx.c.distanceTo(gy.c);
+    row('centre distance', lin(d));
+    if (d >= gx.r + gy.r) row('gap', lin(d - gx.r - gy.r));
+    dim(X, gx.c, Y, gy.c, d);
+  } else if (gx.type === 'sphere' && gy.type === 'line'){
+    const f = footOnLine(gx.c, gy.p0, gy.d), d = gx.c.distanceTo(f);
+    row('centre to edge line', lin(d));
+    dim(X, gx.c, Y, f, d);
+  } else if (gx.type === 'line' && gy.type === 'line'){
+    const c = Math.abs(gx.d.dot(gy.d));
+    if (c >= PAR){
+      const f = footOnLine(X.hit, gy.p0, gy.d), d = X.hit.distanceTo(f);
+      row('distance', lin(d) + ' (parallel)');
+      dim(X, X.hit, Y, f, d);
+    } else row('angle', deg(Math.acos(c)));
+  }
+  if (md){
+    row('min distance (mesh)', md.d <= eps ? '0 (touching)' : lin(md.d));
+    if (!drawn) dim(A, md.pa, B, md.pb, md.d);
+  }
+  row('source', A.exact && B.exact ? 'exact (STEP B-rep)' : 'fitted to the mesh');
+  return {rows, items};
+}
+
+function addMeasureEntity(ent){
+  if (measA && measB) measureClear(false);
+  if (measA && measA.part === ent.part && measA.key === ent.key){ toast('Already picked — pick another face or edge'); return; }
+  ent.color = measA ? COL_B : COL_A;
+  if (ent.kind === 'face') ent.overlay = entityOverlay(ent, ent.color);
+  if (!measA) measA = ent;
+  else { measB = ent; measMd = minDistance(measA, measB); }
+  renderMeasure();
+}
+function measureClear(all){
+  [measA, measB].forEach(e => { if (e && e.overlay) disposeOverlay(e.overlay); });
+  measA = measB = measMd = null;
+  if (all) keptItems = [];
+  renderMeasure();
+}
+function measureKeep(){             // freeze the current dimensions on screen, start the next
+  const keep = measItems.filter(it => it.type !== 'edge');
+  if (!keep.length) return;
+  keptItems = keptItems.concat(keep);
+  measureClear(false);
+}
+function renderMeasure(){
+  const row = (r, main) => '<div class="r' + (main ? ' main' : '') + '"><span class="k">' + esc(r[0]) +
+                           '</span><span class="v">' + esc(r[1]) + '</span></div>';
+  const head = (e, d, tag) => '<div class="ent"><i style="background:' + e.color + '"></i><span>' + tag + ' · ' +
+                              esc(d.title + (d.short ? ' ' + d.short : '')) + '</span><span class="nm">' + esc(e.part.name) + '</span></div>';
+  let html = '';
+  measItems = [];
+  if (measA && !measB){
+    const d = describe(measA);
+    html = head(measA, d, 'A') + d.rows.map(r => row(r)).join('');
+    measItems = d.marks.concat(d.items);
+  } else if (measA){
+    const da = describe(measA), db = describe(measB), rel = relate(measA, measB, measMd);
+    html = head(measA, da, 'A') + head(measB, db, 'B') + '<div class="div"></div>' + rel.rows.map((r, i) => row(r, i === 0)).join('');
+    if (explodeAmt > 0 && measA.part !== measB.part) html += '<div class="hint">Exploded view: distances are for the assembled positions.</div>';
+    measItems = da.marks.concat(db.marks, rel.items);
+  } else if (keptItems.length){
+    const n = keptItems.filter(it => it.type === 'dim' || it.type === 'tag').length;
+    html = '<div class="k">' + n + (n === 1 ? ' dimension' : ' dimensions') + ' kept on screen. Clear removes them.</div>';
+  }
+  $('measbody').innerHTML = html;
+  $('btnMeasKeep').disabled = !measItems.some(it => it.type !== 'edge');
+  $('btnMeasClear').disabled = !measA && !keptItems.length;
+}
+
+// ── Minimum distance ─────────────────────────────────────────
+// Between the geometry actually picked — the triangles of a face, the segments of an edge —
+// using a small bounding-box tree per pick, searched pairwise: exact on the tessellation.
+function bvh(e){
+  if (e.bvh) return e.bvh;
+  const P = e.prims, S = e.stride, nv = S / 3, n = e.count, order = new Int32Array(n), cen = new Float64Array(n * 3);
+  for (let i = 0; i < n; i++){
+    order[i] = i;
+    for (let k = 0; k < 3; k++){ let s = 0; for (let v = 0; v < nv; v++) s += P[i*S + v*3 + k]; cen[i*3 + k] = s / nv; }
+  }
+  const build = (lo, hi) => {
+    const nd = {lo, hi, min:[Infinity, Infinity, Infinity], max:[-Infinity, -Infinity, -Infinity], l:null, r:null};
+    for (let j = lo; j < hi; j++){
+      const o = order[j] * S;
+      for (let v = 0; v < nv; v++) for (let k = 0; k < 3; k++){
+        const x = P[o + v*3 + k];
+        if (x < nd.min[k]) nd.min[k] = x;
+        if (x > nd.max[k]) nd.max[k] = x;
+      }
+    }
+    if (hi - lo > 4){
+      let ax = 0;
+      for (let k = 1; k < 3; k++) if (nd.max[k] - nd.min[k] > nd.max[ax] - nd.min[ax]) ax = k;
+      const mid = (lo + hi) >> 1;
+      nthElement(order, lo, hi, mid, i => cen[i*3 + ax]);
+      nd.l = build(lo, mid); nd.r = build(mid, hi);
+    }
+    return nd;
+  };
+  return e.bvh = {root:build(0, n), order};
+}
+// reorders a[lo..hi) so that a[k] holds what a full sort by key would put there
+function nthElement(a, lo, hi, k, key){
+  hi--;
+  while (hi > lo){
+    const pv = key(a[(lo + hi) >> 1]);
+    let i = lo, j = hi;
+    while (i <= j){
+      while (key(a[i]) < pv) i++;
+      while (key(a[j]) > pv) j--;
+      if (i <= j){ const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else return;
+  }
+}
+function boxDist2(a, b){
+  let s = 0;
+  for (let k = 0; k < 3; k++){ const d = Math.max(a.min[k] - b.max[k], b.min[k] - a.max[k], 0); s += d*d; }
+  return s;
+}
+function minDistance(A, B){
+  const ta = bvh(A), tb = bvh(B), pa = new THREE.Vector3(), pb = new THREE.Vector3(), stack = [ta.root, tb.root];
+  let best = Infinity;
+  while (stack.length && best > 0){
+    const nb = stack.pop(), na = stack.pop();
+    if (boxDist2(na, nb) >= best) continue;
+    if (!na.l && !nb.l){
+      for (let x = na.lo; x < na.hi; x++) for (let y = nb.lo; y < nb.hi; y++){
+        if (primDist(A, ta.order[x], B, tb.order[y]) < best){ best = _pd; pa.copy(_ca); pb.copy(_cb); }
+      }
+    } else if (!nb.l || (na.l && na.hi - na.lo >= nb.hi - nb.lo)){
+      if (boxDist2(na.l, nb) < boxDist2(na.r, nb)) stack.push(na.r, nb, na.l, nb); else stack.push(na.l, nb, na.r, nb);
+    } else {
+      if (boxDist2(na, nb.l) < boxDist2(na, nb.r)) stack.push(na, nb.r, na, nb.l); else stack.push(na, nb.l, na, nb.r);
+    }
+  }
+  return {d:Math.sqrt(best), pa, pb};
+}
+const _va = [0,1,2].map(() => new THREE.Vector3()), _vb = [0,1,2].map(() => new THREE.Vector3());
+const _ca = new THREE.Vector3(), _cb = new THREE.Vector3(), _q1 = new THREE.Vector3(), _q2 = new THREE.Vector3();
+let _pd = Infinity;
+function closer(p, q){ const d = p.distanceToSquared(q); if (d < _pd){ _pd = d; _ca.copy(p); _cb.copy(q); } }
+function loadPrim(e, i, out){
+  const P = e.prims, o = i * e.stride, n = e.stride / 3;
+  for (let v = 0; v < n; v++) out[v].set(P[o + v*3], P[o + v*3 + 1], P[o + v*3 + 2]);
+  return n;
+}
+// squared distance between two triangles / segments; closest points left in _ca, _cb
+function primDist(A, i, B, j){
+  const na = loadPrim(A, i, _va), nb = loadPrim(B, j, _vb), ea = na === 3 ? 3 : 1, eb = nb === 3 ? 3 : 1;
+  _pd = Infinity;
+  for (let x = 0; x < ea; x++) for (let y = 0; y < eb; y++){
+    segSeg(_va[x], _va[(x+1) % na], _vb[y], _vb[(y+1) % nb], _q1, _q2); closer(_q1, _q2);
+  }
+  if (nb === 3) for (let x = 0; x < na; x++){ closestOnTri(_va[x], _vb[0], _vb[1], _vb[2], _q2); closer(_va[x], _q2); }
+  if (na === 3) for (let y = 0; y < nb; y++){ closestOnTri(_vb[y], _va[0], _va[1], _va[2], _q1); closer(_q1, _vb[y]); }
+  // an edge running through a triangle
+  if (_pd > 0 && nb === 3) for (let x = 0; x < ea; x++)
+    if (segHitsTri(_va[x], _va[(x+1) % na], _vb[0], _vb[1], _vb[2], _q1)){ _pd = 0; _ca.copy(_q1); _cb.copy(_q1); break; }
+  if (_pd > 0 && na === 3) for (let y = 0; y < eb; y++)
+    if (segHitsTri(_vb[y], _vb[(y+1) % nb], _va[0], _va[1], _va[2], _q1)){ _pd = 0; _ca.copy(_q1); _cb.copy(_q1); break; }
+  return _pd;
+}
+const _d1 = new THREE.Vector3(), _d2 = new THREE.Vector3(), _rr = new THREE.Vector3();
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+function segSeg(p1, q1, p2, q2, c1, c2){       // Ericson, Real-Time Collision Detection 5.1.9
+  _d1.subVectors(q1, p1); _d2.subVectors(q2, p2); _rr.subVectors(p1, p2);
+  const a = _d1.dot(_d1), e = _d2.dot(_d2), f = _d2.dot(_rr);
+  let s = 0, t = 0;
+  if (a > 1e-30 || e > 1e-30){
+    if (a <= 1e-30) t = clamp01(f / e);
+    else {
+      const c = _d1.dot(_rr);
+      if (e <= 1e-30) s = clamp01(-c / a);
+      else {
+        const b = _d1.dot(_d2), den = a*e - b*b;
+        s = den > 1e-12 * a * e ? clamp01((b*f - c*e) / den) : 0;
+        t = (b*s + f) / e;
+        if (t < 0){ t = 0; s = clamp01(-c / a); }
+        else if (t > 1){ t = 1; s = clamp01((b - c) / a); }
+      }
+    }
+  }
+  c1.copy(p1).addScaledVector(_d1, s); c2.copy(p2).addScaledVector(_d2, t);
+}
+const _ab = new THREE.Vector3(), _ac = new THREE.Vector3(), _ap = new THREE.Vector3();
+function closestOnTri(p, a, b, c, out){       // Ericson 5.1.5
+  _ab.subVectors(b, a); _ac.subVectors(c, a); _ap.subVectors(p, a);
+  const d1 = _ab.dot(_ap), d2 = _ac.dot(_ap);
+  if (d1 <= 0 && d2 <= 0) return out.copy(a);
+  _ap.subVectors(p, b);
+  const d3 = _ab.dot(_ap), d4 = _ac.dot(_ap);
+  if (d3 >= 0 && d4 <= d3) return out.copy(b);
+  const vc = d1*d4 - d3*d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) return out.copy(a).addScaledVector(_ab, d1 / (d1 - d3));
+  _ap.subVectors(p, c);
+  const d5 = _ab.dot(_ap), d6 = _ac.dot(_ap);
+  if (d6 >= 0 && d5 <= d6) return out.copy(c);
+  const vb = d5*d2 - d1*d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) return out.copy(a).addScaledVector(_ac, d2 / (d2 - d6));
+  const va = d3*d6 - d5*d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0)
+    return out.copy(b).addScaledVector(_ap.subVectors(c, b), (d4 - d3) / ((d4 - d3) + (d5 - d6)));
+  const sum = va + vb + vc;
+  if (!(sum > 0)) return out.copy(a);           // degenerate triangle
+  return out.copy(a).addScaledVector(_ab, vb / sum).addScaledVector(_ac, vc / sum);
+}
+const _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _hh = new THREE.Vector3(), _ss = new THREE.Vector3(), _qq = new THREE.Vector3();
+function segHitsTri(p, q, a, b, c, out){      // Möller–Trumbore, limited to the segment
+  _d1.subVectors(q, p); _e1.subVectors(b, a); _e2.subVectors(c, a);
+  _hh.crossVectors(_d1, _e2);
+  const det = _e1.dot(_hh);
+  if (Math.abs(det) < 1e-30) return false;
+  _ss.subVectors(p, a);
+  const u = _ss.dot(_hh) / det;
+  if (u < 0 || u > 1) return false;
+  _qq.crossVectors(_ss, _e1);
+  const v = _d1.dot(_qq) / det;
+  if (v < 0 || u + v > 1) return false;
+  const t = _e2.dot(_qq) / det;
+  if (t < 0 || t > 1) return false;
+  out.copy(p).addScaledVector(_d1, t);
+  return true;
+}
+
+// ── Measurement annotations ──────────────────────────────────
+// Drawn on a 2D canvas over the 3D view each frame, and burnt into screenshots. Every point
+// is kept in assembled coordinates together with its part, so dimensions ride along with the
+// parts in an exploded view.
+const ANNOT_FONT = '"Cascadia Code", Consolas, "JetBrains Mono", ui-monospace, monospace';
+const _sv = new THREE.Vector3();
+let annotShown = false;
+function annotItems(){ return keptItems.concat(measItems); }
+function drawAnnotLive(){
+  const items = annotItems();
+  if (!items.length && !annotShown) return;
+  annotCtx.setTransform(1, 0, 0, 1, 0, 0);
+  annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
+  annotShown = items.length > 0;
+  if (annotShown) drawAnnotations(annotCtx, annotCanvas.width, annotCanvas.height, annotCanvas.width / (viewport.clientWidth || 1), items);
+}
+function toScreen(p, part, W, H){
+  _sv.copy(p);
+  if (part) _sv.add(part.offset);
+  _sv.applyMatrix4(camera.matrixWorldInverse);
+  if (_sv.z > -camera.near) return null;               // behind the camera
+  _sv.applyMatrix4(camera.projectionMatrix);
+  return {x:(_sv.x + 1) / 2 * W, y:(1 - _sv.y) / 2 * H};
+}
+function dimText(it){
+  const a = it.a.part, b = it.b && it.b.part;
+  const split = a && b && a !== b && !a.offset.equals(b.offset);      // parts drawn apart, value is assembled
+  return (it.prefix || '') + L(it.value) + ' mm' + (split ? ' (assembled)' : '');
+}
+// s: canvas pixels per CSS pixel, so lines and text keep their size in hi-res screenshots
+function drawAnnotations(ctx, W, H, s, items){
+  const dimCol = whiteBg ? '#c2410c' : '#ffb454', axisCol = whiteBg ? '#2563eb' : '#5aa7e8', labels = [];
+  const th = 19 * s;
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.font = Math.round(11.5 * s) + 'px ' + ANNOT_FONT;
+  for (const it of items){
+    if (it.type === 'edge'){                          // a picked edge, drawn thick
+      ctx.strokeStyle = it.color; ctx.lineWidth = 3 * s; ctx.setLineDash([]);
+      ctx.beginPath();
+      let pen = false, first = null;
+      for (const p of it.pts){
+        const q = toScreen(p, it.part, W, H);
+        if (!q){ pen = false; continue; }
+        if (pen) ctx.lineTo(q.x, q.y); else { ctx.moveTo(q.x, q.y); pen = true; }
+        if (!first) first = q;
+      }
+      if (it.closed && pen && first) ctx.lineTo(first.x, first.y);
+      ctx.stroke();
+      continue;
+    }
+    const a = toScreen(it.a.p, it.a.part, W, H);
+    if (it.type === 'tag'){ if (a) labels.push({x:a.x, y:a.y, text:dimText(it)}); continue; }
+    const b = toScreen(it.b.p, it.b.part, W, H);
+    if (!a || !b) continue;
+    if (it.type === 'center'){                        // centre line of an axis
+      ctx.strokeStyle = axisCol; ctx.lineWidth = 1.2 * s; ctx.setLineDash([10*s, 4*s, 2*s, 4*s]);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      continue;
+    }
+    const text = dimText(it), tw = ctx.measureText(text).width + 12 * s, len = Math.hypot(b.x - a.x, b.y - a.y);
+    const ux = len > 1 ? (b.x - a.x) / len : 1, uy = len > 1 ? (b.y - a.y) / len : 0;
+    let lx = (a.x + b.x) / 2, ly = (a.y + b.y) / 2;
+    if (len < tw + 16 * s){                         // too short to hold its value: label just past the end
+      const push = Math.abs(ux) * tw / 2 + Math.abs(uy) * th / 2 + 8 * s;
+      lx = b.x + ux * push; ly = b.y + uy * push;
+    }
+    ctx.strokeStyle = ctx.fillStyle = dimCol; ctx.lineWidth = 1.6 * s; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(lx, ly); ctx.stroke();
+    if (len > 1){
+      const hd = Math.min(9 * s, len / 3), w = hd * 0.35;
+      const arrow = (x, y, dx, dy) => {
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.lineTo(x - dx*hd - dy*w, y - dy*hd + dx*w); ctx.lineTo(x - dx*hd + dy*w, y - dy*hd - dx*w);
+        ctx.closePath(); ctx.fill();
+      };
+      arrow(b.x, b.y, ux, uy);
+      if (!it.single) arrow(a.x, a.y, -ux, -uy);
+    }
+    labels.push({x:lx, y:ly, text});
+  }
+  ctx.setLineDash([]);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const l of labels){
+    const w = ctx.measureText(l.text).width + 12 * s, h = th, r = 3 * s;
+    const x = Math.min(Math.max(l.x, w/2 + 2*s), W - w/2 - 2*s), y = Math.min(Math.max(l.y, h/2 + 2*s), H - h/2 - 2*s);
+    const x0 = x - w/2, y0 = y - h/2;
+    ctx.beginPath();
+    ctx.moveTo(x0 + r, y0); ctx.arcTo(x0 + w, y0, x0 + w, y0 + h, r); ctx.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
+    ctx.arcTo(x0, y0 + h, x0, y0, r); ctx.arcTo(x0, y0, x0 + w, y0, r); ctx.closePath();
+    ctx.fillStyle = 'rgba(17,19,24,.9)'; ctx.fill();
+    ctx.strokeStyle = dimCol; ctx.lineWidth = s; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.fillText(l.text, x, y + 0.5 * s);
+  }
+  ctx.restore();
+}
+
+// ── Exploded view ────────────────────────────────────────────
+// Each part slides away from the assembly centre along the line through its own centre (or
+// just that line's X, Y or Z part). The move is made in world space and turned into the
+// part's parent frame, so nested assemblies stay consistent; edges, section caps and
+// highlights move along. Measurements keep using the assembled geometry.
+let explodeAmt = 0, explodeAxis = 'all';
+const EXPLODE_MAX = 2;               // at 100 % a part ends up three times as far from the centre
+$('btnExplode').addEventListener('click', ()=>{
+  if (!modelRoot){ toast('Load a model first'); return; }
+  const open = $('explodepanel').classList.toggle('show');
+  $('btnExplode').classList.toggle('active', open);
+  if (open && parts.length < 2) toast('A single part — nothing to explode');
+});
+$('expAmount').addEventListener('input', e => setExplode(e.target.value / 100));
+document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', ()=>{
+  explodeAxis = b.dataset.exp;
+  document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x === b));
+  applyExplode();
+}));
+$('btnExpReset').addEventListener('click', ()=> setExplode(0));
+function setExplode(v){
+  explodeAmt = v;
+  $('expAmount').value = Math.round(v * 100);
+  $('expAmountVal').textContent = Math.round(v * 100) + ' %';
+  applyExplode();
+}
+function resetExplode(){             // a newly loaded model starts assembled
+  explodeAmt = 0;
+  $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
+}
+const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3();
+function applyExplode(){
+  if (!modelRoot) return;
+  const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis];
+  parts.forEach(p=>{
+    p.offset.subVectors(p.restCenter, modelCenter);
+    if (k !== undefined) for (let i = 0; i < 3; i++) if (i !== k) p.offset.setComponent(i, 0);
+    p.offset.multiplyScalar(f);
+  });
+  parts.forEach(p=>{                  // `parts` lists parents before their children
+    const m = p.mesh;
+    _wp.setFromMatrixPosition(p.restMatrix).add(p.offset).applyMatrix4(_inv.copy(m.parent.matrixWorld).invert());
+    m.position.copy(_wp);
+    m.updateMatrixWorld(true);
+    if (p.edges){ p.edges.position.setFromMatrixPosition(m.matrixWorld); p.edges.updateMatrixWorld(true); }
+    if (p.capBack){
+      p.capBack.matrix.copy(m.matrixWorld); p.capFront.matrix.copy(m.matrixWorld);
+      p.capBack.matrixWorldNeedsUpdate = p.capFront.matrixWorldNeedsUpdate = true;
+    }
+  });
+  followers.forEach(o => { const fl = o.userData.follow; o.position.copy(fl.part.offset).sub(fl.base); });
+  if (mode === 'measure') renderMeasure();
 }
 
 // ── Edges ────────────────────────────────────────────────────
@@ -6263,7 +7470,16 @@ function screenshot(){
   renderer.setSize(w*2, h*2, false);
   camera.aspect = w/h; camera.updateProjectionMatrix();
   renderer.render(scene, camera);
-  canvas.toBlob(blob=>{
+  let shot = canvas;
+  const items = annotItems();
+  if (items.length){                  // burn the measurement annotations into the image
+    shot = document.createElement('canvas');
+    shot.width = canvas.width; shot.height = canvas.height;
+    const ctx = shot.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    drawAnnotations(ctx, shot.width, shot.height, shot.width / (viewport.clientWidth || 1), items);
+  }
+  shot.toBlob(blob=>{
     renderer.setSize(w, h, false); resize();
     const a = document.createElement('a');
     const base = ($('fname').textContent || 'model').replace(/\.[^.]+$/,'');
@@ -6286,6 +7502,7 @@ $('unitToggle').addEventListener('click', ()=>{
     $('stBbox').textContent = [s2.x,s2.y,s2.z].map(v=>L(v)).join(' × ') + (unitScale===1000?' mm':'');
   }
   $('secOffsetVal').textContent = L(sectionOffset);
+  if (mode === 'measure') renderMeasure();
   toast(unitScale === 1000 ? 'Lengths shown in mm (mesh × 1000)' : 'Lengths shown in raw mesh units');
 });
 
@@ -6301,9 +7518,17 @@ window.addEventListener('keydown', e=>{
   else if (k === '1') setMode('part');
   else if (k === '2') setMode('face');
   else if (k === '3') setMode('edge');
+  else if (k === '4') setMode('measure');
+  else if (k === 'm') setMode(mode === 'measure' ? 'part' : 'measure');
+  else if (k === 'v') $('btnExplode').click();
+  else if (k === 'k' && mode === 'measure') measureKeep();
+  else if ((k === 'delete' || k === 'backspace') && mode === 'measure') measureClear(true);
   else if (k === 'h' && selected) setPartVisible(selected, !selected.visible);
   else if (k === 'i' && selected) isolate(selected);
-  else if (k === 'escape'){ clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
+  else if (k === 'escape'){
+    if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
+    clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
+  }
 });
 
 // ── Files ────────────────────────────────────────────────────
