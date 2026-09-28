@@ -6609,10 +6609,18 @@ function edgeChain(topo, geo, h0){
     if (topo.sliver[t] || (u >= 0 ? topo.faceId[u] : -1) !== G) continue;
     for (const w of [wv(h), wv(nx(h))]){ let l = byV.get(w); if (!l) byV.set(w, l = []); l.push(h); }
   }
+  // A face's free boundary (an open sheet, a gap in the mesh) has no neighbour to tell its
+  // B-rep edges apart, so the run also stops at corners, as Edge mode does: segments that
+  // turn more than 35° from one another belong to different edges.
+  const pos = geo.attributes.position, dirs = new Map(), bend = Math.cos(THREE.MathUtils.degToRad(35));
+  const dir = h => { let d = dirs.get(h);
+    if (!d){ d = new THREE.Vector3().fromBufferAttribute(pos, topo.rep[wv(nx(h))]).sub(_t.fromBufferAttribute(pos, topo.rep[wv(h)])).normalize(); dirs.set(h, d); }
+    return d; };
+  const joins = (h, o) => G >= 0 || Math.abs(dir(h).dot(dir(o))) >= bend;
   const comp = new Set([h0]), stack = [h0];               // the connected run holding h0
   while (stack.length){
     const h = stack.pop();
-    for (const w of [wv(h), wv(nx(h))]) for (const o of byV.get(w)) if (!comp.has(o)){ comp.add(o); stack.push(o); }
+    for (const w of [wv(h), wv(nx(h))]) for (const o of byV.get(w)) if (!comp.has(o) && joins(h, o)){ comp.add(o); stack.push(o); }
   }
   const deg = w => byV.get(w).reduce((n, o) => n + comp.has(o), 0);
   let start = h0, cur = wv(h0);                            // walk it from an open end if it has one
@@ -6626,10 +6634,11 @@ function edgeChain(topo, geo, h0){
   }
   const closed = ids.length > 3 && ids[0] === ids[ids.length - 1];
   if (closed) ids.pop();
-  const pos = geo.attributes.position;
   return {pts:ids.map(w => new THREE.Vector3().fromBufferAttribute(pos, topo.rep[w])), closed,
           faces:G >= 0 ? [F, G] : [F],
-          key:'e' + Math.min(F, G) + '_' + Math.max(F, G) + '_' + ids.reduce((m, w) => Math.min(m, w), Infinity)};
+          // the same from either face; pieces of a free boundary can share a corner, so name them by their segments
+          key:G >= 0 ? 'e' + Math.min(F, G) + '_' + Math.max(F, G) + '_' + ids.reduce((m, w) => Math.min(m, w), Infinity)
+                     : 'e' + F + '_free_' + [...comp].reduce((m, h) => Math.min(m, h), Infinity)};
 }
 function edgeEntity(part, h, hit){
   const geo = part.mesh.geometry, topo = topology(geo), ch = edgeChain(topo, geo, h), m = part.restMatrix;
