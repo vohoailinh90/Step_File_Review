@@ -714,53 +714,6 @@ def _same_origin_only():
     return problems
 
 
-@check("PRODUCT  every URL known only at runtime goes through sameOrigin()")
-def _runtime_urls_guarded():
-    """The half of the air-gap a literal scan cannot see, made structural.
-
-    Codex review round 9 on PR #1: `fetch(modelUrl)` fetched whatever the
-    ?model= query named -- `?model=https://example.com/x.glb` made an
-    off-machine request in a real browser -- and passed every check, because
-    the same-origin check only judged QUOTED arguments. Probing the class found
-    a second route nobody named: a .gltf's buffer and image uris, which
-    GLTFLoader fetches, so opening a supplier's file could reach the network.
-
-    A value known only at runtime cannot be judged statically, so the check
-    does not try. It inverts the question: every runtime URL must pass through
-    one guard, sameOrigin() in src/app/10-load.js, which tests/viewer.test.mjs
-    exercises. Here that means: a fetch() target is a quoted literal (judged by
-    _same_origin_only) or a sameOrigin() call -- anything else is a target the
-    check cannot vouch for; three.js's default loading manager routes every
-    loader URL through the guard; and no loader gets a manager of its own,
-    which would bypass it.
-    """
-    problems = []
-    hook = re.compile(r"THREE\.DefaultLoadingManager\.setURLModifier\(\s*sameOrigin\s*\)")
-    hooked = False
-    for rel in scanned_sources():
-        text = (ROOT / rel).read_text(encoding="utf-8")
-        hooked = hooked or bool(hook.search(text))
-
-        def flag(m, why):
-            line = text.count("\n", 0, m.start()) + 1
-            problems.append(f"{rel}:{line} {why}")
-
-        for m in re.finditer(r"\bfetch\s*\(\s*", text):
-            rest = text[m.end():]
-            if rest[:1] in ("'", '"', "`") or re.match(r"sameOrigin\s*\(", rest):
-                continue
-            flag(m, f"fetch({rest[:30].split(')')[0]}...) -- a target known only at runtime "
-                    f"must be passed through sameOrigin()")
-        for m in re.finditer(r"\bnew\s+THREE\.LoadingManager\b", text):
-            flag(m, "creates a LoadingManager, whose loaders would bypass the sameOrigin() hook")
-        for m in re.finditer(r"\bnew\s+THREE\.\w*Loader\s*\(\s*[^)\s]", text):
-            flag(m, "gives a loader its own manager, bypassing the sameOrigin() hook")
-    if not hooked:
-        problems.append("no shipped source installs THREE.DefaultLoadingManager.setURLModifier("
-                        "sameOrigin) -- a .gltf's buffer and image uris would be fetched unchecked")
-    return problems
-
-
 def _rhs(text: str, start: int) -> str:
     """The expression starting at `start`, up to a `;`, `)` or `,` at depth 0.
 
@@ -795,6 +748,101 @@ _STRING_LITERAL = re.compile(r"""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`
 # Number formatters: their output is digits, sign and a decimal point, so a value
 # passed through one cannot carry markup or a URL.
 _NUMBER_CALL = re.compile(r"\b(?:L|A2|fmt)\((?:[^()]|\([^()]*\))*\)")
+
+
+def _one_literal(value: str) -> bool:
+    """The WHOLE value is one string literal -- not merely one at its start.
+
+    Codex review on PR #1: fetch() accepted any target whose first character
+    was a quote, so `fetch('' + location.hash.slice(1))` passed all 23 checks.
+    A template literal with a `${...}` in it is not a literal here.
+    """
+    return bool(_STRING_LITERAL.fullmatch(value.strip()))
+
+
+def _whole_call(value: str, callee: str) -> bool:
+    """The WHOLE value is one call to `callee`: its closing paren ends the value.
+
+    `sameOrigin(a) + location.hash` begins with the guard and is not guarded.
+    Quote-aware bracket matching, like _rhs(); a misread can only reject.
+    """
+    value = value.strip()
+    m = re.match(rf"(?:{callee})\s*\(", value)
+    if not m:
+        return False
+    depth, i, quote = 1, m.end(), None
+    while i < len(value):
+        c = value[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "'\"`":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth == 0:
+                return i == len(value) - 1
+        i += 1
+    return False
+
+
+# What a runtime URL may be: written in source whole, or wrapped whole by the
+# guard. Used by the fetch() check and the URL-sink check alike.
+_GUARD_CALLS = r"sameOrigin|URL\.createObjectURL"
+
+
+@check("PRODUCT  every URL known only at runtime goes through sameOrigin()")
+def _runtime_urls_guarded():
+    """The half of the air-gap a literal scan cannot see, made structural.
+
+    Codex review round 9 on PR #1: `fetch(modelUrl)` fetched whatever the
+    ?model= query named -- `?model=https://example.com/x.glb` made an
+    off-machine request in a real browser -- and passed every check, because
+    the same-origin check only judged QUOTED arguments. Probing the class found
+    a second route nobody named: a .gltf's buffer and image uris, which
+    GLTFLoader fetches, so opening a supplier's file could reach the network.
+
+    A value known only at runtime cannot be judged statically, so the check
+    does not try. It inverts the question: every runtime URL must pass through
+    one guard, sameOrigin() in src/app/10-load.js, which tests/viewer.test.mjs
+    exercises. Here that means: a fetch() target is a quoted literal (judged by
+    _same_origin_only) or a sameOrigin() call -- anything else is a target the
+    check cannot vouch for; three.js's default loading manager routes every
+    loader URL through the guard; and no loader gets a manager of its own,
+    which would bypass it.
+    """
+    problems = []
+    hook = re.compile(r"THREE\.DefaultLoadingManager\.setURLModifier\(\s*sameOrigin\s*\)")
+    hooked = False
+    for rel in scanned_sources():
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        hooked = hooked or bool(hook.search(text))
+
+        def flag(m, why):
+            line = text.count("\n", 0, m.start()) + 1
+            problems.append(f"{rel}:{line} {why}")
+
+        for m in re.finditer(r"\bfetch\s*\(\s*", text):
+            target = _rhs(text, m.end())          # the whole first argument
+            if _one_literal(target) or _whole_call(target, "sameOrigin"):
+                continue
+            flag(m, f"fetch({target[:40]}) -- a target known only at runtime "
+                    f"must be passed, whole, through sameOrigin()")
+        for m in re.finditer(r"\bnew\s+THREE\.LoadingManager\b", text):
+            flag(m, "creates a LoadingManager, whose loaders would bypass the sameOrigin() hook")
+        for m in re.finditer(r"\bnew\s+THREE\.\w*Loader\s*\(\s*[^)\s]", text):
+            flag(m, "gives a loader its own manager, bypassing the sameOrigin() hook")
+    if not hooked:
+        problems.append("no shipped source installs THREE.DefaultLoadingManager.setURLModifier("
+                        "sameOrigin) -- a .gltf's buffer and image uris would be fetched unchecked")
+    return problems
+
+
 # A JS property is the attribute's name (case aside: formAction, imageSrcset);
 # setAttribute/setAttributeNS take the attribute name itself, namespace or not.
 _URL_PROPS = "|".join(re.escape(a) for a in URL_ATTRS if ":" not in a)
@@ -804,10 +852,16 @@ URL_SINK = re.compile(
     r"|(?<![\w.])location(?:\.href)?)\s*=(?!=)\s*"
     rf"|setAttribute(?:\(|NS\(\s*[^,()]*,)\s*['\"](?:{_URL_ATTRS_ANY})['\"]\s*,\s*",
     re.I)
+# Codex review on PR #1: `el.style = 'background:url(' + location.hash + ')'`
+# passed all 23 checks -- assigning a string to .style sets cssText -- and so
+# did setAttribute('style', ...). Probing the class found srcdoc (a whole
+# document), setHTMLUnsafe and createContextualFragment passing too.
 MARKUP_SINK = re.compile(
-    r"\.(?:innerHTML|outerHTML|cssText)\s*\+?=(?!=)\s*"
-    r"|\.style\.[A-Za-z]+\s*=(?!=)\s*"
-    r"|(?:insertAdjacentHTML\(\s*['\"][a-z]+['\"]\s*,|document\.write(?:ln)?\(|setProperty\(\s*['\"][^'\"]+['\"]\s*,)\s*")
+    r"\.(?:innerHTML|outerHTML|cssText|srcdoc)\s*\+?=(?!=)\s*"
+    r"|\.style(?:\.[A-Za-z]+)?\s*\+?=(?!=)\s*"
+    r"|setAttribute(?:\(|NS\(\s*[^,()]*,)\s*['\"](?:style|srcdoc)['\"]\s*,\s*"
+    r"|(?:insertAdjacentHTML\(\s*['\"][a-z]+['\"]\s*,|document\.write(?:ln)?\(|setProperty\(\s*['\"][^'\"]+['\"]\s*,"
+    r"|setHTMLUnsafe\(|parseHTMLUnsafe\(|createContextualFragment\()\s*")
 
 
 @check("PRODUCT  every URL and markup sink takes only what the source vouches for")
@@ -849,11 +903,11 @@ def _sinks_take_vouched_values():
             bare = _STRING_LITERAL.sub("", value).strip()
             if bare == "" and value:
                 continue                          # a literal: the remote-URL checks judge it
-            if re.fullmatch(r"(?:sameOrigin|URL\.createObjectURL)\((?:.|\n)*\)", value):
+            if _whole_call(value, _GUARD_CALLS):
                 continue
             # scene.background = new THREE.Color(...): a three.js object, never a
             # URL string. `.background` stays a sink -- body.background fetches.
-            if re.fullmatch(r"new\s+THREE\.\w+\((?:.|\n)*\)", value):
+            if _whole_call(value, r"new\s+THREE\.\w+"):
                 continue
             flag(m, "a URL sink", value)
         for m in MARKUP_SINK.finditer(text):

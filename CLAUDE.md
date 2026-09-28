@@ -103,10 +103,11 @@ enforces the ones a script can:
   default loading manager resolves every loader URL through it. Both are enforced
   by an invariant, and the guard itself is tested in `tests/viewer.test.mjs`.
   Element **sinks** are held to a closed safe set of values: a URL sink (`.src`,
-  `.href`, `setAttribute('src', …)`, `location =`) takes a literal, `sameOrigin()`
-  or `URL.createObjectURL()`; a markup sink (`innerHTML`, `insertAdjacentHTML`,
-  `.style.*`) takes only markup written in source, UPPER_CASE constants and the
-  number formatters `L`/`A2`/`fmt`. **Text from a model file — a part name — goes in
+  `.href`, `.ping`, `setAttribute('src', …)`, `location =`) takes one whole
+  literal, or a value wrapped whole by `sameOrigin()` or `URL.createObjectURL()`;
+  a markup sink (`innerHTML`, `insertAdjacentHTML`, `.style` and `.style.*`,
+  `srcdoc`, `setHTMLUnsafe`) takes only markup written in source, UPPER_CASE
+  constants and the number formatters `L`/`A2`/`fmt`. **Text from a model file — a part name — goes in
   through `textContent`, never markup.**
 - **No user-facing toolchain.** `build.py` is stdlib Python. Do not add a
   bundler, `package.json`, TypeScript or a preprocessor.
@@ -238,7 +239,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 105 mutations, all currently caught. When you ship a fix with a
+suite to notice — 114 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
@@ -341,7 +342,14 @@ twice: the markup scan and the JS sink check each had their own attribute list,
 they had drifted apart, and neither had `ping` — which posts to its URLs when a
 link is followed — so `a.ping = location.hash` passed all 23 checks, and so did
 `setAttributeNS(…, 'href', …)`. There is now one list, `URL_ATTRS`, and both
-checks derive from it. **Two copies of a list are two lists.**
+checks derive from it. **Two copies of a list are two lists.** Round 13 found the
+values judged by their *first token*: `fetch('' + location.hash)` passed because
+the argument began with a quote, and `fetch(sameOrigin(a) + location.hash)`
+because it began with the guard. Both judges now read the whole expression — one
+literal, or one guard call whose closing parenthesis ends it. The same round
+found `.style = …` (it sets `cssText`), `srcdoc`, `setHTMLUnsafe` and
+`createContextualFragment` missing from the markup sinks. **A value is safe as a
+whole or not at all.**
 
 **The harness must never destroy what it did not create.** `mutation_check.py`
 edits the working tree on purpose. Its `create` field first shipped overwriting a
