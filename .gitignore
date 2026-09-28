@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.stepview_cache/
+*.partial
+.claude/settings.json
+
+# Artifact run outputs are per-run working notes, not repository documentation
+# (see artifacts/README.md). Keep the folders, ignore the contents.
+artifacts/architecture/*
+artifacts/critiques/*
+artifacts/plans/*
+artifacts/reviews/*
+!artifacts/*/.gitkeep
