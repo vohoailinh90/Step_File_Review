@@ -6780,7 +6780,7 @@ function describe(e){
       rows.push(['length', lin(g.len)]);
       break;
   }
-  if (e.kind === 'face') rows.push(['area', A2(e.area) + MM2()]);
+  if (e.kind === 'face') rows.push(['area (mesh)', A2(e.area) + MM2()]);      // summed over the triangles, even when exact
   rows.push(['source', SOURCES[provenance(e)]]);
   return {title, short, rows, items, marks};
 }
@@ -6898,9 +6898,13 @@ function relate(A, B, md){
     }
   } else if (ax && gy.type === 'line'){
     if (gx.type === 'circle'){
-      const f = footOnLine(gx.c, gy.p0, gy.d), d = gx.c.distanceTo(f);
+      // to the picked edge itself, not its extension (pick a face for a distance to its plane)
+      const t = Math.min(Math.max(_t.subVectors(gx.c, gy.p0).dot(gy.d), 0), gy.len);
+      const f = gy.p0.clone().addScaledVector(gy.d, t), d = gx.c.distanceTo(f);
       row('centre to edge', lin(d));
-      if (d >= gx.r) row('circle to edge', lin(d - gx.r));
+      // circle to edge is d − r only for an edge lying in the circle's plane
+      const inPlane = Math.abs(gy.d.dot(gx.a)) <= PERP && Math.abs(_t.subVectors(gy.p0, gx.c).dot(gx.a)) <= Math.max(eps * 10, 1e-4 * gx.r);
+      if (inPlane && d >= gx.r) row('circle to edge', lin(d - gx.r));
       dim(X, gx.c, Y, f, d);
     } else {
       const c = Math.abs(ax.a.dot(gy.d));
