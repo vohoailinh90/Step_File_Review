@@ -8,6 +8,13 @@ const OUT = path.join(__dirname, 'out') + path.sep;                // screenshot
 fs.mkdirSync(OUT, {recursive: true});
 async function launch(){
   const browser = await chromium.launch({args:['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']});
+  // an uncaught exception in the viewer fails the test, whatever its own checks say
+  const newPage = browser.newPage.bind(browser);
+  browser.newPage = async (...a) => {
+    const pg = await newPage(...a);
+    pg.on('pageerror', e => { fails++; console.log('FAIL uncaught page error: ' + e.message); });
+    return pg;
+  };
   return browser;
 }
 async function openModel(browser, model, name, page = 'viewer_test.html', vp = {width:1400, height:900}){
