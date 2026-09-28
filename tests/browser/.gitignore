@@ -1,0 +1,6 @@
+node_modules/
+package-lock.json
+www/
+out/
+models/big.step
+models/big_brep.glb

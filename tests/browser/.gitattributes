@@ -1,0 +1,2 @@
+# the test models are compared byte for byte; keep them as committed on Windows too
+models/** -text

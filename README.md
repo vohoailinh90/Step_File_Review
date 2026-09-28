@@ -99,6 +99,17 @@ Measurements are always taken on the assembled geometry: the distance between tw
 
 *Plane from a circle* — press **Plane from circle…** then click any circular edge: a hole rim, a boss, a bore. The plane is built through that circle's axis and passes through its centre, and the **angle** slider sweeps the plane around the axis from 0° to 180°, so you can cut a bore at exactly the orientation you want. Offset then shifts the plane sideways from the axis. If you have already picked a circle in Edge mode, the button uses it directly.
 
+## Tests
+
+`tests/browser` holds headless-browser tests for the viewer. They run on test models with known dimensions and check the measurements, explode, section and edge picking against those dimensions. They need Node and Playwright; one test also exercises `stepview.py`'s conversion and needs `cascadio`. See [tests/browser/README.md](tests/browser/README.md).
+
+```
+cd tests/browser
+npm install
+npx playwright install chromium
+node run.js
+```
+
 ## Known limits of this first version
 
 Colors assigned in the source CAD are preserved when present in the STEP file; parts without color render in a neutral gray. Dimensions in the status bar come from the mesh bounding box. There is no assembly *tree* yet (the part list is flat), and the measure tool works on faces and edges, not on arbitrary points; those are natural next steps. STL files carry no face structure, so there a face is grown across triangles up to a 20° break: faces that meet tangentially — a fillet and the flat it runs into — merge into one freeform surface that has no diameter to report. The explode direction runs out from the assembly centre, so a part centred on it (a shaft through the middle of the assembly) stays put; Along X / Y / Z helps there. In Edge mode, diameters come from a least-squares fit to the tessellated rim: on the samples tested the fit recovered known diameters to within 0.02%, but a coarse tessellation will inscribe the polygon slightly inside the true circle, so treat that figure as a check rather than an inspection result — Measure mode reports the exact B-rep value.
