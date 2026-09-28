@@ -47,13 +47,17 @@ const OUT = L.OUT;
   await pg.keyboard.press('f');
   await pg.waitForTimeout(150);
   await pg.screenshot({path: OUT + '6_explode_section_edges.png'});
+  // per part, in model units (m): edges and both stencil caps sit on the mesh, the cap quad in the part's own cut plane
   const sync = await pg.evaluate(() => __qs.parts.map(p => {
-    const m = new __qs.THREE.Vector3().setFromMatrixPosition(p.mesh.matrixWorld), e = p.edges ? new __qs.THREE.Vector3().setFromMatrixPosition(p.edges.matrixWorld) : null,
-          c = p.capBack ? new __qs.THREE.Vector3().setFromMatrixPosition(p.capBack.matrixWorld) : null;
-    return p.name + ' edges ' + (e ? e.distanceTo(m).toExponential(1) : '-') + ' caps ' + (c ? c.distanceTo(m).toExponential(1) : '-');
+    const T = __qs.THREE, m = new T.Vector3().setFromMatrixPosition(p.mesh.matrixWorld);
+    const off = o => o ? new T.Vector3().setFromMatrixPosition(o.matrixWorld).distanceTo(m) : null;
+    return {name: p.name, edges: off(p.edges), capBack: off(p.capBack), capFront: off(p.capFront),
+            quadOnPlane: p.capQuad && p.clip ? Math.abs(p.clip.distanceToPoint(p.capQuad.position)) : null};
   }));
-  console.log('      sync (distance mesh↔edges/caps):', sync.join(' ; '));
-  check('edges and caps follow parts', sync.join(' '), /^(?!.*e-[0-2]\b)/);
+  console.log('      sync (m):', JSON.stringify(sync));
+  const TOL = 1e-9;                                  // 1e-6 mm
+  const bad = sync.flatMap(r => ['edges', 'capBack', 'capFront', 'quadOnPlane'].filter(k => !(r[k] !== null && r[k] < TOL)).map(k => r.name + '.' + k + '=' + r[k]));
+  check('edges and caps follow parts (3 parts, every entry present, < 1e-6 mm)', sync.length === 3 && !bad.length ? 'ok' : bad.join(', ') || sync.length + ' parts', /^ok$/);
   // Along Z only
   await pg.click('[data-exp="z"]');
   const offz = await pg.evaluate(() => __qs.parts.map(p => p.offset.toArray().map(v => +(v*1000).toFixed(2))));
