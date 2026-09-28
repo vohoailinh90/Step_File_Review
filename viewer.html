@@ -6914,6 +6914,12 @@ function relate(A, B, md){
     items.push({type:'dim', a:{part:e1.part, p:p1.clone()}, b:{part:e2.part, p:p2.clone()}, value});
     drawn = true;
   };
+  // an angle is drawn too, as a label: where the picks touch, else at the first pick
+  const angle = (k, r) => {
+    const v = deg(r), [e, p] = md && md.d <= eps ? [A, md.pa] : [X, X.hit];
+    row(k, v);
+    items.push({type:'tag', a:{part:e.part, p:p.clone()}, text:v});
+  };
   const radius = g => g.type === 'cylinder' || g.type === 'circle' ? g.r : null;
   const onAxis = (e, g, a) => g.type === 'circle' ? g.c.clone() : footOnLine(e.hit, a.p, a.a);   // axis point by the pick
 
@@ -6925,14 +6931,15 @@ function relate(A, B, md){
       row('planes', 'parallel');
       if (md && Math.abs(md.d - d) <= Math.max(eps, d * 1e-4)) dim(A, md.pa, B, md.pb, d);   // faces overlap: draw it there
       else dim(X, X.hit, Y, footOnPlane(X.hit, gy.p, gy.n), d);
-    } else row('angle', deg(Math.acos(c)));
+    } else angle('angle', Math.acos(c));
   } else if (gx.type === 'plane' && ay){
     const s = Math.abs(gx.n.dot(ay.a)), q = onAxis(Y, gy, ay), d = Math.abs(_t.subVectors(q, gx.p).dot(gx.n));
     if (s <= PERP){                                       // axis parallel to the plane
       row(gy.type === 'circle' ? 'centre to plane' : 'axis to plane', lin(d));
-      const r = radius(gy);
-      if (r !== null){
-        if (d >= r){ row('min to plane', lin(d - r)); row('max to plane', lin(d + r)); }
+      // to the surface: a cylinder's or circle's radius, or a cone's widest point, off its vertices
+      const r = radius(gy), R = r !== null ? r : gy.type === 'cone' ? gy.rMax : null, m = r !== null ? '' : ' (mesh)';
+      if (R !== null){
+        if (d >= R){ row('min to plane' + m, lin(d - R)); row('max to plane' + m, lin(d + R)); }
         else row('plane', 'cuts through it');
       }
       dim(Y, q, X, footOnPlane(q, gx.p, gx.n), d);
@@ -6950,7 +6957,7 @@ function relate(A, B, md){
         dim(Y, far, X, footOnPlane(far, gx.p, gx.n), Math.max(e0, e1));
       }
     } else {
-      row('axis angle to plane', deg(Math.asin(Math.min(1, s))));
+      angle('axis angle to plane', Math.asin(Math.min(1, s)));
       if (gy.type === 'circle'){ row('centre to plane', lin(d)); dim(Y, q, X, footOnPlane(q, gx.p, gx.n), d); }
     }
   } else if (gx.type === 'plane' && gy.type === 'sphere'){
@@ -6965,7 +6972,7 @@ function relate(A, B, md){
       row('distance', lin(d) + ' (edge ∥ plane)');
       dim(Y, Y.hit, X, footOnPlane(Y.hit, gx.p, gx.n), d);
     } else {
-      row('angle to plane', deg(Math.asin(Math.min(1, s))));
+      angle('angle to plane', Math.asin(Math.min(1, s)));
       const d0 = Math.abs(_t.subVectors(gy.p0, gx.p).dot(gx.n)), d1 = Math.abs(_t.subVectors(gy.p1, gx.p).dot(gx.n));
       row('edge ends to plane', lin(Math.min(d0, d1)) + ' / ' + lin(Math.max(d0, d1)));
     }
@@ -6986,7 +6993,7 @@ function relate(A, B, md){
       }
       dim(X, q1, Y, q2, d);
     } else {
-      row('angle between axes', deg(Math.acos(c)));
+      angle('angle between axes', Math.acos(c));
       const cl = closestLines(ax.p, ax.a, ay.p, ay.a);
       if (cl.d <= eps * 10) row('axes', 'intersect');
       else { row('axis to axis', lin(cl.d)); dim(X, cl.c1, Y, cl.c2, cl.d); }
@@ -7018,7 +7025,7 @@ function relate(A, B, md){
         const cl = closestLines(ax.p, ax.a, gy.p0, gy.d);
         p1 = cl.c1; p2 = cl.c2; d = cl.d;
         row('axis to edge line', d <= eps * 10 ? '0 (they meet)' : lin(d));
-        row('angle to edge', deg(Math.acos(c)));
+        angle('angle to edge', Math.acos(c));
       }
       const r = radius(gx);
       if (r !== null && d >= r) row('surface to edge', lin(d - r));
@@ -7039,7 +7046,7 @@ function relate(A, B, md){
       const f = footOnLine(X.hit, gy.p0, gy.d), d = X.hit.distanceTo(f);
       row('distance', lin(d) + ' (parallel)');
       dim(X, X.hit, Y, f, d);
-    } else row('angle', deg(Math.acos(c)));
+    } else angle('angle', Math.acos(c));
   }
   if (md){
     row('min distance (mesh)', md.d <= eps ? '0 (touching)' : lin(md.d));
