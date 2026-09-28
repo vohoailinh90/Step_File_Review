@@ -134,7 +134,7 @@ function runTest(file, args, env, verbose){
   const results = [];
   for (const [name, file, args] of tests){
     const t0 = Date.now();
-    let skip = null;
+    let skip = null, error = null;
     if (name === 't6' || name === 't7'){
       if (!fs.existsSync(path.join(MODELS, 'big_brep.glb'))) skip = 'needs models/big_brep.glb: python tools/make_models.py --big';
     }
@@ -142,11 +142,13 @@ function runTest(file, args, env, verbose){
       const py = findPython();
       if (!py) skip = 'needs Python with cascadio (set PYTHON to choose the interpreter)';
       else {
+        // only a missing cascadio is a skip: a usable Python whose stepview.py won't serve is a failure
         try { stepview = await startStepview(py, page); }
-        catch (e){ skip = e.message; }
+        catch (e){ error = 'stepview.py (' + py + '): ' + e.message; }
       }
     }
     if (skip){ results.push([name, 'SKIP', skip]); console.log(`SKIP  ${name.padEnd(9)} ${skip}`); continue; }
+    if (error){ results.push([name, 'ERROR', error]); console.log(`ERROR ${name.padEnd(9)} ${error}`); continue; }
     const r = await runTest(file, args, name === 't5' ? {...env, QS_STEPVIEW_PORT: stepview.port} : env, verbose);
     const log = name.replace(' ', '_') + '.log';
     fs.writeFileSync(path.join(OUT, log), r.out);

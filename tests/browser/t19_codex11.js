@@ -15,11 +15,19 @@ const {launch, openModel, check} = L;
     const state = () => pg.evaluate(() => ({keep:document.getElementById('btnMeasKeep').disabled ? 'disabled' : 'enabled',
       items:__qs.measItems.filter(i => i.type === 'tag' || i.type === 'dim').map(i => i.type + ':' + __qs.dimText(i)).join(','), kept:__qs.keptItems.length,
       area:([...document.getElementById('measbody').children].map(d => d.textContent).find(t => /area \(mesh\)/.test(t)) || '').replace(/\s+/g, ' ').trim()}));
-    const kinds = model.endsWith('.stl') ? [['freeform/plane', "s.type === 'plane' || s.type === 'surface'"]] :
-      [['plane', "s.type === 'plane'"], ['freeform', "s.type === 'surface'"]];
-    for (const [k, t] of kinds){
+    // [label, face test, required]: each model must contain the faces it was built with; asm has no freeform face
+    const kinds = {
+      'asm_brep.glb': [['plane', "s.type === 'plane'", true], ['freeform', "s.type === 'surface'", false]],
+      'asm2_brep.glb': [['plane', "s.type === 'plane'", true], ['freeform', "s.type === 'surface'", true]],
+      'plate.stl': [['freeform/plane', "s.type === 'plane' || s.type === 'surface'", true]],
+    }[model];
+    for (const [k, t, required] of kinds){
       const f = await pickFace(t);
-      if (!f){ console.log('   (no ' + k + ' face in ' + model + ')'); continue; }
+      if (!f){
+        if (required) check(`${model} has a ${k} face`, 'none found', /^found$/);
+        else console.log('   (no ' + k + ' face in ' + model + ', as built)');
+        continue;
+      }
       let st = await state();
       console.log(`   ${model} ${k} ${f}:`, JSON.stringify(st));
       check(`${model} ${k}: Keep enabled`, st.keep, /^enabled$/);

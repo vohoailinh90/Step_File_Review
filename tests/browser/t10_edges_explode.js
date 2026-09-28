@@ -13,6 +13,12 @@ const ALIGN = () => __qs.parts.map(p => {
   const t = new T.Vector3().setFromMatrixPosition(p.restMatrix);
   return p.name + ' (node offset ' + t.toArray().map(x => (x*1000).toFixed(0)).join(',') + ') ' + (worst * 1000).toExponential(1) + ' mm';
 }).join(' | ');
+// every part's worst distance, as a number, must be float noise: 1e-6 mm is far below any misplacement
+const TOL = 1e-6;
+const aligned = s => {
+  const d = [...s.matchAll(/ (-?\d\.\de[-+]\d+) mm/g)].map(m => +m[1]);
+  return d.length === 3 && d.every(x => x < TOL) ? 'ok' : 'worst ' + Math.max(...d) + ' mm over ' + d.length + ' parts: ' + s;
+};
 (async () => {
   const browser = await launch();
   {
@@ -24,7 +30,7 @@ const ALIGN = () => __qs.parts.map(p => {
     await pg.evaluate(() => __qs.setExplode(0.9));
     const a2 = await pg.evaluate(ALIGN);
     console.log('  built assembled      :', a0); console.log('  exploded 50 %        :', a1); console.log('  exploded 90 %        :', a2);
-    for (const [k, v] of [['assembled', a0], ['50%', a1], ['90%', a2]]) check('edges on their mesh, ' + k, v, /^(?!.*e[-+]0[0-9]\b.*mm)(?:[^|]*\d\.\de-(?:[1-9]|[1-9]\d) mm|[^|]*0\.0e\+0 mm)(?: \| (?:[^|]*\d\.\de-(?:[1-9]|[1-9]\d) mm|[^|]*0\.0e\+0 mm))*$/);
+    for (const [k, v] of [['assembled', a0], ['50%', a1], ['90%', a2]]) check('edges on their mesh, ' + k, aligned(v), /^ok$/);
     // Edge mode while exploded: the shaft's shoulder rim reports its centre where the shaft is drawn
     await pg.evaluate(() => __qs.setExplode(0.5));
     await pg.keyboard.press('3');
@@ -52,7 +58,7 @@ const ALIGN = () => __qs.parts.map(p => {
     await pg.evaluate(() => __qs.setExplode(0));
     const b2 = await pg.evaluate(ALIGN);
     console.log('  built at 50 %        :', b0); console.log('  then 80 %            :', b1); console.log('  then assembled       :', b2);
-    for (const [k, v] of [['built exploded', b0], ['re-exploded', b1], ['reassembled', b2]]) check('edges on their mesh, ' + k, v, /^(?:[^|]*(?:\d\.\de-(?:[1-9]|[1-9]\d)|0\.0e\+0) mm)(?: \| [^|]*(?:\d\.\de-(?:[1-9]|[1-9]\d)|0\.0e\+0) mm)*$/);
+    for (const [k, v] of [['built exploded', b0], ['re-exploded', b1], ['reassembled', b2]]) check('edges on their mesh, ' + k, aligned(v), /^ok$/);
     await pg.screenshot({path: L.OUT + '10_edges_exploded.png'});
     await pg.close();
   }
