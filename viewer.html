@@ -7052,6 +7052,12 @@ function relate(A, B, md){
     row('min distance (mesh)', md.d <= eps ? '0 (touching)' : lin(md.d));
     if (!drawn) dim(A, md.pa, B, md.pb, md.d);
   }
+  // figures that are all zero — flush faces, a line-to-line fit — have no length to draw:
+  // label the headline where the picks meet instead, so Keep and screenshots still carry it
+  if (rows.length && !items.some(it => it.type === 'dim' || it.type === 'tag')){
+    const [e, p] = md ? [A, md.pa] : [X, X.hit];
+    items.push({type:'tag', a:{part:e.part, p:p.clone()}, text:rows[0][1]});
+  }
   row('source', SOURCES[Math.max(provenance(A), provenance(B))]);
   return {rows, items};
 }
