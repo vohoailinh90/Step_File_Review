@@ -7052,9 +7052,24 @@ function relate(A, B, md){
   } else if (gx.type === 'line' && gy.type === 'line'){
     const c = Math.abs(gx.d.dot(gy.d));
     if (c >= PAR){
-      const f = footOnLine(X.hit, gy.p0, gy.d), d = X.hit.distanceTo(f);
-      row('distance', lin(d) + ' (parallel)');
-      dim(X, X.hit, Y, f, d);
+      // the gap between the picked edges themselves: square across where they overlap along
+      // their direction, else from end to nearest end
+      const u = gx.d, s0 = _t.subVectors(gy.p0, gx.p0).dot(u), s1 = _t.subVectors(gy.p1, gx.p0).dot(u);
+      const lo = Math.max(0, Math.min(s0, s1)), hi = Math.min(gx.len, Math.max(s0, s1));
+      const sep = footOnLine(gx.p0, gy.p0, gy.d).distanceTo(gx.p0), sepText = sep <= eps ? '0 (collinear)' : lin(sep) + ' (parallel)';
+      let p1, p2;
+      if (hi >= lo - eps){
+        const s = hi > lo ? Math.min(Math.max(_t.subVectors(X.hit, gx.p0).dot(u), lo), hi) : (lo + hi) / 2;
+        p1 = gx.p0.clone().addScaledVector(u, s); p2 = footOnLine(p1, gy.p0, gy.d);
+        row('distance', sepText);
+      } else {
+        const after = Math.min(s0, s1) > gx.len;           // Y lies beyond X's p1 end, else before its p0 end
+        p1 = after ? gx.p1.clone() : gx.p0.clone();
+        p2 = (after === (s0 < s1) ? gy.p0 : gy.p1).clone();
+        row('distance', lin(p1.distanceTo(p2)) + ' (end to end)');
+        row('line separation', sepText);
+      }
+      dim(X, p1, Y, p2, p1.distanceTo(p2));
     } else angle('angle', Math.acos(c));
   }
   if (md){

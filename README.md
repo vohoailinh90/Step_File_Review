@@ -76,6 +76,7 @@ Lengths are shown in millimetres. OpenCASCADE writes glTF in metres whatever uni
 | cylinder / circle – cylinder / circle | centre distance of parallel axes, the gap between them (the wall between two holes), outside-to-outside, or the radial clearance of a shaft in a bore; for crossing axes the angle and the distance between the axes |
 | plane – straight edge | distance when the edge runs parallel to the plane, otherwise the angle |
 | circle – straight edge | centre to the picked edge, and circle to edge when the edge lies in the circle's plane (a hole to the plate edge); pick the side face instead for the distance to its plane |
+| straight edge – straight edge | for parallel edges, the distance between them where they overlap along their length, or end to nearest end (with the line separation) where they don't; otherwise the angle |
 | sphere – anything | centre distances |
 
 Every pair also shows the **min distance (mesh)**: the shortest distance between the two picked pieces of geometry, measured on the triangles. A third click starts a new pair; clicking empty space clears it.
