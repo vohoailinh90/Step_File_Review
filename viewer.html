@@ -5635,9 +5635,10 @@ const fill = new THREE.DirectionalLight(0xffffff, 0.3); fill.position.set(-1, -0
 let modelRoot = null, edgeRoot = null, edgesOn = false;
 // Mesh units: OpenCASCADE writes glTF in metres whatever the STEP was authored in,
 // so lengths are shown as mm = mesh units x 1000. STL carries no units; assume mm.
-let unitScale = 1000;
+let unitScale = 1000, unitsRaw = false;       // unitsRaw: status-bar toggle set to raw mesh units
 const L  = v => fmt(v * unitScale);            // length -> mm
 const A2 = v => fmt(v * unitScale * unitScale); // area  -> mm2
+const MM = () => unitsRaw ? '' : ' mm', MM2 = () => unitsRaw ? '' : ' mm²';
 let parts = [], bboxCached = null, modelSize = 1, modelCenter = new THREE.Vector3();
 
 function resize(){
@@ -5736,6 +5737,7 @@ function loadArrayBuffer(buf, name, startedAt){
   spin(true, 'reading mesh');
   const kind = sniff(buf);
   unitScale = (kind === 'glb' || kind === 'gltf') ? 1000 : 1;
+  unitsRaw = false; $('stUnits').textContent = 'mm';
   const finish = root => { clearModel(); modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0); };
   try {
     if (kind === 'step'){
@@ -6381,7 +6383,7 @@ function pickEdge(){
   if (fit && fit.rms < 0.03){
     pickedCircle = fit;
     showInfo({title:'CIRCULAR EDGE', rows:[
-      ['diameter', L(fit.radius*2) + ' mm'], ['radius', L(fit.radius) + ' mm'],
+      ['diameter', L(fit.radius*2) + MM()], ['radius', L(fit.radius) + MM()],
       ['centre', [fit.center.x,fit.center.y,fit.center.z].map(v=>L(v)).join(', ')],
       ['axis', [fit.axis.x,fit.axis.y,fit.axis.z].map(v=>v.toFixed(3)).join(', ')],
       ['arc', chain.closed ? 'closed' : 'open']],
@@ -6390,7 +6392,7 @@ function pickEdge(){
     if (circlePickMode) applyCirclePlane();
   } else {
     pickedCircle = null;
-    showInfo({title:'EDGE', rows:[['length', L(len)+' mm'], ['segments', chain.count],
+    showInfo({title:'EDGE', rows:[['length', L(len) + MM()], ['segments', chain.count],
                                   ['shape', chain.closed ? 'closed loop' : 'open']],
               foot:'Pick a circular edge to derive a section plane from it.'});
   }
@@ -6615,7 +6617,7 @@ function edgeEntity(part, h, hit){
   const geo = part.mesh.geometry, topo = topology(geo), ch = edgeChain(topo, geo, h), m = part.restMatrix;
   const pts = ch.pts.map(p => p.applyMatrix4(m));
   const surfs = ch.faces.map(f => { const i = faceInfo(geo, f); return Object.assign(surfToWorld(i.surf, m), {exact:i.exact}); });
-  const geom = classifyEdge(pts, ch.closed, surfs);
+  const geom = classifyEdge(pts, ch.closed, surfs, topo.source === 'brep');
   const nSeg = pts.length - (ch.closed ? 0 : 1), prims = new Float64Array(nSeg * 6);
   for (let i = 0; i < nSeg; i++){
     const p = pts[i], q = pts[(i+1) % pts.length];
@@ -6635,8 +6637,9 @@ function closestOnPolyline(pts, closed, q){
   return best;
 }
 // What an edge is: a circle or arc (exact when it runs round an adjacent cylinder, cone,
-// torus or sphere), a straight line, or some other curve.
-function classifyEdge(pts, closed, surfs){
+// torus or sphere), a straight line, or some other curve. `brep`: the part has STEP B-rep
+// faces, so a straight edge's end points are its exact B-rep vertices.
+function classifyEdge(pts, closed, surfs, brep){
   const n = pts.length;
   let len = 0;
   for (let i = 1; i < n; i++) len += pts[i].distanceTo(pts[i-1]);
@@ -6648,7 +6651,7 @@ function classifyEdge(pts, closed, surfs){
       const d = p1.clone().sub(p0).divideScalar(l);
       let dev = 0;
       for (const p of pts){ _t.subVectors(p, p0); dev = Math.max(dev, _t.addScaledVector(d, -_t.dot(d)).length()); }
-      if (dev <= 1e-5 * l) return {type:'line', p0:p0.clone(), p1:p1.clone(), d, len:l, exact:true};
+      if (dev <= 1e-5 * l) return {type:'line', p0:p0.clone(), p1:p1.clone(), d, len:l, exact:brep};
     }
   }
   if (n >= 4 || (closed && n >= 3)){
@@ -6729,7 +6732,7 @@ function axisMark(part, p, a, h0, h1){
 // Size and type of one picked face or edge: panel rows plus the dimensions to draw.
 function describe(e){
   const g = e.geom, rows = [], items = [], marks = [];
-  const lin = v => L(v) + ' mm', dir = v => [v.x, v.y, v.z].map(x => x.toFixed(3)).join(', ');
+  const lin = v => L(v) + MM(), dir = v => [v.x, v.y, v.z].map(x => x.toFixed(3)).join(', ');
   const at = v => [v.x, v.y, v.z].map(x => L(Math.abs(x) < modelSize * 1e-9 ? 0 : x)).join(', ');   // no -8e-16
   const deg = r => (r * 180 / Math.PI).toFixed(2) + '°';
   let title = 'Freeform surface', short = '';
@@ -6777,11 +6780,14 @@ function describe(e){
       rows.push(['length', lin(g.len)]);
       break;
   }
-  if (e.kind === 'face') rows.push(['area', A2(e.area) + ' mm²']);
-  rows.push(['source', g.type === 'surface' || g.type === 'curve' ? 'mesh' : g.type === 'line' ? 'mesh vertices'
-                     : e.exact ? 'exact (STEP B-rep)' : 'fitted to the mesh']);
+  if (e.kind === 'face') rows.push(['area', A2(e.area) + MM2()]);
+  rows.push(['source', SOURCES[provenance(e)]]);
   return {title, short, rows, items, marks};
 }
+
+// where a pick's numbers come from, strongest first; a pair is only as good as its weaker pick
+const SOURCES = ['exact (STEP B-rep)', 'fitted to the mesh', 'mesh'];
+const provenance = e => e.exact ? 0 : ['surface', 'curve', 'line'].includes(e.geom.type) ? 2 : 1;
 
 function axisOf(g){
   if (g.type === 'cylinder') return {p:g.p, a:g.a};
@@ -6798,7 +6804,7 @@ function relate(A, B, md){
   const rank = e => e.geom.type in RANK ? RANK[e.geom.type] : 9;
   const [X, Y] = rank(B) < rank(A) ? [B, A] : [A, B];
   const gx = X.geom, gy = Y.geom, ax = axisOf(gx), ay = axisOf(gy);
-  const eps = modelSize * 1e-7, lin = v => L(v) + ' mm', deg = r => (r * 180 / Math.PI).toFixed(2) + '°';
+  const eps = modelSize * 1e-7, lin = v => L(v) + MM(), deg = r => (r * 180 / Math.PI).toFixed(2) + '°';
   const row = (k, v) => rows.push([k, v]);
   let drawn = false;
   const dim = (e1, p1, e2, p2, value) => {
@@ -6933,7 +6939,7 @@ function relate(A, B, md){
     row('min distance (mesh)', md.d <= eps ? '0 (touching)' : lin(md.d));
     if (!drawn) dim(A, md.pa, B, md.pb, md.d);
   }
-  row('source', A.exact && B.exact ? 'exact (STEP B-rep)' : 'fitted to the mesh');
+  row('source', SOURCES[Math.max(provenance(A), provenance(B))]);
   return {rows, items};
 }
 
@@ -7165,7 +7171,7 @@ function toScreen(p, part, W, H){
 function dimText(it){
   const a = it.a.part, b = it.b && it.b.part;
   const split = a && b && a !== b && !a.offset.equals(b.offset);      // parts drawn apart, value is assembled
-  return (it.prefix || '') + L(it.value) + ' mm' + (split ? ' (assembled)' : '');
+  return (it.prefix || '') + L(it.value) + MM() + (split ? ' (assembled)' : '');
 }
 // s: canvas pixels per CSS pixel, so lines and text keep their size in hi-res screenshots
 function drawAnnotations(ctx, W, H, s, items){
@@ -7367,7 +7373,7 @@ function applyCirclePlane(){
   $('secAngle').disabled = false;
   document.querySelectorAll('[data-sec]').forEach(x => x.classList.remove('active'));
   sectionOffset = 0; $('secOffset').value = 0; $('secOffsetVal').textContent = '0.00';
-  $('secHint').innerHTML = 'Plane runs through the axis of the Ø' + L(pickedCircle.radius*2) + ' mm' +
+  $('secHint').innerHTML = 'Plane runs through the axis of the Ø' + L(pickedCircle.radius*2) + MM() +
     ' circle. <b>Angle</b> rotates it around that axis; offset shifts it sideways.';
   $('sectionpanel').classList.add('show'); $('btnSection').classList.add('active');
   sectionOn();
@@ -7496,10 +7502,11 @@ function toast(msg, ms){
 
 $('unitToggle').addEventListener('click', ()=>{
   unitScale = unitScale === 1000 ? 1 : 1000;
-  $('stUnits').textContent = unitScale === 1000 ? 'mm' : 'raw';
+  unitsRaw = unitScale !== 1000;
+  $('stUnits').textContent = unitsRaw ? 'raw' : 'mm';
   if (bboxCached){
     const s2 = bboxCached.getSize(new THREE.Vector3());
-    $('stBbox').textContent = [s2.x,s2.y,s2.z].map(v=>L(v)).join(' × ') + (unitScale===1000?' mm':'');
+    $('stBbox').textContent = [s2.x,s2.y,s2.z].map(v=>L(v)).join(' × ') + MM();
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
