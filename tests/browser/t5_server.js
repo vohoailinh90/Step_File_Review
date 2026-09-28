@@ -10,7 +10,15 @@ const fs = require('fs');
   pg.on('pageerror', e => errors.push(e.message)); pg.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await pg.goto('http://127.0.0.1:' + port + '/');
   await pg.setInputFiles('#fileinput', L.MODELS + 'asm.step');
-  await pg.waitForFunction(() => window.__qs && __qs.parts.length === 3 && document.getElementById('drop').classList.contains('hidden'), null, {timeout:60000});
+  try {
+    await pg.waitForFunction(() => window.__qs && __qs.parts.length === 3 && document.getElementById('drop').classList.contains('hidden'), null, {timeout:60000});
+  } catch (e) {
+    // say what the page was doing: a conversion error reaches console.error, a slow one the spinner
+    const st = await pg.evaluate(() => ({spin: document.getElementById('spin').textContent,
+      toast: (document.getElementById('toast') || {}).textContent, parts: window.__qs ? __qs.parts.length : null})).catch(x => String(x));
+    console.log('FAIL converted model never loaded:', JSON.stringify(st), '| page errors:', JSON.stringify(errors));
+    throw e;
+  }
   const st = await pg.evaluate(() => ({load: document.getElementById('loadtime').textContent, brep: __qs.parts.map(p => p.name + ':' + (p.mesh.geometry.userData.brep ? p.mesh.geometry.userData.brep.faces.length + ' faces' : 'none')),
     engine: document.getElementById('enginewarn').classList.contains('show')}));
   console.log('  loaded:', st.load, '| B-rep data:', st.brep.join(', '), '| engine warning shown:', st.engine);
