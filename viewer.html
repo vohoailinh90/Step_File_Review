@@ -6649,16 +6649,19 @@ function closestOnPolyline(pts, closed, q){
   }
   return best;
 }
-// What an edge is: a circle or arc (exact when it runs round an adjacent cylinder, cone,
-// torus or sphere), a straight line, or some other curve. A line is exact only when its B-rep
-// faces make it straight — two planes meeting, or a ruling of a cylinder or cone; a curved edge
-// meshed as one chord looks just as straight.
+// What an edge is: a circle or arc (snapped to an adjacent cylinder, cone, torus or sphere), a
+// straight line, or some other curve. A handful of mesh points fits a circle on a sphere, or a
+// line, whatever the real curve is, so an edge is only exact when both of its B-rep faces are
+// exact and meet in exactly that circle or line.
 function classifyEdge(pts, closed, surfs){
   const n = pts.length;
   let len = 0;
   for (let i = 1; i < n; i++) len += pts[i].distanceTo(pts[i-1]);
   if (closed) len += pts[n-1].distanceTo(pts[0]);
-  for (const s of surfs){ const c = circleOn(s, pts); if (c) return circleEdge(c, pts, closed, s.exact); }
+  for (const s of surfs){
+    const c = circleOn(s, pts);
+    if (c) return circleEdge(c, pts, closed, s.exact && surfs.some(o => o !== s && o.exact && meetsInCircle(o, c)));
+  }
   if (!closed){
     const p0 = pts[0], p1 = pts[n-1], l = p0.distanceTo(p1);
     if (l > 0){
@@ -6683,11 +6686,31 @@ function classifyEdge(pts, closed, surfs){
   }
   return {type:'curve', len, exact:false};
 }
+// Two exact faces meeting in straight lines: planes that are not parallel (coplanar faces can
+// share a curved edge), a plane along a cylinder's axis or through a cone's apex, or two
+// cylinders with parallel axes.
 function straightByFaces(surfs, p0, d, l){
-  const ex = surfs.filter(s => s.exact);
-  if (ex.length === 2 && ex[0].type === 'plane' && ex[1].type === 'plane') return true;
-  return ex.some(s => (s.type === 'cylinder' && Math.abs(s.a.dot(d)) >= PAR) ||
-                      (s.type === 'cone' && _t.subVectors(p0, s.apex).cross(d).length() <= 1e-6 * (l + p0.distanceTo(s.apex))));
+  if (surfs.length !== 2 || !surfs.every(s => s.exact)) return false;
+  const [a, b] = surfs[1].type === 'plane' ? [surfs[1], surfs[0]] : surfs;
+  const tol = 1e-6 * (l + modelSize);
+  if (a.type === 'plane' && b.type === 'plane') return Math.abs(a.n.dot(b.n)) < PAR;
+  if (a.type === 'plane' && b.type === 'cylinder') return Math.abs(a.n.dot(b.a)) <= PERP && Math.abs(d.dot(b.a)) >= PAR;
+  if (a.type === 'plane' && b.type === 'cone')
+    return Math.abs(_t.subVectors(b.apex, a.p).dot(a.n)) <= tol && _t.subVectors(p0, b.apex).cross(d).length() <= tol;
+  if (a.type === 'cylinder' && b.type === 'cylinder') return Math.abs(a.a.dot(b.a)) >= PAR && Math.abs(d.dot(a.a)) >= PAR;
+  return false;
+}
+// Does exact surface o pin circle c down with the surface c was found on: a plane square to the
+// circle's axis through its centre, or a surface of revolution about the same axis?
+function meetsInCircle(o, c){
+  const tol = 1e-4 * c.r + 1e-6 * modelSize;
+  const onAxis = p => _t.subVectors(p, c.c).cross(c.a).length() <= tol;
+  if (o.type === 'plane') return Math.abs(o.n.dot(c.a)) >= PAR && Math.abs(_t.subVectors(c.c, o.p).dot(o.n)) <= tol;
+  if (o.type === 'cylinder') return Math.abs(o.a.dot(c.a)) >= PAR && onAxis(o.p);
+  if (o.type === 'cone') return Math.abs(o.a.dot(c.a)) >= PAR && onAxis(o.apex);
+  if (o.type === 'torus') return Math.abs(o.a.dot(c.a)) >= PAR && onAxis(o.c);
+  if (o.type === 'sphere') return onAxis(o.c);
+  return false;
 }
 function circleOn(s, pts){
   if (s.type === 'cylinder' || s.type === 'cone' || s.type === 'torus'){
