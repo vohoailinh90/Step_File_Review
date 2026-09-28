@@ -6660,7 +6660,13 @@ function classifyEdge(pts, closed, surfs){
   if (closed) len += pts[n-1].distanceTo(pts[0]);
   for (const s of surfs){
     const c = circleOn(s, pts);
-    if (c) return circleEdge(c, pts, closed, s.exact && surfs.some(o => o !== s && o.exact && meetsInCircle(o, c)));
+    if (!c) continue;
+    let exact = false;
+    for (const o of surfs){
+      const e = s.exact && o !== s && o.exact ? exactCircle(s, o, c) : null;
+      if (e){ Object.assign(c, e); exact = true; break; }
+    }
+    return circleEdge(c, pts, closed, exact);
   }
   if (!closed){
     const p0 = pts[0], p1 = pts[n-1], l = p0.distanceTo(p1);
@@ -6700,17 +6706,59 @@ function straightByFaces(surfs, p0, d, l){
   if (a.type === 'cylinder' && b.type === 'cylinder') return Math.abs(a.a.dot(b.a)) >= PAR && Math.abs(d.dot(a.a)) >= PAR;
   return false;
 }
-// Does exact surface o pin circle c down with the surface c was found on: a plane square to the
-// circle's axis through its centre, or a surface of revolution about the same axis?
-function meetsInCircle(o, c){
+// The circle where exact surface s (the one mesh circle c was found on) meets exact surface o.
+// Two surfaces meet in circles when they turn about one axis — a plane counts when square to it,
+// and a sphere turns about any line through its centre — so cut both with a half-plane through
+// that axis and cross their profiles, lines and circles in (ρ, z). Centre and radius then come
+// from the surface parameters, not the mesh; the crossing that matches mesh circle c is the edge.
+function exactCircle(s, o, c){
   const tol = 1e-4 * c.r + 1e-6 * modelSize;
-  const onAxis = p => _t.subVectors(p, c.c).cross(c.a).length() <= tol;
-  if (o.type === 'plane') return Math.abs(o.n.dot(c.a)) >= PAR && Math.abs(_t.subVectors(c.c, o.p).dot(o.n)) <= tol;
-  if (o.type === 'cylinder') return Math.abs(o.a.dot(c.a)) >= PAR && onAxis(o.p);
-  if (o.type === 'cone') return Math.abs(o.a.dot(c.a)) >= PAR && onAxis(o.apex);
-  if (o.type === 'torus') return Math.abs(o.a.dot(c.a)) >= PAR && onAxis(o.c);
-  if (o.type === 'sphere') return onAxis(o.c);
-  return false;
+  const own = t => t.type === 'cylinder' ? {p:t.p, a:t.a} : t.type === 'cone' ? {p:t.apex, a:t.a} : t.type === 'torus' ? {p:t.c, a:t.a} : null;
+  const sph = [s, o].filter(t => t.type === 'sphere'), pl = [s, o].find(t => t.type === 'plane');
+  let ax = own(s) || own(o);
+  if (!ax && sph.length){                                   // spheres: through both centres, or square to the plane
+    const d = sph.length === 2 ? _t.subVectors(sph[1].c, sph[0].c) : pl ? pl.n : null;
+    if (d && d.length() > tol) ax = {p:sph[0].c, a:d.clone().normalize()};
+  }
+  if (!ax) return null;
+  const O = ax.p, a = ax.a, z = p => _t.subVectors(p, O).dot(a);
+  const rho = p => { _t.subVectors(p, O); return _t.addScaledVector(a, -_t.dot(a)).length(); };
+  // the profile: lines [ρ, z, dρ, dz] through a point along a unit direction, circles [ρ, z, r]
+  const profile = t => {
+    const f = own(t);
+    if (f && (Math.abs(f.a.dot(a)) < PAR || rho(f.p) > tol)) return null;          // not on this axis
+    switch (t.type){
+      case 'plane': return Math.abs(t.n.dot(a)) < PAR ? null : {L:[[0, _t.subVectors(t.p, O).dot(t.n) / t.n.dot(a), 1, 0]], C:[]};
+      case 'cylinder': return {L:[[t.r, 0, 0, 1]], C:[]};
+      case 'cone': { const za = z(t.apex), sn = Math.sin(t.semi), cs = Math.cos(t.semi); return {L:[[0, za, sn, cs], [0, za, sn, -cs]], C:[]}; }
+      case 'sphere': return rho(t.c) > tol ? null : {L:[], C:[[0, z(t.c), t.r]]};
+      case 'torus': { const zc = z(t.c); return {L:[], C:[[t.R, zc, t.r], [-t.R, zc, t.r]]}; }
+    }
+    return null;
+  };
+  const P = profile(s), Q = profile(o);
+  if (!P || !Q) return null;
+  const hits = [], put = (r, h) => { if (r > 0) hits.push({c:O.clone().addScaledVector(a, h), a:a.clone(), r}); };
+  const root = q => q < -4 * tol * tol ? null : Math.sqrt(Math.max(q, 0));        // tangent profiles give q ≈ 0
+  const lineLine = ([x1, z1, u1, w1], [x2, z2, u2, w2]) => {
+    const den = u1 * w2 - w1 * u2;
+    if (Math.abs(den) < 1e-9) return;                                             // parallel: no single crossing
+    const t = ((x2 - x1) * w2 - (z2 - z1) * u2) / den;
+    put(x1 + t * u1, z1 + t * w1);
+  };
+  const lineCircle = ([x, h, u, w], [cx, cz, r]) => {
+    const b = u * (x - cx) + w * (h - cz), q = root(b * b - (x - cx) ** 2 - (h - cz) ** 2 + r * r);
+    if (q !== null) for (const t of [q - b, -q - b]) put(x + t * u, h + t * w);
+  };
+  const circleCircle = ([x1, z1, r1], [x2, z2, r2]) => {
+    const D = Math.hypot(x2 - x1, z2 - z1);
+    if (D <= tol) return;                                                         // concentric: never a single circle
+    const m = (r1 * r1 - r2 * r2 + D * D) / (2 * D), q = root(r1 * r1 - m * m), ux = (x2 - x1) / D, uz = (z2 - z1) / D;
+    if (q !== null) for (const k of [q, -q]) put(x1 + m * ux - k * uz, z1 + m * uz + k * ux);
+  };
+  for (const l of P.L){ Q.L.forEach(k => lineLine(l, k)); Q.C.forEach(k => lineCircle(l, k)); }
+  for (const l of P.C){ Q.L.forEach(k => lineCircle(k, l)); Q.C.forEach(k => circleCircle(l, k)); }
+  return hits.find(x => Math.abs(x.r - c.r) <= tol && x.c.distanceTo(c.c) <= tol) || null;
 }
 function circleOn(s, pts){
   if (s.type === 'cylinder' || s.type === 'cone' || s.type === 'torus'){
@@ -6787,14 +6835,15 @@ function describe(e){
       break;
     case 'cylinder':
       title = g.hole ? 'Cylinder (hole)' : 'Cylinder (boss)'; short = 'Ø' + L(2*g.r);
-      rows.push(['diameter', 'Ø' + lin(2*g.r)], ['radius', 'R' + lin(g.r)], ['length', lin(g.h1 - g.h0)], ['axis', dir(g.a)]);
+      rows.push(['diameter', 'Ø' + lin(2*g.r)], ['radius', 'R' + lin(g.r)], ['length (mesh)', lin(g.h1 - g.h0)], ['axis', dir(g.a)]);
       items.push(diaDim(e.part, footOnLine(e.hit, g.p, g.a), g.a, g.r, e.hit));
       marks.push(axisMark(e.part, g.p, g.a, g.h0, g.h1));
       break;
     case 'cone':
       title = 'Cone'; short = deg(2*g.semi);
-      rows.push(['included angle', deg(2*g.semi)], ['diameter', 'Ø' + L(2*g.rMin) + ' – Ø' + lin(2*g.rMax)],
-                ['length', lin(g.h1 - g.h0)], ['axis', dir(g.a)]);
+      rows.push(['included angle', deg(2*g.semi)], ['diameter (mesh)', 'Ø' + L(2*g.rMin) + ' – Ø' + lin(2*g.rMax)],
+                ['length (mesh)', lin(g.h1 - g.h0)], ['axis', dir(g.a)]);
+      items.push({type:'tag', a:{part:e.part, p:e.hit.clone()}, text:deg(2*g.semi)});
       marks.push(axisMark(e.part, g.apex, g.a, g.h0, g.h1));
       break;
     case 'sphere':
@@ -6821,6 +6870,7 @@ function describe(e){
     case 'curve':
       title = 'Curve'; short = lin(g.len);
       rows.push(['length', lin(g.len)]);
+      items.push({type:'tag', a:{part:e.part, p:e.hit.clone()}, value:g.len});
       break;
   }
   if (e.kind === 'face') rows.push(['area (mesh)', A2(e.area) + MM2()]);      // summed over the triangles, even when exact
@@ -6847,7 +6897,7 @@ function relate(A, B, md){
   const rank = e => e.geom.type in RANK ? RANK[e.geom.type] : 9;
   const [X, Y] = rank(B) < rank(A) ? [B, A] : [A, B];
   const gx = X.geom, gy = Y.geom, ax = axisOf(gx), ay = axisOf(gy);
-  const eps = modelSize * 1e-7, lin = v => L(v) + MM(), deg = r => (r * 180 / Math.PI).toFixed(2) + '°';
+  const eps = modelSize * 1e-7, lin = v => L(Math.abs(v) <= eps ? 0 : v) + MM(), deg = r => (r * 180 / Math.PI).toFixed(2) + '°';   // no 1e-7 mm
   const row = (k, v) => rows.push([k, v]);
   let drawn = false;
   const dim = (e1, p1, e2, p2, value) => {
@@ -6885,8 +6935,8 @@ function relate(A, B, md){
       } else {
         row('axis', 'square to the plane');
         const hp = _t.subVectors(gx.p, ay.p).dot(gx.n) / ay.a.dot(gx.n), e0 = Math.abs(gy.h0 - hp), e1 = Math.abs(gy.h1 - hp);
-        row('far end to plane', lin(Math.max(e0, e1)));
-        row('near end to plane', lin(Math.min(e0, e1)));
+        row('far end to plane (mesh)', lin(Math.max(e0, e1)));        // the face's extent, off its vertices
+        row('near end to plane (mesh)', lin(Math.min(e0, e1)));
         const far = ay.p.clone().addScaledVector(ay.a, e0 > e1 ? gy.h0 : gy.h1);
         dim(Y, far, X, footOnPlane(far, gx.p, gx.n), Math.max(e0, e1));
       }
@@ -7005,10 +7055,10 @@ function measureClear(all){
   if (all) keptItems = [];
   renderMeasure();
 }
+const hasNumbers = items => items.some(it => it.type === 'dim' || it.type === 'tag');
 function measureKeep(){             // freeze the current dimensions on screen, start the next
-  const keep = measItems.filter(it => it.type !== 'edge');
-  if (!keep.length) return;
-  keptItems = keptItems.concat(keep);
+  if (!hasNumbers(measItems)) return;
+  keptItems = keptItems.concat(measItems.filter(it => it.type !== 'edge'));
   measureClear(false);
 }
 function renderMeasure(){
@@ -7032,7 +7082,7 @@ function renderMeasure(){
     html = '<div class="k">' + n + (n === 1 ? ' dimension' : ' dimensions') + ' kept on screen. Clear removes them.</div>';
   }
   $('measbody').innerHTML = html;
-  $('btnMeasKeep').disabled = !measItems.some(it => it.type !== 'edge');
+  $('btnMeasKeep').disabled = !hasNumbers(measItems);
   $('btnMeasClear').disabled = !measA && !keptItems.length;
 }
 
@@ -7216,6 +7266,7 @@ function toScreen(p, part, W, H){
   return {x:(_sv.x + 1) / 2 * W, y:(1 - _sv.y) / 2 * H};
 }
 function dimText(it){
+  if (it.text) return it.text;
   const a = it.a.part, b = it.b && it.b.part;
   const split = a && b && a !== b && !a.offset.equals(b.offset);      // parts drawn apart, value is assembled
   return (it.prefix || '') + L(it.value) + MM() + (split ? ' (assembled)' : '');
