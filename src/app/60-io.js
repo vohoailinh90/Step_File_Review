@@ -13,7 +13,16 @@ function screenshot(){
   renderer.setSize(w*2, h*2, false);
   camera.aspect = w/h; camera.updateProjectionMatrix();
   renderer.render(scene, camera);
-  canvas.toBlob(blob=>{
+  let shot = canvas;
+  const items = annotItems();
+  if (items.length){                  // burn the measurement annotations into the image
+    shot = document.createElement('canvas');
+    shot.width = canvas.width; shot.height = canvas.height;
+    const ctx = shot.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    drawAnnotations(ctx, shot.width, shot.height, shot.width / (viewport.clientWidth || 1), items);
+  }
+  shot.toBlob(blob=>{
     renderer.setSize(w, h, false); resize();
     const a = document.createElement('a');
     const base = ($('fname').textContent || 'model').replace(/\.[^.]+$/,'');
@@ -30,12 +39,14 @@ function toast(msg, ms){
 
 $('unitToggle').addEventListener('click', ()=>{
   unitScale = unitScale === 1000 ? 1 : 1000;
-  $('stUnits').textContent = unitScale === 1000 ? 'mm' : 'raw';
+  unitsRaw = unitScale !== 1000;
+  $('stUnits').textContent = unitsRaw ? 'raw' : 'mm';
   if (bboxCached){
     const s2 = bboxCached.getSize(new THREE.Vector3());
-    $('stBbox').textContent = [s2.x,s2.y,s2.z].map(v=>L(v)).join(' × ') + (unitScale===1000?' mm':'');
+    $('stBbox').textContent = [s2.x,s2.y,s2.z].map(v=>L(v)).join(' × ') + MM();
   }
   $('secOffsetVal').textContent = L(sectionOffset);
+  if (mode === 'measure') renderMeasure();
   toast(unitScale === 1000 ? 'Lengths shown in mm (mesh × 1000)' : 'Lengths shown in raw mesh units');
 });
 
@@ -51,9 +62,17 @@ window.addEventListener('keydown', e=>{
   else if (k === '1') setMode('part');
   else if (k === '2') setMode('face');
   else if (k === '3') setMode('edge');
+  else if (k === '4') setMode('measure');
+  else if (k === 'm') setMode(mode === 'measure' ? 'part' : 'measure');
+  else if (k === 'v') $('btnExplode').click();
+  else if (k === 'k' && mode === 'measure') measureKeep();
+  else if ((k === 'delete' || k === 'backspace') && mode === 'measure') measureClear(true);
   else if (k === 'h' && selected) setPartVisible(selected, !selected.visible);
   else if (k === 'i' && selected) isolate(selected);
-  else if (k === 'escape'){ clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
+  else if (k === 'escape'){
+    if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
+    clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
+  }
 });
 
 // ── Files ────────────────────────────────────────────────────

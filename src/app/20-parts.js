@@ -21,7 +21,7 @@ function setPartVisible(p, v){
   p.visible = v; p.mesh.visible = v;
   p.rowEl.classList.toggle('hiddenpart', !v);
   if (p.edges) p.edges.visible = v && edgesOn;
-  if (p.capBack){ p.capBack.visible = v; p.capFront.visible = v; }
+  if (p.capBack){ p.capBack.visible = v; p.capFront.visible = v; p.capQuad.visible = v; }
 }
 function isolate(p){
   const onlyOne = parts.every(q => (q===p) === q.visible);

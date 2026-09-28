@@ -5,10 +5,10 @@ description: The correct procedure for changing QuickSTEP's viewer — which fil
 
 # Changing the viewer
 
-`viewer.html` is **796 KB and generated**. Do not open it to work, and do not
-edit it. Roughly 99% of its bytes are vendored three.js — reading it costs a huge
-amount of context and tells you nothing, because the part you need is 831 lines
-at the bottom, now split into `src/app/`.
+`viewer.html` is **854 KB and generated**. Do not open it to work, and do not
+edit it. Roughly 85% of its bytes are vendored three.js — reading it costs a huge
+amount of context and tells you nothing, because the part you need is the
+application code at the bottom, split into `src/app/`.
 
 ## Find the file from the symptom
 
@@ -18,9 +18,18 @@ at the bottom, now split into `src/app/`.
 | units, `L()` / `A2()` scaling, `unitScale` | `src/app/00-scene.js` |
 | opening a file, format sniffing, GLB/GLTF/STL, load status, dispose | `src/app/10-load.js` |
 | part list rows, hide/show, isolate, invert, hover highlight | `src/app/20-parts.js` |
-| click-to-select, Part/Face/Edge modes, face flood-fill (20° break) | `src/app/30-select.js` |
-| edge chaining, circle fitting, reported diameter/length/area, `fmt` | `src/app/40-geometry.js` |
-| section planes, offset/flip, plane-from-circle, stencil caps | `src/app/50-section.js` |
+| click-to-select, Part/Face/Edge/Measure modes, raycast, highlights | `src/app/30-select.js` |
+| plane / cylinder / sphere fitting to mesh vertices | `src/app/31-fit.js` |
+| what counts as one face: B-rep ids, index connectivity, 20° break | `src/app/32-faces.js` |
+| a face's surface type, exact B-rep data, hole vs boss, face area | `src/app/33-surfaces.js` |
+| Edge mode: edge chaining, circle fitting, info panel, `fmt` | `src/app/40-geometry.js` |
+| Measure: which face or edge a click picks | `src/app/41-measure.js` |
+| Measure: an edge's type, one pick's reported figures (`describe`) | `src/app/42-classify.js` |
+| Measure: two picks' distances/angles (`relate`), Keep/Clear, panel | `src/app/43-relate.js` |
+| Measure: the "min distance (mesh)" row | `src/app/44-mindist.js` |
+| dimensions drawn on the model and in screenshots | `src/app/45-annotate.js` |
+| exploded view, feature-edge toggle | `src/app/46-explode.js` |
+| section planes, offset/flip, plane-from-circle, stencil caps, cuts while exploded | `src/app/50-section.js` |
 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload | `src/app/60-io.js` |
 | colours, spacing, buttons, panels, responsive rules | `src/ui/viewer.css` |
 | new toolbar button, new panel, any new DOM element | `src/ui/layout.html` |

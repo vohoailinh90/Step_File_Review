@@ -1,6 +1,6 @@
 ---
 name: geometry-reviewer
-description: Review any change that affects a number QuickSTEP reports to an engineer — diameter, length, area, bounding box, units, face extent, section-plane placement, or the rms/angle thresholds that gate them. Use whenever src/app/30-select.js, 40-geometry.js or 50-section.js changes, at any tier. This is the repo's highest-value review role; it does not edit code.
+description: Review any change that affects a number QuickSTEP reports to an engineer — diameter, length, area, bounding box, units, face extent, section-plane placement, or the rms/angle thresholds that gate them. Use whenever any of src/app/30-select.js through 46-explode.js, or 50-section.js, changes, at any tier. This is the repo's highest-value review role; it does not edit code.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Write, Edit
 model: sonnet

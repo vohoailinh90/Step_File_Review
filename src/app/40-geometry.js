@@ -3,7 +3,7 @@ function pickEdge(){
   if (!edgeRoot){ toast('Feature edges are still building'); return; }
   raycaster.params.Line.threshold = modelSize * 0.005;
   const lines = edgeRoot.children.filter(l => l.visible);
-  const hits = raycaster.intersectObjects(lines, false).filter(h => notClipped(h.point));
+  const hits = raycaster.intersectObjects(lines, false).filter(h => notClipped(h.point, h.object));
   if (!hits.length){ clearSubSelection(); return; }
   const hit = hits[0];
   const part = parts.find(p => p.edges === hit.object);
@@ -12,14 +12,14 @@ function pickEdge(){
 
   const chain = chainFrom(hit.object, hit.index);
   if (!chain){ toast('Could not trace that edge'); return; }
-  drawEdgeOverlay(chain.points);
+  drawEdgeOverlay(chain.points, part);
 
   const fit = fitCircle(chain.points);
   const len = polylineLength(chain.points, chain.closed);
   if (fit && fit.rms < 0.03){
-    pickedCircle = fit;
+    pickedCircle = Object.assign(fit, {rest:fit.center.clone().sub(part ? part.offset : new THREE.Vector3())});
     showInfo({title:'CIRCULAR EDGE', rows:[
-      ['diameter', L(fit.radius*2) + ' mm'], ['radius', L(fit.radius) + ' mm'],
+      ['diameter', L(fit.radius*2) + MM()], ['radius', L(fit.radius) + MM()],
       ['centre', [fit.center.x,fit.center.y,fit.center.z].map(v=>L(v)).join(', ')],
       ['axis', [fit.axis.x,fit.axis.y,fit.axis.z].map(v=>v.toFixed(3)).join(', ')],
       ['arc', chain.closed ? 'closed' : 'open']],
@@ -28,7 +28,7 @@ function pickEdge(){
     if (circlePickMode) applyCirclePlane();
   } else {
     pickedCircle = null;
-    showInfo({title:'EDGE', rows:[['length', L(len)+' mm'], ['segments', chain.count],
+    showInfo({title:'EDGE', rows:[['length', L(len) + MM()], ['segments', chain.count],
                                   ['shape', chain.closed ? 'closed loop' : 'open']],
               foot:'Pick a circular edge to derive a section plane from it.'});
   }
@@ -94,10 +94,11 @@ function chainFrom(lineObj, hitIndex){
   if (closed) pts.pop();          // drop the duplicated closing point so it doesn't bias the fit
   return {points:pts, closed, count:total};
 }
-function drawEdgeOverlay(points){
+function drawEdgeOverlay(points, part){
   const g = new THREE.BufferGeometry().setFromPoints(points);
   edgeOverlay = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xff7a45, depthTest:false}));
   edgeOverlay.renderOrder = 4;
+  if (part) follow(edgeOverlay, part, part.offset);      // points are where the part is drawn now
   scene.add(edgeOverlay);
 }
 function polylineLength(pts, closed){
@@ -170,27 +171,5 @@ function showInfo(data){
     const f = infoLine(null, data.foot); f.className = 'k'; f.style.marginTop = '5px'; el.append(f);
   }
   el.classList.add('show');
-}
-
-// ── Edges ────────────────────────────────────────────────────
-$('btnEdges').addEventListener('click', toggleEdges);
-function toggleEdges(){
-  edgesOn = !edgesOn;
-  $('btnEdges').classList.toggle('active', edgesOn);
-  if (edgesOn && !edgeRoot && modelRoot){
-    edgeRoot = new THREE.Group();
-    parts.forEach(p=>{
-      if (p.tris > 400000) return;
-      const eg = new THREE.EdgesGeometry(p.mesh.geometry, 25);
-      const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({color:0x2a2a2a}));
-      p.mesh.updateWorldMatrix(true, false);
-      lines.applyMatrix4(p.mesh.matrixWorld);
-      lines.updateMatrixWorld(true);
-      p.edges = lines;
-      edgeRoot.add(lines);
-    });
-    scene.add(edgeRoot);
-  }
-  if (edgeRoot) parts.forEach(p=>{ if (p.edges) p.edges.visible = edgesOn && p.visible; });
 }
 

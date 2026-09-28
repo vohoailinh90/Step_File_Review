@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
 const canvas = $('canvas3d'), viewport = $('viewport');
+const annotCanvas = $('annot'), annotCtx = annotCanvas.getContext('2d');
 
 // ── Renderer / scene ─────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true, stencil:true});
@@ -27,19 +28,22 @@ const fill = new THREE.DirectionalLight(0xffffff, 0.3); fill.position.set(-1, -0
 let modelRoot = null, edgeRoot = null, edgesOn = false;
 // Mesh units: OpenCASCADE writes glTF in metres whatever the STEP was authored in,
 // so lengths are shown as mm = mesh units x 1000. STL carries no units; assume mm.
-let unitScale = 1000;
+let unitScale = 1000, unitsRaw = false;       // unitsRaw: status-bar toggle set to raw mesh units
 const L  = v => fmt(v * unitScale);            // length -> mm
 const A2 = v => fmt(v * unitScale * unitScale); // area  -> mm2
+const MM = () => unitsRaw ? '' : ' mm', MM2 = () => unitsRaw ? '' : ' mm²';
 let parts = [], bboxCached = null, modelSize = 1, modelCenter = new THREE.Vector3();
 
 function resize(){
   const w = viewport.clientWidth, h = viewport.clientHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
+  annotCanvas.width = Math.round(w * renderer.getPixelRatio());
+  annotCanvas.height = Math.round(h * renderer.getPixelRatio());
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
-renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); });
+renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
 
 // ── Framing ──────────────────────────────────────────────────
 function computeBBox(){
@@ -48,7 +52,7 @@ function computeBBox(){
   return box.isEmpty() ? null : box;
 }
 function frame(dir){
-  const box = bboxCached || computeBBox();
+  const box = (explodeAmt > 0 ? computeBBox() : bboxCached) || computeBBox();
   if (!box) return;
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);

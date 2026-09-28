@@ -6,7 +6,7 @@ before changing behavior it describes.
 
 ## Read this first: viewer.html is generated
 
-`viewer.html` is **796 KB, and about 99% of it is vendored three.js**. It is
+`viewer.html` is **854 KB, and about 85% of it is vendored three.js**. It is
 assembled by `build.py` from `src/` and `vendor/`, and it is committed because
 shipping it *is* the product — a user gets two files, no npm, no build step, no
 internet.
@@ -41,21 +41,30 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 ## Where the code lives
 
-862 lines of application code, in one shared closure, split by concern:
+2,212 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
-| `src/app/00-scene.js`    | 69  | renderer, scene, camera, lights, `unitScale`, `L()`/`A2()`, framing |
-| `src/app/10-load.js`     | 121 | `sameOrigin()` runtime URL guard, format sniffing, GLB/GLTF/STL load, dispose, load status |
+| `src/app/00-scene.js`    | 73  | renderer, scene, camera, lights, `unitScale`, `L()`/`A2()`, framing, annotation canvas |
+| `src/app/10-load.js`     | 157 | `sameOrigin()` runtime URL guard, format sniffing, `TM_brep_faces` import, GLB/GLTF/STL load, dispose, load status |
 | `src/app/20-parts.js`    | 42  | part list, visibility, isolate, hover |
-| `src/app/30-select.js`   | 155 | pick modes, raycast, face flood-fill (20° break angle) |
-| `src/app/40-geometry.js` | 196 | edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
-| `src/app/50-section.js`  | 144 | section planes, plane-from-circle, stencil caps |
-| `src/app/60-io.js`       | 135 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
-| `src/ui/viewer.css`      | 92  | all styling |
-| `src/ui/layout.html`     | 112 | toolbar, sidebar, section panel, status bar |
+| `src/app/30-select.js`   | 94  | pick modes, raycast, `notClipped`, highlights that follow an exploded part |
+| `src/app/31-fit.js`      | 144 | vector helpers, `fitPlane` / `fitCylinder` / `fitSphere`, `eigSym3`, `solveLin` |
+| `src/app/32-faces.js`    | 130 | `topology()`: face ids from B-rep data, index connectivity or the 20° break; `faceInfo` |
+| `src/app/33-surfaces.js` | 152 | B-rep surfaces, `onSurface`/`fitSurface`, hole vs boss, `faceEntity` (area), Face mode |
+| `src/app/40-geometry.js` | 175 | Edge mode: edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
+| `src/app/41-measure.js`  | 122 | Measure picking: face vs edge under the cursor, `edgeEntity` |
+| `src/app/42-classify.js` | 247 | what an edge is (exact circle/line from its two faces), `describe()` — one pick's figures |
+| `src/app/43-relate.js`   | 231 | `relate()` — two picks' distances and angles; Keep/Clear; the measure panel |
+| `src/app/44-mindist.js`  | 155 | `minDistance()` — BVH over the picked triangles, the "(mesh)" minimum |
+| `src/app/45-annotate.js` | 97  | dimensions drawn on the model and into screenshots |
+| `src/app/46-explode.js`  | 77  | exploded view (`EXPLODE_MAX`), feature-edge toggle |
+| `src/app/50-section.js`  | 162 | section planes, plane-from-circle, stencil caps, per-part cuts while exploded |
+| `src/app/60-io.js`       | 154 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
+| `src/ui/viewer.css`      | 109 | all styling |
+| `src/ui/layout.html`     | 146 | toolbar, sidebar, section / measure / explode panels, status bar |
 | `src/viewer.template.html` | — | the shell and the concatenation order |
-| `stepview.py`            | 422 | tessellation, cache, CLI, loopback server |
+| `stepview.py`            | 443 | tessellation (with B-rep data), cache, CLI, loopback server |
 
 `.claude/skills/viewer-change/SKILL.md` maps a symptom to a file. Use it.
 
@@ -224,12 +233,12 @@ If the answer is computable, compute it. Counting, hashing, threshold comparison
 conformance a validator can assert, and any lint/test run whose output is already
 a verdict all belong in a script — `tests/check_invariants.py` or
 `tests/mutation_check.py` — not in a reviewer's turn. A reviewer asked to eyeball
-796 KB for a stray CDN reference will sometimes miss it; the script never will.
+854 KB for a stray CDN reference will sometimes miss it; the script never will.
 
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 89 mutations, all currently caught. When you ship a fix with a
+suite to notice — 101 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught

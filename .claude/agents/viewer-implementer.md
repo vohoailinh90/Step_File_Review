@@ -44,11 +44,14 @@ filename order inside a single IIFE. So:
 | file | owns |
 |---|---|
 | `00-scene.js` | renderer, scene, camera, lights, `unitScale`, `L()`/`A2()`, framing |
-| `10-load.js`  | format sniffing, GLB/GLTF/STL load, dispose, post-load status |
+| `10-load.js`  | `sameOrigin()`, format sniffing, B-rep data import, GLB/GLTF/STL load, dispose, status |
 | `20-parts.js` | part list, visibility, isolate, hover |
-| `30-select.js`| pick modes, raycast, face flood-fill (20° break) |
-| `40-geometry.js` | edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
-| `50-section.js`  | section planes, circle-plane, stencil caps |
+| `30-select.js`| pick modes, raycast, highlights that follow exploded parts |
+| `31-fit.js` … `33-surfaces.js` | surface fitting; what one face is (20° break without B-rep data); face surface and area |
+| `40-geometry.js` | Edge mode: edge chaining, `fitCircle`, `polylineLength`, `fmt`, info panel |
+| `41-measure.js` … `45-annotate.js` | Measure: picking, `describe`, `relate`, `minDistance`, drawn dimensions |
+| `46-explode.js` | exploded view, feature-edge toggle |
+| `50-section.js`  | section planes, circle-plane, stencil caps, per-part cuts while exploded |
 | `60-io.js` | drag/drop, `/convert`, `/status`, screenshot, keyboard, autoload |
 
 ## Constraints that are product features, not preferences

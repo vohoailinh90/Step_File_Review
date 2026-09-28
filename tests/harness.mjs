@@ -148,7 +148,7 @@ export function makeTHREE() {
       this.outputEncoding = null; this.localClippingEnabled = false;
       this.info = { render: { calls: 0 } };
     }
-    setPixelRatio() {} setSize() {} render() {} setAnimationLoop() {}
+    setPixelRatio() {} getPixelRatio() { return 1; } setSize() {} render() {} setAnimationLoop() {}
     getSize(t) { return t.set ? t.set(800, 600) : t; } clear() {} dispose() {}
     getContext() { return {}; }
   }
@@ -180,7 +180,7 @@ export function makeTHREE() {
                  clamp: (v, a, b) => Math.max(a, Math.min(b, v)) },
     OrbitControls: class { constructor() { this.target = new Vector3(); this.enableDamping = false; }
                            update() {} addEventListener() {} saveState() {} reset() {} },
-    GLTFLoader: class { parse(_b, _p, onLoad) { onLoad({ scene: new Scene() }); } setPath() {} },
+    GLTFLoader: class { parse(_b, _p, onLoad) { onLoad({ scene: new Scene() }); } setPath() {} register() { return this; } },
     // Records the hook src/app/10-load.js installs, so a test can call it.
     DefaultLoadingManager: { urlModifier: null, setURLModifier(fn) { this.urlModifier = fn; return this; } },
     STLLoader: class { parse() { return geometryFromTriangles([]); } },
@@ -198,14 +198,25 @@ export function makeTHREE() {
 // The page the viewer is served from: stepview.py's loopback server.
 export const PAGE = 'http://127.0.0.1:8000/?model=/model.glb';
 
-export function loadViewer(modules, names = []) {
-  const THREE = makeTHREE();
+/**
+ * `{three: 'real'}` evaluates the vendored three.js in the same context first,
+ * so the measure code runs on the real Vector3/Matrix4/Box3/BufferGeometry it
+ * ships with -- no stub to keep faithful. Only what needs a GPU or a file
+ * (renderer, controls, loaders) is swapped for the stubs above. The context
+ * then keeps its own built-ins, so three.js's typed-array checks see one realm.
+ */
+export function loadViewer(modules, names = [], { three = 'stub' } = {}) {
+  const real = three === 'real';
+  const THREE = real ? null : makeTHREE();
   const page = new URL(PAGE);
   const location = { href: page.href, origin: page.origin, search: page.search };
   const el = stubElement();
-  const ctx = createContext({
-    THREE, Math, console, JSON, Set, Map, Array, Object, Number, String, Boolean,
+  const builtins = real ? {} : {
+    Math, JSON, Set, Map, Array, Object, Number, String, Boolean,
     Float32Array, Uint32Array, Uint16Array, isNaN, parseFloat, parseInt, Date, Error,
+  };
+  const ctx = createContext({
+    THREE, console, ...builtins,
     performance: { now: () => 0 },
     document: {
       getElementById: () => el, querySelector: () => el, querySelectorAll: () => [],
@@ -227,12 +238,21 @@ export function loadViewer(modules, names = []) {
     alert() {}, navigator: { userAgent: 'node' },
   });
   ctx.globalThis = ctx;
-  ctx.window.THREE = THREE;
-
-  for (const rel of modules) {
-    runInContext(readFileSync(join(ROOT, rel), 'utf8'), ctx, { filename: rel });
+  if (real) {
+    ctx.self = ctx;
+    runInContext(readFileSync(join(ROOT, 'vendor/three.min.js'), 'utf8'), ctx,
+                 { filename: 'vendor/three.min.js' });
+    const stub = makeTHREE();
+    for (const k of ['WebGLRenderer', 'OrbitControls', 'GLTFLoader', 'STLLoader']) ctx.THREE[k] = stub[k];
   }
-  const out = { ctx, THREE };
+  ctx.window.THREE = ctx.THREE;
+
+  // ONE script, as build.py ships them: a function declared in a later module is
+  // hoisted for an earlier one's top-level code (41-measure.js wires a button to
+  // measureKeep() from 43-relate.js). Evaluating module by module broke that.
+  runInContext(modules.map(rel => readFileSync(join(ROOT, rel), 'utf8')).join(''), ctx,
+               { filename: modules.length === 1 ? modules[0] : 'src/app/(' + modules.length + ' modules)' });
+  const out = { ctx, THREE: ctx.THREE };
   for (const n of names) out[n] = runInContext(n, ctx);
   return out;
 }

@@ -1,5 +1,31 @@
 // ── Load ─────────────────────────────────────────────────────
 const gltfLoader = new THREE.GLTFLoader(), stlLoader = new THREE.STLLoader();
+// stepview.py asks cascadio for include_brep: each primitive then carries a B-rep face
+// index per triangle plus the exact plane / cylinder / cone / sphere / torus of each face
+// (glTF extension TM_brep_faces, mesh-local metres). Registered as a plugin so the loader
+// doesn't copy it into userData — and deep-clone it for every instance of a part — but
+// hangs it once on the shared geometry.
+gltfLoader.register(parser => ({
+  name:'TM_brep_faces',
+  afterRoot(result){
+    const jobs = [];
+    result.scene.traverse(o => {
+      if (!o.isMesh || o.geometry.userData.brep !== undefined) return;
+      const geo = o.geometry, ref = parser.associations.get(o);
+      geo.userData.brep = null;
+      const meshDef = ref && ref.meshes !== undefined ? parser.json.meshes[ref.meshes] : null;
+      const prim = meshDef && meshDef.primitives[ref.primitives || 0];
+      const ext = prim && prim.extensions && prim.extensions.TM_brep_faces;
+      if (!ext || ext.faceIndices === undefined) return;
+      jobs.push(parser.getDependency('accessor', ext.faceIndices).then(attr => {
+        const nTri = (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
+        if (!attr.isInterleavedBufferAttribute && attr.count === nTri)
+          geo.userData.brep = {tri:attr.array, faces:Array.isArray(ext.faces) ? ext.faces : []};
+      }, () => {}));
+    });
+    return Promise.all(jobs);
+  }
+}));
 
 // The viewer is air-gapped. tests/check_invariants.py checks every URL written
 // in source; a URL that only exists at RUNTIME -- a ?model= query, a buffer or
@@ -31,7 +57,7 @@ function sniff(buf){
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
-  clearSelection(); sectionOff(); disposeCaps();
+  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode();
   if (modelRoot){ scene.remove(modelRoot); disposeTree(modelRoot); modelRoot = null; }
   if (edgeRoot){ scene.remove(edgeRoot); disposeTree(edgeRoot); edgeRoot = null; }
   edgesOn = false; $('btnEdges').classList.remove('active');
@@ -48,6 +74,7 @@ function loadArrayBuffer(buf, name, startedAt){
   spin(true, 'reading mesh');
   const kind = sniff(buf);
   unitScale = (kind === 'glb' || kind === 'gltf') ? 1000 : 1;
+  unitsRaw = false; $('stUnits').textContent = 'mm';
   const finish = root => { clearModel(); modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0); };
   try {
     if (kind === 'step'){
@@ -87,9 +114,18 @@ function afterLoad(name, bytes, ms){
       n.material.side = THREE.DoubleSide;
       const t = n.geometry.index ? n.geometry.index.count/3 : n.geometry.attributes.position.count/3;
       tris += t;
+      // restMatrix: where the part sits assembled. Exploding only moves it by `offset`,
+      // and measurements are always taken on the assembled geometry.
       parts.push({mesh:n, name:n.name || (n.parent && n.parent.name) || ('part_'+parts.length),
-                  tris:t, visible:true, rowEl:null, edges:null});
+                  tris:t, visible:true, rowEl:null, edges:null,
+                  restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3(),
+                  clip:new THREE.Plane()});                     // its cut: the section plane, moved with it
     }
+  });
+  parts.forEach(p=>{
+    const g = p.mesh.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    g.boundingBox.getCenter(p.restCenter).applyMatrix4(p.restMatrix);
   });
   bboxCached = computeBBox();
   if (bboxCached){

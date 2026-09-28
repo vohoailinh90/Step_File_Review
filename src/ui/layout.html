@@ -10,10 +10,12 @@
       <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
       <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
       <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
+      <button class="btn" data-mode="measure" title="Measure diameters, radii and distances between faces and edges (4 / M)">Measure</button>
     </div>
     <span class="sep"></span>
 
     <button class="btn" id="btnSection" title="Section views (X)">Section</button>
+    <button class="btn" id="btnExplode" title="Exploded view (V)">Explode</button>
     <button class="btn" id="btnParts" title="Show or hide part list">Parts</button>
     <div class="btn-group" role="group" aria-label="Standard views">
       <button class="btn" data-view="iso">Iso</button>
@@ -46,8 +48,40 @@
 
     <div id="viewport">
       <canvas id="canvas3d"></canvas>
+      <canvas id="annot"></canvas>
 
       <div id="info"></div>
+
+      <div id="measurepanel">
+        <div class="mhead">
+          <span class="hd">MEASURE</span>
+          <button class="btn" id="btnMeasKeep" title="Keep this measurement on screen while you take the next (K)">Keep</button>
+          <button class="btn" id="btnMeasClear" title="Remove all measurements (Del)">Clear</button>
+        </div>
+        <div id="measbody"></div>
+        <div class="hint" id="meashint">Click a face or an edge for its size — Ø and R of cylinders, circles and arcs.
+          Click a second one to measure between them. Esc clears.</div>
+      </div>
+
+      <div id="explodepanel">
+        <div class="row">
+          <span class="lbl">amount</span>
+          <input type="range" id="expAmount" min="0" max="100" step="1" value="0">
+          <span class="val" id="expAmountVal">0 %</span>
+        </div>
+        <div class="row">
+          <span class="lbl">along</span>
+          <div class="btn-group" role="group" aria-label="Explode direction">
+            <button class="btn active" data-exp="all" title="Away from the assembly centre">All</button>
+            <button class="btn" data-exp="x">X</button>
+            <button class="btn" data-exp="y">Y</button>
+            <button class="btn" data-exp="z">Z</button>
+          </div>
+          <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
+        </div>
+        <div class="row"><span class="hint">Parts slide away from the assembly centre. Measurements keep
+          using the assembled positions.</span></div>
+      </div>
 
       <div id="sectionpanel">
         <div class="row">
@@ -107,6 +141,6 @@
     <span>bbox <b id="stBbox">–</b></span>
     <span id="unitToggle" style="cursor:pointer" title="Click if the scale looks wrong">units <b id="stUnits">mm</b></span>
     <span class="spacer"></span>
-    <span id="hintbar">LMB rotate · RMB pan · wheel zoom · click to select · H hide · I isolate</span>
+    <span id="hintbar">LMB rotate · RMB pan · wheel zoom · click to select · H hide · I isolate · M measure</span>
   </div>
 </div>
