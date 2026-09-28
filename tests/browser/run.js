@@ -100,7 +100,7 @@ function startStepview(py, page){
   const cache = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qs-test-cache-'));
   fs.writeFileSync(STEPVIEW_LOG, '');
   // -u: unbuffered, so the log is complete even when the server is killed
-  const proc = cp.spawn(py, ['-u', path.join(DIR, 'tools', 'serve_stepview.py'), page, cache], {stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true});
+  const proc = cp.spawn(py, ['-u', path.join(DIR, 'tools', 'serve_stepview.py'), page, cache], {stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true});
   proc.stderr.on('data', d => fs.appendFileSync(STEPVIEW_LOG, d));
   return new Promise((ok, fail) => {
     let buf = '';
@@ -109,7 +109,7 @@ function startStepview(py, page){
       fs.appendFileSync(STEPVIEW_LOG, d);
       buf += d;
       const m = buf.match(/port (\d+)/);
-      if (m){ clearTimeout(t); ok({port: m[1], stop(){ proc.stdin.end(); proc.kill(); try { fs.rmSync(cache, {recursive: true, force: true}); } catch {} }}); }
+      if (m){ clearTimeout(t); ok({port: m[1], stop(){ proc.kill(); try { fs.rmSync(cache, {recursive: true, force: true}); } catch {} }}); }
     });
     proc.on('exit', c => { clearTimeout(t); fail(new Error('stepview.py exited with ' + c + '; see out/stepview.log')); });
   });
@@ -168,7 +168,7 @@ function runTest(file, args, env, verbose){
     console.log(`${status.padEnd(5)} ${name.padEnd(9)} ${((Date.now() - t0) / 1000).toFixed(1).padStart(5)} s  ${note}`);
     if (status === 'FAIL' && !verbose) fails.forEach(l => console.log('        ' + l));
     if (status === 'ERROR' && !verbose) console.log(r.out.split(/\r?\n/).slice(-8).map(l => '        ' + l).join('\n'));
-    if (name === 't5' && status !== 'PASS') console.log(['        out/stepview.log:', ...logTail(STEPVIEW_LOG, 15).map(l => '          ' + l)].join('\n'));
+    if (name === 't5' && status !== 'PASS') console.log(['        out/stepview.log:', ...logTail(STEPVIEW_LOG, 60).map(l => '          ' + l)].join('\n'));
   }
   if (stepview) stepview.stop();
   server.close();
