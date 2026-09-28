@@ -5781,7 +5781,8 @@ function afterLoad(name, bytes, ms){
       // and measurements are always taken on the assembled geometry.
       parts.push({mesh:n, name:n.name || (n.parent && n.parent.name) || ('part_'+parts.length),
                   tris:t, visible:true, rowEl:null, edges:null,
-                  restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3()});
+                  restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3(),
+                  clip:new THREE.Plane()});                     // its cut: the section plane, moved with it
     }
   });
   parts.forEach(p=>{
@@ -5840,7 +5841,7 @@ function setPartVisible(p, v){
   p.visible = v; p.mesh.visible = v;
   p.rowEl.classList.toggle('hiddenpart', !v);
   if (p.edges) p.edges.visible = v && edgesOn;
-  if (p.capBack){ p.capBack.visible = v; p.capFront.visible = v; }
+  if (p.capBack){ p.capBack.visible = v; p.capFront.visible = v; p.capQuad.visible = v; }
 }
 function isolate(p){
   const onlyOne = parts.every(q => (q===p) === q.visible);
@@ -5928,7 +5929,11 @@ function setRay(e){
   ndc.y = -((e.clientY-r.top)/r.height)*2 + 1;
   raycaster.setFromCamera(ndc, camera);
 }
-function notClipped(pt){ return !sectionActive || sectionPlane.distanceToPoint(pt) >= 0; }
+// is a point on obj left standing by the section? obj is clipped by its own part's cut
+function notClipped(pt, obj){
+  const planes = sectionActive && obj.material.clippingPlanes;
+  return !planes || planes.every(pl => pl.distanceToPoint(pt) >= 0);
+}
 
 function pick(e){
   if (!modelRoot) return;
@@ -5937,7 +5942,7 @@ function pick(e){
   if (mode === 'measure') return pickMeasure(e);
 
   const meshes = parts.filter(p=>p.visible).map(p=>p.mesh);
-  const hits = raycaster.intersectObjects(meshes, false).filter(h => notClipped(h.point));
+  const hits = raycaster.intersectObjects(meshes, false).filter(h => notClipped(h.point, h.object));
   if (!hits.length){ clearSelection(); return; }
   const hit = hits[0];
   const part = parts.find(p => p.mesh === hit.object);
@@ -6380,7 +6385,7 @@ function pickEdge(){
   if (!edgeRoot){ toast('Feature edges are still building'); return; }
   raycaster.params.Line.threshold = modelSize * 0.005;
   const lines = edgeRoot.children.filter(l => l.visible);
-  const hits = raycaster.intersectObjects(lines, false).filter(h => notClipped(h.point));
+  const hits = raycaster.intersectObjects(lines, false).filter(h => notClipped(h.point, h.object));
   if (!hits.length){ clearSubSelection(); return; }
   const hit = hits[0];
   const part = parts.find(p => p.edges === hit.object);
@@ -6394,7 +6399,7 @@ function pickEdge(){
   const fit = fitCircle(chain.points);
   const len = polylineLength(chain.points, chain.closed);
   if (fit && fit.rms < 0.03){
-    pickedCircle = fit;
+    pickedCircle = Object.assign(fit, {rest:fit.center.clone().sub(part ? part.offset : new THREE.Vector3())});
     showInfo({title:'CIRCULAR EDGE', rows:[
       ['diameter', L(fit.radius*2) + MM()], ['radius', L(fit.radius) + MM()],
       ['centre', [fit.center.x,fit.center.y,fit.center.z].map(v=>L(v)).join(', ')],
@@ -6551,7 +6556,7 @@ function meshHit(x, y, r){          // nearest visible, unclipped mesh under a v
   ndc.set(x / r.width * 2 - 1, -(y / r.height) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   const hits = raycaster.intersectObjects(parts.filter(p => p.visible).map(p => p.mesh), false);
-  return hits.find(h => notClipped(h.point)) || null;
+  return hits.find(h => notClipped(h.point, h.object)) || null;
 }
 function pickMeasure(e){
   const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -6589,7 +6594,7 @@ function nearestBoundary(part, topo, f, hit, x, y, r){
     const d = Math.hypot(ax + s*dx - x, ay + s*dy - y);
     if (best && d >= best.px) continue;
     q.copy(a).lerp(b, s);
-    if (!notClipped(q) || q.distanceTo(camera.position) > hit.distance + slack) continue;
+    if (!notClipped(q, part.mesh) || q.distanceTo(camera.position) > hit.distance + slack) continue;
     best = {px:d, h};
   }
   return best;
@@ -6694,7 +6699,8 @@ function classifyEdge(pts, closed, surfs){
 }
 // Two exact faces meeting in straight lines: planes that are not parallel (coplanar faces can
 // share a curved edge), a plane along a cylinder's axis or through a cone's apex, or two
-// cylinders with parallel axes.
+// cylinders with parallel axes that are not patches of one cylinder (which, like coplanar
+// faces, can share any curve).
 function straightByFaces(surfs, p0, d, l){
   if (surfs.length !== 2 || !surfs.every(s => s.exact)) return false;
   const [a, b] = surfs[1].type === 'plane' ? [surfs[1], surfs[0]] : surfs;
@@ -6703,7 +6709,10 @@ function straightByFaces(surfs, p0, d, l){
   if (a.type === 'plane' && b.type === 'cylinder') return Math.abs(a.n.dot(b.a)) <= PERP && Math.abs(d.dot(b.a)) >= PAR;
   if (a.type === 'plane' && b.type === 'cone')
     return Math.abs(_t.subVectors(b.apex, a.p).dot(a.n)) <= tol && _t.subVectors(p0, b.apex).cross(d).length() <= tol;
-  if (a.type === 'cylinder' && b.type === 'cylinder') return Math.abs(a.a.dot(b.a)) >= PAR && Math.abs(d.dot(a.a)) >= PAR;
+  if (a.type === 'cylinder' && b.type === 'cylinder'){
+    const one = Math.abs(a.r - b.r) <= tol && _t.subVectors(b.p, a.p).cross(a.a).length() <= tol;
+    return !one && Math.abs(a.a.dot(b.a)) >= PAR && Math.abs(d.dot(a.a)) >= PAR;
+  }
   return false;
 }
 // The circle where exact surface s (the one mesh circle c was found on) meets exact surface o.
@@ -7390,6 +7399,7 @@ function applyExplode(){
     }
   });
   followers.forEach(o => { const fl = o.userData.follow; o.position.copy(fl.part.offset).sub(fl.base); });
+  if (sectionActive) syncClips();
   if (mode === 'measure') renderMeasure();
 }
 
@@ -7403,7 +7413,7 @@ function toggleEdges(){
     parts.forEach(p=>{
       if (p.tris > 400000) return;
       const eg = new THREE.EdgesGeometry(p.mesh.geometry, 25);
-      const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({color:0x2a2a2a}));
+      const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({color:0x2a2a2a, clippingPlanes:sectionActive ? [p.clip] : null}));
       p.mesh.updateWorldMatrix(true, false);
       lines.applyMatrix4(p.mesh.matrixWorld);
       lines.updateMatrixWorld(true);
@@ -7416,10 +7426,12 @@ function toggleEdges(){
 }
 
 // ── Section planes ───────────────────────────────────────────
+// sectionPlane is the cut in assembled coordinates. Each part is clipped by its own copy, moved
+// with the part when the assembly is exploded, so every part keeps the cut it had assembled.
 const sectionPlane = new THREE.Plane(new THREE.Vector3(1,0,0), 0);
 let sectionActive = false, sectionNormalBase = new THREE.Vector3(1,0,0),
     sectionPoint = new THREE.Vector3(), sectionFlip = 1, sectionOffset = 0,
-    sectionKind = null, capsWanted = true, capGroup = null, capQuad = null,
+    sectionKind = null, capsWanted = true, capGroup = null,
     circlePickMode = false;
 
 $('btnSection').addEventListener('click', ()=>{
@@ -7467,7 +7479,7 @@ function applyCirclePlane(){
   circlePickMode = false;
   $('btnPickCircle').classList.remove('active');
   sectionKind = 'circle';
-  sectionPoint.copy(pickedCircle.center);
+  sectionPoint.copy(pickedCircle.rest);          // assembled; each part's cut moves with the part
   $('secAngle').disabled = false;
   document.querySelectorAll('[data-sec]').forEach(x => x.classList.remove('active'));
   sectionOffset = 0; $('secOffset').value = 0; $('secOffsetVal').textContent = '0.00';
@@ -7489,16 +7501,20 @@ function circleNormal(deg){
 }
 function sectionOn(){
   sectionActive = true;
-  parts.forEach(p=>{ p.mesh.material.clippingPlanes = [sectionPlane]; p.mesh.material.needsUpdate = true; });
-  if (edgeRoot) edgeRoot.children.forEach(l=>{ l.material.clippingPlanes = [sectionPlane]; l.material.needsUpdate = true; });
+  parts.forEach(p=>{
+    p.mesh.material.clippingPlanes = [p.clip]; p.mesh.material.needsUpdate = true;
+    if (p.edges){ p.edges.material.clippingPlanes = [p.clip]; p.edges.material.needsUpdate = true; }
+  });
   if (capsWanted && !capGroup) buildCaps();
   updatePlane();
 }
 function sectionOff(){
   sectionActive = false;
   sectionKind = null;
-  parts.forEach(p=>{ if (p.mesh.material){ p.mesh.material.clippingPlanes = null; p.mesh.material.needsUpdate = true; } });
-  if (edgeRoot) edgeRoot.children.forEach(l=>{ l.material.clippingPlanes = null; l.material.needsUpdate = true; });
+  parts.forEach(p=>{
+    if (p.mesh.material){ p.mesh.material.clippingPlanes = null; p.mesh.material.needsUpdate = true; }
+    if (p.edges){ p.edges.material.clippingPlanes = null; p.edges.material.needsUpdate = true; }
+  });
   disposeCaps();
   document.querySelectorAll('[data-sec]').forEach(x => x.classList.remove('active'));
   $('secAngle').disabled = true;
@@ -7512,51 +7528,63 @@ function updatePlane(){
   n.multiplyScalar(sectionFlip);
   sectionPlane.setFromNormalAndCoplanarPoint(n, sectionPoint);
   sectionPlane.constant -= sectionOffset;
-  if (capQuad){
-    const p = n.clone().multiplyScalar(-sectionPlane.constant);
-    capQuad.position.copy(p);
-    capQuad.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), n);
-  }
+  syncClips();
 }
+const _zAxis = new THREE.Vector3(0, 0, 1), _cc = new THREE.Vector3();
+function syncClips(){                 // each part's cut and cap: the section plane, moved with the part
+  parts.forEach(p=>{
+    p.clip.copy(sectionPlane);
+    p.clip.constant -= p.clip.normal.dot(p.offset);
+    if (!p.capQuad) return;
+    p.clip.projectPoint(_cc.copy(p.restCenter).add(p.offset), p.capQuad.position);
+    p.capQuad.quaternion.setFromUnitVectors(_zAxis, p.clip.normal);
+  });
+}
+// Caps, part by part: count the part's clipped faces into the stencil (back faces up, front
+// faces down), so it is non-zero where the view looks into the part through its cut; fill the
+// cut there with a quad in the part's plane. The quad writes 0 wherever it lands, so it also
+// hands a clean stencil to the next part — no full-screen clear per part.
 function buildCaps(){
   if (!parts.length) return;
   capGroup = new THREE.Group();
-  const mkStencil = (side, op) => new THREE.MeshBasicMaterial({
-    depthWrite:false, depthTest:false, colorWrite:false, side,
+  const mkStencil = (side, op, plane) => new THREE.MeshBasicMaterial({
+    depthWrite:false, depthTest:false, colorWrite:false, side, clippingPlanes:[plane],
     stencilWrite:true, stencilFunc:THREE.AlwaysStencilFunc,
     stencilFail:op, stencilZFail:op, stencilZPass:op});
-  const backMat  = mkStencil(THREE.BackSide,  THREE.IncrementWrapStencilOp);
-  const frontMat = mkStencil(THREE.FrontSide, THREE.DecrementWrapStencilOp);
-  parts.forEach(p=>{
-    const b = new THREE.Mesh(p.mesh.geometry, backMat);
-    const f = new THREE.Mesh(p.mesh.geometry, frontMat);
-    [b,f].forEach(m=>{
-      m.matrixAutoUpdate = false;
-      m.matrix.copy(p.mesh.matrixWorld);
-      m.matrixWorldNeedsUpdate = true;
-      m.renderOrder = 1;
-      m.visible = p.visible;
-      capGroup.add(m);
-    });
-    p.capBack = b; p.capFront = f;
-  });
   const capMat = new THREE.MeshStandardMaterial({
     color:0x6f7885, metalness:.1, roughness:.85, side:THREE.DoubleSide,
     stencilWrite:true, stencilRef:0, stencilFunc:THREE.NotEqualStencilFunc,
     stencilFail:THREE.ReplaceStencilOp, stencilZFail:THREE.ReplaceStencilOp, stencilZPass:THREE.ReplaceStencilOp});
-  capQuad = new THREE.Mesh(new THREE.PlaneGeometry(modelSize*4, modelSize*4), capMat);
-  capQuad.renderOrder = 2;
-  capQuad.onAfterRender = r => r.clearStencil();
-  capGroup.add(capQuad);
+  const quad = new THREE.PlaneGeometry(1, 1), box = new THREE.Box3(), size = new THREE.Vector3();
+  parts.forEach((p, i)=>{
+    const b = new THREE.Mesh(p.mesh.geometry, mkStencil(THREE.BackSide,  THREE.IncrementWrapStencilOp, p.clip));
+    const f = new THREE.Mesh(p.mesh.geometry, mkStencil(THREE.FrontSide, THREE.DecrementWrapStencilOp, p.clip));
+    [b,f].forEach(m=>{
+      m.matrixAutoUpdate = false;
+      m.matrix.copy(p.mesh.matrixWorld);
+      m.matrixWorldNeedsUpdate = true;
+      m.renderOrder = 1 + 2*i;
+      m.visible = p.visible;
+      capGroup.add(m);
+    });
+    // wide enough for the part's cut wherever the plane crosses it: its bounding-box diagonal
+    const c = new THREE.Mesh(quad, capMat);
+    c.scale.setScalar(box.copy(p.mesh.geometry.boundingBox).applyMatrix4(p.restMatrix).getSize(size).length() * 1.05 + modelSize * 1e-3);
+    c.renderOrder = 2 + 2*i;
+    c.visible = p.visible;
+    capGroup.add(c);
+    p.capBack = b; p.capFront = f; p.capQuad = c;
+  });
   scene.add(capGroup);
+  syncClips();
 }
 function disposeCaps(){
   if (!capGroup) return;
   scene.remove(capGroup);
-  capGroup.traverse(n=>{ if (n.material) n.material.dispose(); });
-  if (capQuad) capQuad.geometry.dispose();
-  parts.forEach(p=>{ p.capBack = null; p.capFront = null; });
-  capGroup = null; capQuad = null;
+  new Set(capGroup.children.map(n => n.material)).forEach(m => m.dispose());   // the part geometry stays
+  if (parts.length && parts[0].capQuad) parts[0].capQuad.geometry.dispose();
+  parts.forEach(p=>{ p.capBack = null; p.capFront = null; p.capQuad = null; });
+  capGroup = null;
 }
 
 // ── Background / screenshot ──────────────────────────────────

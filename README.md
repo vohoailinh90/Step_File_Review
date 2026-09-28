@@ -86,7 +86,7 @@ Every pair also shows the **min distance (mesh)**: the shortest distance between
 
 ## Exploded view
 
-**Explode** (`V`) opens the explode panel. **Amount** slides every part away from the assembly centre along the line from the centre through the part's own centre — at 100 % a part ends up three times as far out. **Along X / Y / Z** keeps the movement to one axis, which suits stacked assemblies; **Reset** puts everything back. Feature edges, section caps and highlights move with their parts, and Fit (`F`) frames the exploded model.
+**Explode** (`V`) opens the explode panel. **Amount** slides every part away from the assembly centre along the line from the centre through the part's own centre — at 100 % a part ends up three times as far out. **Along X / Y / Z** keeps the movement to one axis, which suits stacked assemblies; **Reset** puts everything back. Feature edges and highlights move with their parts, and so does a section: each part keeps the cut it had assembled, caps included, so an exploded section still shows every part cut through the same features. Fit (`F`) frames the exploded model.
 
 Measurements are always taken on the assembled geometry: the distance between two parts reads the same exploded or not, and while the parts are drawn apart its dimension is marked *(assembled)*.
 
