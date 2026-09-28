@@ -7055,8 +7055,8 @@ function relate(A, B, md){
   // figures that are all zero — flush faces, a line-to-line fit — have no length to draw:
   // label the headline where the picks meet instead, so Keep and screenshots still carry it
   if (rows.length && !items.some(it => it.type === 'dim' || it.type === 'tag')){
-    const [e, p] = md ? [A, md.pa] : [X, X.hit];
-    items.push({type:'tag', a:{part:e.part, p:p.clone()}, text:rows[0][1]});
+    const [e, p, o, q] = md ? [A, md.pa, B, md.pb] : [X, X.hit, Y, Y.hit];
+    items.push({type:'tag', a:{part:e.part, p:p.clone()}, b:{part:o.part, p:q.clone()}, text:rows[0][1]});   // b: marks it (assembled) when exploded
   }
   row('source', SOURCES[Math.max(provenance(A), provenance(B))]);
   return {rows, items};
@@ -7288,10 +7288,9 @@ function toScreen(p, part, W, H){
   return {x:(_sv.x + 1) / 2 * W, y:(1 - _sv.y) / 2 * H};
 }
 function dimText(it){
-  if (it.text) return it.text;
   const a = it.a.part, b = it.b && it.b.part;
   const split = a && b && a !== b && !a.offset.equals(b.offset);      // parts drawn apart, value is assembled
-  return (it.prefix || '') + L(it.value) + MM() + (split ? ' (assembled)' : '');
+  return (it.text || (it.prefix || '') + L(it.value) + MM()) + (split ? ' (assembled)' : '');
 }
 // s: canvas pixels per CSS pixel, so lines and text keep their size in hi-res screenshots
 function drawAnnotations(ctx, W, H, s, items){
