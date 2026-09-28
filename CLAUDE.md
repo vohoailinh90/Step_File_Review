@@ -431,8 +431,9 @@ semantics (mutate in place, return `this`); an unfaithful stub would silently
 void every test that uses it. Nothing there renders, so nothing there proves a
 pixel — that needs headless Chromium: `tests/browser/` runs the built
 `viewer.html` in it on fixture models of known dimensions (`node
-tests/browser/run.js`, setup in its README). It is not in CI; run it for a change
-to what the viewer draws or reports, and extend it rather than building another.
+tests/browser/run.js`, setup in its README). CI runs it on `windows-latest` (the
+`browser` job, `--strict`, so nothing may skip); run it locally too for a change to
+what the viewer draws or reports, and extend it rather than building another.
 
 ## Scope of this file
 

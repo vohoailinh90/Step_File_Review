@@ -3,6 +3,7 @@
 //   node run.js              all tests
 //   node run.js t2 t18       only these
 //   node run.js -v ...       stream each test's full output
+//   node run.js --strict     a SKIP fails the run too (CI uses this: nothing may go untested)
 //
 // It builds www/viewer_test.html (viewer.html plus a window.__qs debug handle), serves it with
 // the test models on a free loopback port, and runs each test in its own Node process.
@@ -120,7 +121,8 @@ function runTest(file, args, env, verbose){
 }
 
 (async () => {
-  const argv = process.argv.slice(2), verbose = argv.includes('-v'), only = argv.filter(a => a !== '-v');
+  const argv = process.argv.slice(2), verbose = argv.includes('-v'), strict = argv.includes('--strict');
+  const only = argv.filter(a => a !== '-v' && a !== '--strict');
   const tests = only.length ? TESTS.filter(([n]) => only.includes(n.split(' ')[0])) : TESTS;
   if (!tests.length){ console.error('no test matches: ' + only.join(' ')); process.exit(2); }
   try { require.resolve('playwright', {paths: [DIR, ...(process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean)]}); }
@@ -164,5 +166,6 @@ function runTest(file, args, env, verbose){
   server.close();
   const n = s => results.filter(r => r[1] === s).length;
   console.log(`\n${n('PASS')} passed, ${n('FAIL')} failed, ${n('ERROR')} errors, ${n('SKIP')} skipped`);
-  process.exit(n('FAIL') || n('ERROR') ? 1 : 0);
+  if (strict && n('SKIP')) console.log('--strict: a skipped test is a failure here; install what the SKIP line names');
+  process.exit(n('FAIL') || n('ERROR') || (strict && n('SKIP')) ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

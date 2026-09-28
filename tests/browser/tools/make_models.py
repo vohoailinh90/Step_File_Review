@@ -4,7 +4,8 @@ The committed models are what the tests expect; run this only to change them.
 Needs build123d and cascadio (python -m pip install build123d cascadio).
 
     python tools/make_models.py          # asm, asm2, plate.stl, the sheets
-    python tools/make_models.py --big    # also big.step / big_brep.glb for t6 and t7 (~5 MB, not committed)
+    python tools/make_models.py --big    # also big.step / big_brep.glb for t6 and t7 (~2 MB, not committed)
+    python tools/make_models.py --big-only   # just those two, leaving the committed models alone (CI)
     python tools/make_models.py --out DIR
 
 Dimensions are in millimetres; the tests check against them.
@@ -133,12 +134,17 @@ def make_sheets(out: Path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--big", action="store_true", help="also build the 401-part model for t6 / t7")
+    ap.add_argument("--big-only", action="store_true", help="build only the 401-part model")
     ap.add_argument("--out", default=str(HERE.parent / "models"), help="output folder (default: models)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     import build123d as B
 
+    if a.big_only:
+        make_big(B, out / "big.step")
+        glb(out / "big.step", out / "big_brep.glb")
+        return
     make_asm(B, out / "asm.step")
     glb(out / "asm.step", out / "asm_brep.glb")
     glb(out / "asm.step", out / "asm_plain.glb", brep=False)
