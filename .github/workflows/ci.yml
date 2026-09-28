@@ -120,24 +120,28 @@ jobs:
         with:
           node-version: "22"
 
-      # The engine exactly as README.md installs it: t5 converts a STEP file
-      # through stepview.py's real /convert endpoint.
-      - run: python -m pip install cascadio numpy
-
-      # build123d only builds the 401-part fixture for t6/t7. It is a test
-      # dependency, never the launcher's.
-      - run: python -m pip install build123d
+      # The engine as README.md installs it (cascadio numpy), so t5 converts a
+      # STEP file through stepview.py's real /convert endpoint, plus build123d,
+      # which only builds the 401-part fixture for t6/t7 -- a test dependency,
+      # never the launcher's, pinned so a release cannot change the fixture. One line on purpose: the engine job's install line
+      # must stay the only copy of README's, or the mutation that guards it
+      # (product/ci-engine-job-tests-another-install) cannot tell them apart.
+      - run: python -m pip install cascadio numpy build123d==0.13.0
 
       - name: Build the 401-part model
         working-directory: tests/browser
         run: python tools/make_models.py --big-only
 
       # No package.json (CLAUDE.md): --no-save installs without writing one.
-      - name: Install Playwright and Chromium
+      # Two steps, not one multi-line run: pwsh reports only the last command's
+      # exit code, so a failed npm install would otherwise pass here.
+      - name: Install Playwright
         working-directory: tests/browser
-        run: |
-          npm install --no-save --no-audit --no-fund playwright@1.56.1
-          npx playwright install chromium
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+
+      - name: Install Chromium for Playwright
+        working-directory: tests/browser
+        run: npx playwright install chromium
 
       - name: Browser tests
         working-directory: tests/browser
