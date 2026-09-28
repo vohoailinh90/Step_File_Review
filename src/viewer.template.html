@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickSTEP Viewer</title>
+<style>
+@@INCLUDE:src/ui/viewer.css@@</style>
+</head>
+<body>
+@@INCLUDE:src/ui/layout.html@@
+<script>@@INCLUDE:vendor/three.min.js@@</script>
+<script>@@INCLUDE:vendor/OrbitControls.js@@</script>
+<script>@@INCLUDE:vendor/GLTFLoader.js@@</script>
+<script>@@INCLUDE:vendor/STLLoader.js@@</script>
+
+<script>
+(function(){
+"use strict";
+@@INCLUDE:src/app/00-scene.js@@@@INCLUDE:src/app/10-load.js@@@@INCLUDE:src/app/20-parts.js@@@@INCLUDE:src/app/30-select.js@@@@INCLUDE:src/app/31-fit.js@@@@INCLUDE:src/app/32-faces.js@@@@INCLUDE:src/app/33-surfaces.js@@@@INCLUDE:src/app/40-geometry.js@@@@INCLUDE:src/app/41-measure.js@@@@INCLUDE:src/app/42-classify.js@@@@INCLUDE:src/app/43-relate.js@@@@INCLUDE:src/app/44-mindist.js@@@@INCLUDE:src/app/45-annotate.js@@@@INCLUDE:src/app/46-explode.js@@@@INCLUDE:src/app/50-section.js@@@@INCLUDE:src/app/60-io.js@@})();
+</script>
+</body>
+</html>

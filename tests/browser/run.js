@@ -124,7 +124,7 @@ function runTest(file, args, env, verbose){
   const tests = only.length ? TESTS.filter(([n]) => only.includes(n.split(' ')[0])) : TESTS;
   if (!tests.length){ console.error('no test matches: ' + only.join(' ')); process.exit(2); }
   try { require.resolve('playwright', {paths: [DIR, ...(process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean)]}); }
-  catch { console.error('playwright is not installed: run  npm install  and  npx playwright install chromium  in tests/browser'); process.exit(2); }
+  catch { console.error('playwright is not installed: in tests/browser run  npm install --no-save playwright@1.56.1  then  npx playwright install chromium'); process.exit(2); }
 
   fs.mkdirSync(OUT, {recursive: true});
   const page = buildPage();

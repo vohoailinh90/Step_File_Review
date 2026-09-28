@@ -7,9 +7,11 @@ Headless-Chromium tests for `viewer.html`, driven by [Playwright](https://playwr
 Node 18 or later, from this folder:
 
 ```
-npm install
+npm install --no-save playwright@1.56.1
 npx playwright install chromium
 ```
+
+There is deliberately no `package.json`: the repo adds no npm manifest (see `CLAUDE.md`), and `--no-save` installs Playwright into `node_modules/` here without writing one. Both are ignored by git.
 
 t5 also needs the Python that runs `stepview.py`, with `cascadio` installed. t6 and t7 need a large generated model (see [Models](#models)). When either is missing, those tests are skipped and the rest still run.
 
