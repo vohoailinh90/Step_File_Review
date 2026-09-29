@@ -54,6 +54,7 @@ function sniff(buf){
   if (txt.startsWith('solid')) return 'stl';
   return 'stl-binary';
 }
+function mmScale(kind){ return kind === 'glb' || kind === 'gltf' ? 1000 : 1; }   // glTF is metres; STL is taken as mm
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
@@ -73,7 +74,7 @@ function loadArrayBuffer(buf, name, startedAt){
   const t0 = startedAt || performance.now();
   spin(true, 'reading mesh');
   const kind = sniff(buf);
-  unitScale = (kind === 'glb' || kind === 'gltf') ? 1000 : 1;
+  unitMm = unitScale = mmScale(kind);
   unitsRaw = false; $('stUnits').textContent = 'mm';
   const finish = root => { clearModel(); modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0); };
   try {

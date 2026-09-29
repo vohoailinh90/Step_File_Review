@@ -59,7 +59,7 @@ Clicking a component in the 3D view highlights it and scrolls to its row in the 
 
 In Face mode the click selects the face you hit — the B-rep face from the STEP file, so a fillet is its own face — and reports its type and area: for a cylinder its diameter, radius, length and axis and whether it is a hole or a boss, for a cone its included angle, for a sphere its diameter, for a torus (the fillet round a shaft shoulder) its tube and ring radii, for a plane its normal. In Edge mode the click traces the connected feature edge and reports its length; if the edge is a circle it reports the **diameter**, centre and axis — useful for checking a bore or hole without opening CAD. Feature edges switch on automatically in Edge and Measure mode so you can see what you are aiming at.
 
-Lengths are shown in millimetres. OpenCASCADE writes glTF in metres whatever units the STEP was authored in (the samples tested here were inch files, converted correctly), so the viewer displays mesh units × 1000. If a file ever disagrees, click **units** in the status bar to switch to raw mesh units.
+Lengths are shown in millimetres. OpenCASCADE writes glTF in metres whatever units the STEP was authored in (the samples tested here were inch files, converted correctly), so the viewer displays mesh units × 1000. If a file ever disagrees, click **units** in the status bar to switch to raw mesh units. An STL carries no units and is taken to be in millimetres as it stands, so for an STL the toggle only swaps *mm* for *raw*; the numbers stay the same.
 
 ## Measuring
 

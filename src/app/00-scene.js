@@ -29,6 +29,7 @@ let modelRoot = null, edgeRoot = null, edgesOn = false;
 // Mesh units: OpenCASCADE writes glTF in metres whatever the STEP was authored in,
 // so lengths are shown as mm = mesh units x 1000. STL carries no units; assume mm.
 let unitScale = 1000, unitsRaw = false;       // unitsRaw: status-bar toggle set to raw mesh units
+let unitMm = 1000;                             // the unitScale that shows this file in mm: glTF 1000, STL 1
 const L  = v => fmt(v * unitScale);            // length -> mm
 const A2 = v => fmt(v * unitScale * unitScale); // area  -> mm2
 const MM = () => unitsRaw ? '' : ' mm', MM2 = () => unitsRaw ? '' : ' mm²';

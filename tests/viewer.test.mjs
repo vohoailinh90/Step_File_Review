@@ -16,7 +16,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runInContext } from 'node:vm';
-import { loadViewer, PAGE } from './harness.mjs';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { loadViewer, PAGE, ROOT } from './harness.mjs';
 
 // ---------------------------------------------------------------------------
 // Unit scaling. OpenCASCADE writes glTF in METRES whatever the STEP authored,
@@ -53,6 +55,46 @@ test('L() and A2() agree with fmt() on the scaled value', () => {
     assert.equal(scene.L(v), scene.fmt(v * 1000));
     assert.equal(scene.A2(v), scene.fmt(v * 1e6));
   }
+});
+
+// ---------------------------------------------------------------------------
+// The units toggle in the status bar (src/app/60-io.js). mm is the file's own
+// scale -- glTF is in metres (x1000), an STL is taken to be in mm (x1) -- and
+// "raw" is the mesh numbers as they are. For an STL the two are the same
+// numbers: the toggle used to multiply every STL length by 1000 and still
+// label it mm, so one click made a 10 mm plate read 10000 mm.
+// ---------------------------------------------------------------------------
+const ALL = readdirSync(join(ROOT, 'src/app')).filter(f => f.endsWith('.js')).sort().map(f => 'src/app/' + f);
+const app = loadViewer(ALL, ['setUnitsRaw', 'mmScale', 'sniff', 'L', 'A2', 'MM'], { three: 'real' });
+const units = () => runInContext('[unitScale, unitsRaw]', app.ctx);
+
+test('the loader takes glTF as metres and an STL as millimetres', () => {
+  const buf = text => new TextEncoder().encode(text).buffer;
+  assert.equal(app.mmScale(app.sniff(buf('glTF\x02\x00\x00\x00'))), 1000, 'GLB: metres, shown x1000');
+  assert.equal(app.mmScale(app.sniff(buf('{"asset":{"version":"2.0"}}'))), 1000, 'glTF JSON: metres');
+  assert.equal(app.mmScale(app.sniff(buf('solid plate\nfacet normal 0 0 1'))), 1, 'ASCII STL: mm as it stands');
+  assert.equal(app.mmScale(app.sniff(new Uint8Array(84).buffer)), 1, 'binary STL: mm as it stands');
+});
+
+test('the units toggle shows a glTF in mm or in raw metres, and back', () => {
+  runInContext('unitMm = 1000; unitScale = 1000; unitsRaw = false;', app.ctx);
+  app.setUnitsRaw(true);
+  assert.deepEqual([...units()], [1, true]);
+  assert.equal(app.L(0.0127) + app.MM(), '0.0127', 'raw: the mesh number, no unit');
+  app.setUnitsRaw(false);
+  assert.deepEqual([...units()], [1000, false]);
+  assert.equal(app.L(0.0127) + app.MM(), '12.70 mm');
+});
+
+test('the units toggle never multiplies an STL by 1000', () => {
+  runInContext('unitMm = 1; unitScale = 1; unitsRaw = false;', app.ctx);      // as the loader leaves an STL
+  assert.equal(app.L(10) + app.MM(), '10.00 mm', 'a 10 mm plate');
+  app.setUnitsRaw(true);
+  assert.equal(app.L(10) + app.MM(), '10.00', 'raw: the same number, the unit dropped (was "10000 mm")');
+  assert.equal(app.A2(6000), '6000', 'and areas too (was 6000000000)');
+  app.setUnitsRaw(false);
+  assert.equal(app.L(10) + app.MM(), '10.00 mm', 'back to mm: still the same number');
+  runInContext('unitMm = 1000; unitScale = 1000; unitsRaw = false;', app.ctx);
 });
 
 // ---------------------------------------------------------------------------
