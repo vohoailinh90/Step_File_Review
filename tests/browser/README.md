@@ -56,6 +56,7 @@ On Windows, run the same commands in PowerShell or `cmd`. To pick the Python use
 | t17 | free boundaries split at corners (open STL sheets) |
 | t18 | parallel edges measured between the picked segments |
 | t19 | a lone plane or freeform face labels its area |
+| t20 | turning the view straight on over the top (it used to stop there); Explode → Pick… on a cylinder, a typed move, the drag arrow following the cursor in round steps, Along Axis, cuts kept, Reset |
 
 t9–t19 were written against review findings on the measure / explode feature (PR #2). The `codexN` in a file name is the order the tests were written in; it does not match the review round number.
 

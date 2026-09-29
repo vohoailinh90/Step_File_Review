@@ -16,19 +16,23 @@ function meshHit(x, y, r){          // nearest visible, unclipped mesh under a v
   return hits.find(h => notClipped(h.point, h.object)) || null;
 }
 function pickMeasure(e){
+  const ent = entityAt(e);
+  if (!ent){ measureClear(false); return; }
+  addMeasureEntity(ent);
+}
+// The face or edge under a click, in assembled coordinates, or null. Pick axis… uses it too.
+function entityAt(e){
   const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   let hit = meshHit(x, y, r);
   const onFace = !!hit;
   // a click just outside a silhouette can still land on the edge there
   for (const [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]){ if (hit) break; hit = meshHit(x + dx*EDGE_PX, y + dy*EDGE_PX, r); }
-  if (!hit){ measureClear(false); return; }
+  if (!hit) return null;
   const part = parts.find(p => p.mesh === hit.object);
   const topo = topology(part.mesh.geometry), f = topo.faceId[hit.faceIndex];
   const rest = hit.point.clone().sub(part.offset);
   const near = nearestBoundary(part, topo, f, hit, x, y, r);
-  const ent = near && near.px <= EDGE_PX ? edgeEntity(part, near.h, rest) : onFace ? faceEntity(part, f, rest) : null;
-  if (!ent){ measureClear(false); return; }
-  addMeasureEntity(ent);
+  return near && near.px <= EDGE_PX ? edgeEntity(part, near.h, rest) : onFace ? faceEntity(part, f, rest) : null;
 }
 // The boundary segment of face f nearest the cursor (CSS px), ignoring segments clearly
 // behind the picked point — the far rim of a shaft seen from the side.

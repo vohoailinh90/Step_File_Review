@@ -34,10 +34,20 @@ const {launch, openModel, setCam, click, panel, hideAllBut, check} = L;
     await click(pg, [0, 20, 5]);
     const t2 = await panel(pg);
     check('STL top face', t2, /A · Plane plate \| normal 0\.000, 0\.000, 1\.000/);
-    // units toggle: STL is already mm; toggling multiplies by 1000 (raw vs mm is for GLB); panel follows
+    // units toggle: an STL is taken as mm, so "raw" is the same numbers without the unit. It used to
+    // multiply every STL length by 1000 and still say mm. The panel and the status bar follow.
+    const status = () => pg.evaluate(() => document.getElementById('stUnits').textContent + ' ' + document.getElementById('stBbox').textContent);
+    const area = (t2.match(/area \(mesh\) (\d+) mm²/) || [])[1];      // the top face, holes and corners taken out
     await pg.click('#unitToggle');
-    { const tt = await panel(pg); check('panel re-renders on unit toggle', tt, /area \(mesh\) \d{4,} mm²/); }
+    check('STL raw: the same numbers, no mm', (await panel(pg)) + ' || ' + (await status()), new RegExp('area \\(mesh\\) ' + area + ' \\|(?!.*mm).* \\|\\| raw 100\\.00 × 60\\.00 × 10\\.00$'));
     await pg.click('#unitToggle');
+    check('STL back to mm, still the same numbers', (await panel(pg)) + ' || ' + (await status()), new RegExp('area \\(mesh\\) ' + area + ' mm².* \\|\\| mm 100\\.00 × 60\\.00 × 10\\.00 mm$'));
+    // a .glb that fails to load leaves the STL on screen in its own mm, not x1000 (review of the fix)
+    await pg.evaluate(() => __qs.loadArrayBuffer(new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0, 20, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8]).buffer, 'bad.glb'));
+    await pg.waitForTimeout(200);
+    await pg.keyboard.press('Escape');
+    await click(pg, [0, 20, 5]);
+    check('after a failed .glb the STL still reads its own mm', (await panel(pg)) + ' || ' + (await status()), new RegExp('area \\(mesh\\) ' + area + ' mm².* \\|\\| mm 100\\.00 × 60\\.00 × 10\\.00 mm$'));
     console.log('  STL errors:', errors.filter(e => !/Failed to load resource/.test(e)));
     await pg.close();
   }

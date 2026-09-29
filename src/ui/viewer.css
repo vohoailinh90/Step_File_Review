@@ -71,11 +71,21 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #info .hd{color:var(--pick);margin-bottom:3px;letter-spacing:.06em}
 
 #sectionpanel,#explodepanel{position:absolute;bottom:14px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:11px 13px;width:288px;display:none;z-index:7}
-#explodepanel{left:auto;right:10px}
+#explodepanel{left:auto;right:10px;width:330px}
 #sectionpanel.show,#explodepanel.show{display:block}
+#explodepanel .btn-group .btn{padding:5px 9px}
+#explodepanel .div{border-top:1px solid var(--line);margin:2px 0 10px}
+#explodepanel input[type=number]{width:96px;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:4px 6px;font-family:var(--mono);font-size:12px}
+#explodepanel input[type=number]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#explodepanel input[type=number]:disabled{opacity:.4}
+#explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--dim)}
+#axisName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none{color:var(--dim)}
+#btnMoveReset{margin-left:auto}
 #sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
 #sectionpanel .row:last-child,#explodepanel .row:last-child{margin-bottom:0}
 #sectionpanel .row .lbl,#explodepanel .row .lbl{width:44px;flex-shrink:0}
+#explodepanel .row .lbl{width:52px}
 #sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
 #sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent);width:58px;text-align:right;flex-shrink:0}
 #sectionpanel .hint,#explodepanel .hint{font-size:11px;color:var(--dim);line-height:1.55}
@@ -106,4 +116,4 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #statusbar b{color:var(--txt);font-weight:500}
 #hintbar{color:var(--dim)}
 @media (prefers-reduced-motion: reduce){.btn{transition:none}#toast{transition:none}}
-@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel,#explodepanel{width:250px}#measurepanel{width:260px}}
+@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel,#explodepanel{width:250px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:260px}}

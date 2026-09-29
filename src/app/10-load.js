@@ -54,6 +54,7 @@ function sniff(buf){
   if (txt.startsWith('solid')) return 'stl';
   return 'stl-binary';
 }
+function mmScale(kind){ return kind === 'glb' || kind === 'gltf' ? 1000 : 1; }   // glTF is metres; STL is taken as mm
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
@@ -73,9 +74,14 @@ function loadArrayBuffer(buf, name, startedAt){
   const t0 = startedAt || performance.now();
   spin(true, 'reading mesh');
   const kind = sniff(buf);
-  unitScale = (kind === 'glb' || kind === 'gltf') ? 1000 : 1;
-  unitsRaw = false; $('stUnits').textContent = 'mm';
-  const finish = root => { clearModel(); modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0); };
+  // The file's units take effect with the file. Set before the parse, a file that failed to load
+  // left the old model on screen at its scale: an STL after a corrupt .glb read x1000, still in mm.
+  const finish = root => {
+    clearModel();
+    unitMm = unitScale = mmScale(kind);
+    unitsRaw = false; $('stUnits').textContent = 'mm';
+    modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0);
+  };
   try {
     if (kind === 'step'){
       fail(new Error('this is a STEP file — start the viewer with stepview.py so it can be converted here'));
@@ -114,10 +120,11 @@ function afterLoad(name, bytes, ms){
       n.material.side = THREE.DoubleSide;
       const t = n.geometry.index ? n.geometry.index.count/3 : n.geometry.attributes.position.count/3;
       tris += t;
-      // restMatrix: where the part sits assembled. Exploding only moves it by `offset`,
-      // and measurements are always taken on the assembled geometry.
+      // restMatrix: where the part sits assembled. Exploding only moves it by `offset` -- which
+      // includes `moved`, its own move along a picked axis -- and measurements are always taken
+      // on the assembled geometry.
       parts.push({mesh:n, name:n.name || (n.parent && n.parent.name) || ('part_'+parts.length),
-                  tris:t, visible:true, rowEl:null, edges:null,
+                  tris:t, visible:true, rowEl:null, edges:null, moved:new THREE.Vector3(),
                   restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3(),
                   clip:new THREE.Plane()});                     // its cut: the section plane, moved with it
     }

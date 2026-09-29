@@ -37,17 +37,25 @@ function toast(msg, ms){
   clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), ms || 2200);
 }
 
-$('unitToggle').addEventListener('click', ()=>{
-  unitScale = unitScale === 1000 ? 1 : 1000;
-  unitsRaw = unitScale !== 1000;
-  $('stUnits').textContent = unitsRaw ? 'raw' : 'mm';
+// The status-bar units: mm, at this file's own scale (unitMm: glTF is metres, an STL is taken as mm),
+// or the raw mesh numbers. For an STL the two are the same numbers, so the toggle only drops the
+// unit; it used to multiply every STL length by 1000 and still call it mm.
+function setUnitsRaw(raw){
+  unitsRaw = raw;
+  unitScale = raw ? 1 : unitMm;
+  $('stUnits').textContent = raw ? 'raw' : 'mm';
   if (bboxCached){
     const s2 = bboxCached.getSize(new THREE.Vector3());
     $('stBbox').textContent = [s2.x,s2.y,s2.z].map(v=>L(v)).join(' × ') + MM();
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
-  toast(unitScale === 1000 ? 'Lengths shown in mm (mesh × 1000)' : 'Lengths shown in raw mesh units');
+  moveSync();
+}
+$('unitToggle').addEventListener('click', ()=>{
+  setUnitsRaw(!unitsRaw);
+  toast(unitsRaw ? 'Lengths shown in raw mesh units'
+                 : unitMm === 1000 ? 'Lengths shown in mm (mesh × 1000)' : 'Lengths shown in mm (the STL is taken to be in mm)');
 });
 
 // ── Keyboard ─────────────────────────────────────────────────
@@ -72,6 +80,7 @@ window.addEventListener('keydown', e=>{
   else if (k === 'escape'){
     if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
     clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
+    if (axisPickMode) movePickCancel();
   }
 });
 

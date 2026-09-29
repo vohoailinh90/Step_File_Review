@@ -7,12 +7,14 @@ const _sv = new THREE.Vector3();
 let annotShown = false;
 function annotItems(){ return keptItems.concat(measItems); }
 function drawAnnotLive(){
-  const items = annotItems();
-  if (!items.length && !annotShown) return;
+  const items = annotItems(), gizmo = moveGizmoOn();          // the axis and handle of 47-move.js: live only
+  if (!items.length && !gizmo && !annotShown) return;
   annotCtx.setTransform(1, 0, 0, 1, 0, 0);
   annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
-  annotShown = items.length > 0;
-  if (annotShown) drawAnnotations(annotCtx, annotCanvas.width, annotCanvas.height, annotCanvas.width / (viewport.clientWidth || 1), items);
+  annotShown = items.length > 0 || gizmo;
+  const s = annotCanvas.width / (viewport.clientWidth || 1);
+  if (items.length) drawAnnotations(annotCtx, annotCanvas.width, annotCanvas.height, s, items);
+  if (gizmo) drawMoveGizmo(annotCtx, s);
 }
 function toScreen(p, part, W, H){
   _sv.copy(p);

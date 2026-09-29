@@ -24,6 +24,7 @@ const TESTS = [
   ['t8', 't8_edges.js'], ['t9', 't9_codex1.js'], ['t10', 't10_edges_explode.js'], ['t11', 't11_codex2.js'],
   ['t12', 't12_codex3.js'], ['t13', 't13_codex5.js'], ['t14', 't14_codex6.js'], ['t15', 't15_codex7.js'],
   ['t16', 't16_codex8.js'], ['t17', 't17_codex9.js'], ['t18', 't18_codex10.js'], ['t19', 't19_codex11.js'],
+  ['t20', 't20_orbit_move.js'],
 ];
 const REPORT_ONLY = new Set(['t1', 't6']);         // print figures, assert nothing
 
@@ -55,6 +56,15 @@ window.__qs = {THREE, camera, controls, scene, renderer, VIEWS, frame, setMode, 
   get measItems(){ return typeof measItems === 'undefined' ? null : measItems; },
   get keptItems(){ return typeof keptItems === 'undefined' ? null : keptItems; },
   get explodeAmt(){ return typeof explodeAmt === 'undefined' ? 0 : explodeAmt; },
+  get selected(){ return selected; }, selectPart,
+  orbitBy: typeof orbitBy === 'function' ? orbitBy : null,
+  get orbitPending(){ return typeof orbitDX === 'undefined' ? 0 : Math.hypot(orbitDX, orbitDY); },
+  moveTo: typeof moveTo === 'function' ? moveTo : null,
+  moveHandle: typeof moveHandle === 'function' ? moveHandle : null,
+  moveStep: typeof moveStep === 'function' ? moveStep : null,
+  get moveAxis(){ return typeof moveAxis === 'undefined' ? null : moveAxis; },
+  get axisPickMode(){ return typeof axisPickMode === 'undefined' ? false : axisPickMode; },
+  loadArrayBuffer, get unitScale(){ return unitScale; },
 };
 `;
 

@@ -35,6 +35,7 @@ function clearSelection(){
   clearSubSelection();
   if (selected){ emis(selected, 0); selected.rowEl.classList.remove('selected'); }
   selected = null;
+  moveSync();                     // the explode panel moves the selected part
 }
 function selectPart(p, scroll){
   if (selected === p) return;
@@ -48,6 +49,7 @@ function selectPart(p, scroll){
       $('sidebar').classList.remove('hidden'); $('btnParts').classList.add('active');
     }
   }
+  moveSync();
 }
 
 // pointer: distinguish click from orbit drag
@@ -76,6 +78,7 @@ function notClipped(pt, obj){
 function pick(e){
   if (!modelRoot) return;
   setRay(e);
+  if (axisPickMode) return pickAxis(e);           // Explode → Pick axis… (47-move.js)
   if (circlePickMode || mode === 'edge') return pickEdge();
   if (mode === 'measure') return pickMeasure(e);
 
