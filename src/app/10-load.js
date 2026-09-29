@@ -114,10 +114,11 @@ function afterLoad(name, bytes, ms){
       n.material.side = THREE.DoubleSide;
       const t = n.geometry.index ? n.geometry.index.count/3 : n.geometry.attributes.position.count/3;
       tris += t;
-      // restMatrix: where the part sits assembled. Exploding only moves it by `offset`,
-      // and measurements are always taken on the assembled geometry.
+      // restMatrix: where the part sits assembled. Exploding only moves it by `offset` -- which
+      // includes `moved`, its own move along a picked axis -- and measurements are always taken
+      // on the assembled geometry.
       parts.push({mesh:n, name:n.name || (n.parent && n.parent.name) || ('part_'+parts.length),
-                  tris:t, visible:true, rowEl:null, edges:null,
+                  tris:t, visible:true, rowEl:null, edges:null, moved:new THREE.Vector3(),
                   restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3(),
                   clip:new THREE.Plane()});                     // its cut: the section plane, moved with it
     }

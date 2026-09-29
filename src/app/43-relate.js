@@ -218,7 +218,7 @@ function renderMeasure(){
   } else if (measA){
     const da = describe(measA), db = describe(measB), rel = relate(measA, measB, measMd);
     body.push(head(measA, da, 'A'), head(measB, db, 'B'), el('div'), ...rel.rows.map((r, i) => row(r, i === 0)));
-    if (explodeAmt > 0 && measA.part !== measB.part) body.push(el('hint', 'Exploded view: distances are for the assembled positions.'));
+    if (measA.part !== measB.part && !measA.part.offset.equals(measB.part.offset)) body.push(el('hint', 'Exploded view: distances are for the assembled positions.'));
     measItems = da.marks.concat(db.marks, rel.items);
   } else if (keptItems.length){
     const n = keptItems.filter(it => it.type === 'dim' || it.type === 'tag').length;

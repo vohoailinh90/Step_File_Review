@@ -47,6 +47,7 @@ $('unitToggle').addEventListener('click', ()=>{
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
+  moveSync();
   toast(unitScale === 1000 ? 'Lengths shown in mm (mesh × 1000)' : 'Lengths shown in raw mesh units');
 });
 
@@ -72,6 +73,7 @@ window.addEventListener('keydown', e=>{
   else if (k === 'escape'){
     if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
     clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
+    if (axisPickMode) movePickCancel();
   }
 });
 

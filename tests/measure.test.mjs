@@ -37,7 +37,7 @@ function part(geometry, at = [0, 0, 0], name = 'part') {
   mesh.updateMatrixWorld(true);
   geometry.computeBoundingBox();
   const p = { mesh, name, restMatrix: mesh.matrixWorld.clone(), restCenter: new T.Vector3(),
-              offset: new T.Vector3() };
+              offset: new T.Vector3(), moved: new T.Vector3() };
   geometry.boundingBox.getCenter(p.restCenter).applyMatrix4(p.restMatrix);
   return p;
 }

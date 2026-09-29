@@ -178,7 +178,8 @@ export function makeTHREE() {
                      invert() { return this; } },
     MathUtils: { degToRad: d => d * Math.PI / 180, radToDeg: r => r * 180 / Math.PI,
                  clamp: (v, a, b) => Math.max(a, Math.min(b, v)) },
-    OrbitControls: class { constructor() { this.target = new Vector3(); this.enableDamping = false; }
+    OrbitControls: class { constructor() { this.target = new Vector3(); this.enabled = true;
+                                           this.enableDamping = false; this.dampingFactor = 0.05; }
                            update() {} addEventListener() {} saveState() {} reset() {} },
     GLTFLoader: class { parse(_b, _p, onLoad) { onLoad({ scene: new Scene() }); } setPath() {} register() { return this; } },
     // Records the hook src/app/10-load.js installs, so a test can call it.
@@ -244,6 +245,11 @@ export function loadViewer(modules, names = [], { three = 'stub' } = {}) {
                  { filename: 'vendor/three.min.js' });
     const stub = makeTHREE();
     for (const k of ['WebGLRenderer', 'OrbitControls', 'GLTFLoader', 'STLLoader']) ctx.THREE[k] = stub[k];
+    // ...but the controls' target is the real Vector3: camera.lookAt(target) asks it isVector3,
+    // and the stub's would quietly turn the camera to NaN.
+    const V3 = ctx.THREE.Vector3;
+    ctx.THREE.OrbitControls = class extends stub.OrbitControls {
+      constructor(...a) { super(...a); this.target = new V3(); } };
   }
   ctx.window.THREE = ctx.THREE;
 

@@ -76,11 +76,26 @@
             <button class="btn" data-exp="x">X</button>
             <button class="btn" data-exp="y">Y</button>
             <button class="btn" data-exp="z">Z</button>
+            <button class="btn" data-exp="axis" title="Along the picked axis">Axis</button>
           </div>
           <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
         </div>
         <div class="row"><span class="hint">Parts slide away from the assembly centre. Measurements keep
           using the assembled positions.</span></div>
+        <div class="div"></div>
+        <div class="row">
+          <span class="lbl">axis</span>
+          <button class="btn" id="btnAxisPick" title="Pick an axis: then click a straight edge, a circle, a cylinder or a flat face">Pick…</button>
+          <span id="axisName">none</span>
+          <button class="btn" id="btnAxisFlip" title="Reverse the axis" disabled>Flip</button>
+        </div>
+        <div class="row">
+          <span class="lbl">move</span>
+          <input type="number" id="moveDist" step="any" disabled aria-label="Distance along the axis from the assembled place">
+          <span class="unit" id="moveUnit">mm</span>
+          <button class="btn" id="btnMoveReset" title="Put the selected part back where it sits assembled" disabled>Reset part</button>
+        </div>
+        <div class="row"><span class="hint" id="moveHint">Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.</span></div>
       </div>
 
       <div id="sectionpanel">

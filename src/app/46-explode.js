@@ -1,6 +1,7 @@
 // ── Exploded view ────────────────────────────────────────────
 // Each part slides away from the assembly centre along the line through its own centre (or
-// just that line's X, Y or Z part). The move is made in world space and turned into the
+// just that line's X, Y or Z part, or its part along the picked axis), and then by its own move
+// along a picked axis (`moved`, 47-move.js). The move is made in world space and turned into the
 // part's parent frame, so nested assemblies stay consistent; edges, section caps and
 // highlights move along. Measurements keep using the assembled geometry.
 let explodeAmt = 0, explodeAxis = 'all';
@@ -10,14 +11,19 @@ $('btnExplode').addEventListener('click', ()=>{
   const open = $('explodepanel').classList.toggle('show');
   $('btnExplode').classList.toggle('active', open);
   if (open && parts.length < 2) toast('A single part — nothing to explode');
+  if (!open && axisPickMode) movePickCancel();
 });
 $('expAmount').addEventListener('input', e => setExplode(e.target.value / 100));
 document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', ()=>{
-  explodeAxis = b.dataset.exp;
-  document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x === b));
+  setExplodeAxis(b.dataset.exp);
+  if (explodeAxis === 'axis' && !moveAxis) movePickStart();     // explodes radially until an axis is picked
   applyExplode();
 }));
-$('btnExpReset').addEventListener('click', ()=> setExplode(0));
+$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); moveSync(); });
+function setExplodeAxis(k){
+  explodeAxis = k;
+  document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x.dataset.exp === k));
+}
 function setExplode(v){
   explodeAmt = v;
   $('expAmount').value = Math.round(v * 100);
@@ -27,15 +33,18 @@ function setExplode(v){
 function resetExplode(){             // a newly loaded model starts assembled
   explodeAmt = 0;
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
+  moveReset();
 }
+function exploded(){ return parts.some(p => p.offset.lengthSq() > 0); }    // any part drawn off its assembled place
 const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3();
 function applyExplode(){
   if (!modelRoot) return;
-  const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis];
+  const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis], ax = explodeAxis === 'axis' && moveAxis ? moveAxis.d : null;
   parts.forEach(p=>{
     p.offset.subVectors(p.restCenter, modelCenter);
     if (k !== undefined) for (let i = 0; i < 3; i++) if (i !== k) p.offset.setComponent(i, 0);
-    p.offset.multiplyScalar(f);
+    if (ax){ const s = p.offset.dot(ax); p.offset.copy(ax).multiplyScalar(s); }
+    p.offset.multiplyScalar(f).add(p.moved);
   });
   parts.forEach(p=>{                  // `parts` lists parents before their children
     const m = p.mesh;

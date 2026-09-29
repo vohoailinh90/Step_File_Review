@@ -79,11 +79,21 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #info .hd{color:var(--pick);margin-bottom:3px;letter-spacing:.06em}
 
 #sectionpanel,#explodepanel{position:absolute;bottom:14px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:11px 13px;width:288px;display:none;z-index:7}
-#explodepanel{left:auto;right:10px}
+#explodepanel{left:auto;right:10px;width:330px}
 #sectionpanel.show,#explodepanel.show{display:block}
+#explodepanel .btn-group .btn{padding:5px 9px}
+#explodepanel .div{border-top:1px solid var(--line);margin:2px 0 10px}
+#explodepanel input[type=number]{width:96px;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:4px 6px;font-family:var(--mono);font-size:12px}
+#explodepanel input[type=number]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#explodepanel input[type=number]:disabled{opacity:.4}
+#explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--dim)}
+#axisName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none{color:var(--dim)}
+#btnMoveReset{margin-left:auto}
 #sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
 #sectionpanel .row:last-child,#explodepanel .row:last-child{margin-bottom:0}
 #sectionpanel .row .lbl,#explodepanel .row .lbl{width:44px;flex-shrink:0}
+#explodepanel .row .lbl{width:52px}
 #sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
 #sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent);width:58px;text-align:right;flex-shrink:0}
 #sectionpanel .hint,#explodepanel .hint{font-size:11px;color:var(--dim);line-height:1.55}
@@ -114,7 +124,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #statusbar b{color:var(--txt);font-weight:500}
 #hintbar{color:var(--dim)}
 @media (prefers-reduced-motion: reduce){.btn{transition:none}#toast{transition:none}}
-@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel,#explodepanel{width:250px}#measurepanel{width:260px}}
+@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel,#explodepanel{width:250px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:260px}}
 </style>
 </head>
 <body>
@@ -196,11 +206,26 @@ select.btn option{background:var(--panel2);color:var(--txt)}
             <button class="btn" data-exp="x">X</button>
             <button class="btn" data-exp="y">Y</button>
             <button class="btn" data-exp="z">Z</button>
+            <button class="btn" data-exp="axis" title="Along the picked axis">Axis</button>
           </div>
           <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
         </div>
         <div class="row"><span class="hint">Parts slide away from the assembly centre. Measurements keep
           using the assembled positions.</span></div>
+        <div class="div"></div>
+        <div class="row">
+          <span class="lbl">axis</span>
+          <button class="btn" id="btnAxisPick" title="Pick an axis: then click a straight edge, a circle, a cylinder or a flat face">Pick…</button>
+          <span id="axisName">none</span>
+          <button class="btn" id="btnAxisFlip" title="Reverse the axis" disabled>Flip</button>
+        </div>
+        <div class="row">
+          <span class="lbl">move</span>
+          <input type="number" id="moveDist" step="any" disabled aria-label="Distance along the axis from the assembled place">
+          <span class="unit" id="moveUnit">mm</span>
+          <button class="btn" id="btnMoveReset" title="Put the selected part back where it sits assembled" disabled>Reset part</button>
+        </div>
+        <div class="row"><span class="hint" id="moveHint">Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.</span></div>
       </div>
 
       <div id="sectionpanel">
@@ -5651,7 +5676,7 @@ function resize(){
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
-renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
+renderer.setAnimationLoop(()=>{ orbitStep(); controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
 
 // ── Framing ──────────────────────────────────────────────────
 function computeBBox(){
@@ -5660,12 +5685,13 @@ function computeBBox(){
   return box.isEmpty() ? null : box;
 }
 function frame(dir){
-  const box = (explodeAmt > 0 ? computeBBox() : bboxCached) || computeBBox();
+  const box = (exploded() ? computeBBox() : bboxCached) || computeBBox();
   if (!box) return;
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
   const dist = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)) * 1.35;
   const d = (dir || new THREE.Vector3(1, 0.75, 1)).clone().normalize();
+  orbitStop(); camera.up.set(0, 1, 0);               // upright again, however the drag left it (05-orbit.js)
   camera.position.copy(center).addScaledVector(d, dist);
   camera.near = Math.max(dist/1000, 1e-4);
   camera.far  = dist * 100;
@@ -5679,6 +5705,62 @@ const VIEWS = {
 document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', ()=> frame(VIEWS[b.dataset.view])));
 $('btnFit').addEventListener('click', ()=> frame());
 
+// ── Orbit ────────────────────────────────────────────────────
+// Left-drag turns the model with no end stop. OrbitControls stopped the camera dead at its poles:
+// a drag up or down froze once the view looked straight down or up, however far the mouse went.
+// It keeps pan and zoom; turning is done here, the way it turned everywhere else — sideways about
+// the vertical (Y) like a turntable, up and down about the screen's horizontal — but straight on
+// over the top. Past it the model is upside down, and a sideways drag still carries its near side
+// with the cursor. One canvas height of drag is one full turn, eased by the controls' damping.
+const ORBIT_TURN = 2 * Math.PI;                      // radians per canvas height of drag, as OrbitControls
+const _Y = new THREE.Vector3(0, 1, 0), _oo = new THREE.Vector3(), _ox = new THREE.Vector3();
+const _oq = new THREE.Quaternion(), _oq2 = new THREE.Quaternion();
+let orbitDrag = null, orbitDX = 0, orbitDY = 0;      // the pointer turning the view; drag (px) not yet applied
+controls.enableRotate = false;
+
+canvas.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch' && orbitDrag){ orbitDrag = null; return; }    // a second finger: OrbitControls pinches
+  const mod = e.ctrlKey || e.metaKey || e.shiftKey;                            // as OrbitControls: a modifier swaps the buttons
+  if (orbitDrag || !controls.enabled || !(e.pointerType === 'touch' ? e.isPrimary : e.button === (mod ? 2 : 0))) return;
+  orbitDrag = {id:e.pointerId, x:e.clientX, y:e.clientY};
+});
+canvas.addEventListener('pointermove', e => {
+  if (!orbitDrag || e.pointerId !== orbitDrag.id) return;
+  if (!e.buttons){ orbitDrag = null; return; }                                 // released unseen (focus lost mid-drag)
+  orbitDX += e.clientX - orbitDrag.x; orbitDY += e.clientY - orbitDrag.y;
+  orbitDrag.x = e.clientX; orbitDrag.y = e.clientY;
+});
+const orbitEnd = e => { if (orbitDrag && e.pointerId === orbitDrag.id) orbitDrag = null; };
+canvas.addEventListener('pointerup', orbitEnd);
+canvas.addEventListener('pointercancel', orbitEnd);
+
+// Turn the camera about the target for a drag of dx, dy px (right and down are positive).
+function orbitBy(dx, dy){
+  _oo.subVectors(camera.position, controls.target);
+  const r = _oo.length(), h = canvas.clientHeight || 1;
+  if (!(r > 0)) return;
+  _oo.divideScalar(r);                               // unit, target to camera
+  _ox.crossVectors(camera.up, _oo);                  // the screen's right, as lookAt() builds it
+  if (_ox.lengthSq() < 1e-20) _ox.setFromMatrixColumn(camera.matrixWorld, 0);
+  _ox.normalize();
+  camera.up.crossVectors(_oo, _ox);                  // the screen's up, square to the view: it turns with it
+  const flip = camera.up.y < 0 ? -1 : 1;             // upside down, turn the other way: the model follows the cursor
+  _oq.setFromAxisAngle(_Y, -flip * ORBIT_TURN * dx / h).multiply(_oq2.setFromAxisAngle(_ox, -ORBIT_TURN * dy / h));
+  _oo.applyQuaternion(_oq).multiplyScalar(r);
+  camera.up.applyQuaternion(_oq);
+  camera.position.copy(controls.target).add(_oo);
+  camera.lookAt(controls.target);
+}
+// Each frame, before the controls update: the damped share of the drag, the tail landing exactly.
+function orbitStep(){
+  if (!orbitDX && !orbitDY) return;
+  const f = controls.enableDamping ? controls.dampingFactor : 1;
+  let dx = orbitDX * f, dy = orbitDY * f;
+  if (Math.abs(orbitDX - dx) < 0.01 && Math.abs(orbitDY - dy) < 0.01){ dx = orbitDX; dy = orbitDY; }
+  orbitDX -= dx; orbitDY -= dy;
+  orbitBy(dx, dy);
+}
+function orbitStop(){ orbitDX = orbitDY = 0; }       // a view set outright ends any coasting turn
 // ── Load ─────────────────────────────────────────────────────
 const gltfLoader = new THREE.GLTFLoader(), stlLoader = new THREE.STLLoader();
 // stepview.py asks cascadio for include_brep: each primitive then carries a B-rep face
@@ -5795,10 +5877,11 @@ function afterLoad(name, bytes, ms){
       n.material.side = THREE.DoubleSide;
       const t = n.geometry.index ? n.geometry.index.count/3 : n.geometry.attributes.position.count/3;
       tris += t;
-      // restMatrix: where the part sits assembled. Exploding only moves it by `offset`,
-      // and measurements are always taken on the assembled geometry.
+      // restMatrix: where the part sits assembled. Exploding only moves it by `offset` -- which
+      // includes `moved`, its own move along a picked axis -- and measurements are always taken
+      // on the assembled geometry.
       parts.push({mesh:n, name:n.name || (n.parent && n.parent.name) || ('part_'+parts.length),
-                  tris:t, visible:true, rowEl:null, edges:null,
+                  tris:t, visible:true, rowEl:null, edges:null, moved:new THREE.Vector3(),
                   restMatrix:n.matrixWorld.clone(), restCenter:new THREE.Vector3(), offset:new THREE.Vector3(),
                   clip:new THREE.Plane()});                     // its cut: the section plane, moved with it
     }
@@ -5915,6 +5998,7 @@ function clearSelection(){
   clearSubSelection();
   if (selected){ emis(selected, 0); selected.rowEl.classList.remove('selected'); }
   selected = null;
+  moveSync();                     // the explode panel moves the selected part
 }
 function selectPart(p, scroll){
   if (selected === p) return;
@@ -5928,6 +6012,7 @@ function selectPart(p, scroll){
       $('sidebar').classList.remove('hidden'); $('btnParts').classList.add('active');
     }
   }
+  moveSync();
 }
 
 // pointer: distinguish click from orbit drag
@@ -5956,6 +6041,7 @@ function notClipped(pt, obj){
 function pick(e){
   if (!modelRoot) return;
   setRay(e);
+  if (axisPickMode) return pickAxis(e);           // Explode → Pick axis… (47-move.js)
   if (circlePickMode || mode === 'edge') return pickEdge();
   if (mode === 'measure') return pickMeasure(e);
 
@@ -6591,19 +6677,23 @@ function meshHit(x, y, r){          // nearest visible, unclipped mesh under a v
   return hits.find(h => notClipped(h.point, h.object)) || null;
 }
 function pickMeasure(e){
+  const ent = entityAt(e);
+  if (!ent){ measureClear(false); return; }
+  addMeasureEntity(ent);
+}
+// The face or edge under a click, in assembled coordinates, or null. Pick axis… uses it too.
+function entityAt(e){
   const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   let hit = meshHit(x, y, r);
   const onFace = !!hit;
   // a click just outside a silhouette can still land on the edge there
   for (const [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]){ if (hit) break; hit = meshHit(x + dx*EDGE_PX, y + dy*EDGE_PX, r); }
-  if (!hit){ measureClear(false); return; }
+  if (!hit) return null;
   const part = parts.find(p => p.mesh === hit.object);
   const topo = topology(part.mesh.geometry), f = topo.faceId[hit.faceIndex];
   const rest = hit.point.clone().sub(part.offset);
   const near = nearestBoundary(part, topo, f, hit, x, y, r);
-  const ent = near && near.px <= EDGE_PX ? edgeEntity(part, near.h, rest) : onFace ? faceEntity(part, f, rest) : null;
-  if (!ent){ measureClear(false); return; }
-  addMeasureEntity(ent);
+  return near && near.px <= EDGE_PX ? edgeEntity(part, near.h, rest) : onFace ? faceEntity(part, f, rest) : null;
 }
 // The boundary segment of face f nearest the cursor (CSS px), ignoring segments clearly
 // behind the picked point — the far rim of a shaft seen from the side.
@@ -7162,7 +7252,7 @@ function renderMeasure(){
   } else if (measA){
     const da = describe(measA), db = describe(measB), rel = relate(measA, measB, measMd);
     body.push(head(measA, da, 'A'), head(measB, db, 'B'), el('div'), ...rel.rows.map((r, i) => row(r, i === 0)));
-    if (explodeAmt > 0 && measA.part !== measB.part) body.push(el('hint', 'Exploded view: distances are for the assembled positions.'));
+    if (measA.part !== measB.part && !measA.part.offset.equals(measB.part.offset)) body.push(el('hint', 'Exploded view: distances are for the assembled positions.'));
     measItems = da.marks.concat(db.marks, rel.items);
   } else if (keptItems.length){
     const n = keptItems.filter(it => it.type === 'dim' || it.type === 'tag').length;
@@ -7337,12 +7427,14 @@ const _sv = new THREE.Vector3();
 let annotShown = false;
 function annotItems(){ return keptItems.concat(measItems); }
 function drawAnnotLive(){
-  const items = annotItems();
-  if (!items.length && !annotShown) return;
+  const items = annotItems(), gizmo = moveGizmoOn();          // the axis and handle of 47-move.js: live only
+  if (!items.length && !gizmo && !annotShown) return;
   annotCtx.setTransform(1, 0, 0, 1, 0, 0);
   annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
-  annotShown = items.length > 0;
-  if (annotShown) drawAnnotations(annotCtx, annotCanvas.width, annotCanvas.height, annotCanvas.width / (viewport.clientWidth || 1), items);
+  annotShown = items.length > 0 || gizmo;
+  const s = annotCanvas.width / (viewport.clientWidth || 1);
+  if (items.length) drawAnnotations(annotCtx, annotCanvas.width, annotCanvas.height, s, items);
+  if (gizmo) drawMoveGizmo(annotCtx, s);
 }
 function toScreen(p, part, W, H){
   _sv.copy(p);
@@ -7427,7 +7519,8 @@ function drawAnnotations(ctx, W, H, s, items){
 
 // ── Exploded view ────────────────────────────────────────────
 // Each part slides away from the assembly centre along the line through its own centre (or
-// just that line's X, Y or Z part). The move is made in world space and turned into the
+// just that line's X, Y or Z part, or its part along the picked axis), and then by its own move
+// along a picked axis (`moved`, 47-move.js). The move is made in world space and turned into the
 // part's parent frame, so nested assemblies stay consistent; edges, section caps and
 // highlights move along. Measurements keep using the assembled geometry.
 let explodeAmt = 0, explodeAxis = 'all';
@@ -7437,14 +7530,19 @@ $('btnExplode').addEventListener('click', ()=>{
   const open = $('explodepanel').classList.toggle('show');
   $('btnExplode').classList.toggle('active', open);
   if (open && parts.length < 2) toast('A single part — nothing to explode');
+  if (!open && axisPickMode) movePickCancel();
 });
 $('expAmount').addEventListener('input', e => setExplode(e.target.value / 100));
 document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', ()=>{
-  explodeAxis = b.dataset.exp;
-  document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x === b));
+  setExplodeAxis(b.dataset.exp);
+  if (explodeAxis === 'axis' && !moveAxis) movePickStart();     // explodes radially until an axis is picked
   applyExplode();
 }));
-$('btnExpReset').addEventListener('click', ()=> setExplode(0));
+$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); moveSync(); });
+function setExplodeAxis(k){
+  explodeAxis = k;
+  document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x.dataset.exp === k));
+}
 function setExplode(v){
   explodeAmt = v;
   $('expAmount').value = Math.round(v * 100);
@@ -7454,15 +7552,18 @@ function setExplode(v){
 function resetExplode(){             // a newly loaded model starts assembled
   explodeAmt = 0;
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
+  moveReset();
 }
+function exploded(){ return parts.some(p => p.offset.lengthSq() > 0); }    // any part drawn off its assembled place
 const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3();
 function applyExplode(){
   if (!modelRoot) return;
-  const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis];
+  const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis], ax = explodeAxis === 'axis' && moveAxis ? moveAxis.d : null;
   parts.forEach(p=>{
     p.offset.subVectors(p.restCenter, modelCenter);
     if (k !== undefined) for (let i = 0; i < 3; i++) if (i !== k) p.offset.setComponent(i, 0);
-    p.offset.multiplyScalar(f);
+    if (ax){ const s = p.offset.dot(ax); p.offset.copy(ax).multiplyScalar(s); }
+    p.offset.multiplyScalar(f).add(p.moved);
   });
   parts.forEach(p=>{                  // `parts` lists parents before their children
     const m = p.mesh;
@@ -7502,6 +7603,222 @@ function toggleEdges(){
   if (edgeRoot) parts.forEach(p=>{ if (p.edges) p.edges.visible = edgesOn && p.visible; });
 }
 
+// ── Move a part along an axis ────────────────────────────────
+// Pick axis…, then click a straight edge, a circle or arc, a cylinder, cone or torus, or a flat
+// face: its line, its axis or its normal is the axis, + pointing away from the assembly centre.
+// The part it was picked on, or any part clicked after, moves along it by the distance typed in
+// the explode panel, or by dragging the arrow drawn on it. A move is a world-space vector per part
+// (`moved`) that applyExplode() adds to the explode offset, so edges, caps, section cuts and
+// highlights follow it, and measurements keep using the assembled geometry. Along: Axis explodes
+// the whole assembly along the same axis.
+let moveAxis = null;                 // {p, d, part, geom}: a point on it (assembled), unit direction, where picked
+let axisPickMode = false, moveDrag = null, moveHover = false;
+const MOVE_PX = 60, MOVE_GRAB = 9;   // the handle's half-length, and how near the cursor must come to grab it (CSS px)
+const _ma = new THREE.Vector3(), _mb = new THREE.Vector3();
+
+$('btnAxisPick').addEventListener('click', ()=>{ if (axisPickMode) movePickCancel(); else movePickStart(); });
+$('btnAxisFlip').addEventListener('click', ()=>{ if (moveAxis){ moveAxis.d.negate(); moveSync(); } });
+$('moveDist').addEventListener('change', e => moveTyped(e.target.value));
+$('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.set(0, 0, 0); applyExplode(); moveSync(); } });
+
+function movePickStart(){
+  if (!modelRoot){ toast('Load a model first'); return; }
+  axisPickMode = true;
+  if (!edgesOn) toggleEdges();       // an edge is easier to aim at when it is drawn
+  $('btnAxisPick').classList.add('active');
+  moveCursor(); moveSync();
+}
+function movePickCancel(){
+  axisPickMode = false;
+  $('btnAxisPick').classList.remove('active');
+  moveCursor(); moveSync();
+}
+function moveReset(){                // a new model: no axis, nothing picked or held
+  moveAxis = null; moveDrag = null; moveHover = false;
+  if (explodeAxis === 'axis') setExplodeAxis('all');
+  movePickCancel();
+}
+// The click after Pick axis… (pick() in 30-select.js sends it here): a face or edge, as Measure picks.
+function pickAxis(e){
+  const ent = entityAt(e), ax = ent && axisFrom(ent);
+  if (!ax){ toast('No axis there — pick a straight edge, a circle, a cylinder or a flat face'); return; }
+  moveAxis = ax;
+  movePickCancel();
+  selectPart(ent.part);
+  if (explodeAxis === 'axis') applyExplode();
+  moveSync();
+}
+function axisFrom(ent){
+  const g = ent.geom, ax = axisOf(g);
+  let p, d;
+  if (ax){ p = g.type === 'circle' ? g.c : footOnLine(ent.hit, ax.p, ax.a); d = ax.a; }   // on the axis, by the pick
+  else if (g.type === 'line'){ p = g.p0.clone().lerp(g.p1, 0.5); d = g.d; }
+  else if (g.type === 'plane'){ p = ent.hit; d = g.n; }
+  else return null;
+  d = d.clone().normalize();
+  if (d.dot(_ma.subVectors(ent.part.restCenter, modelCenter)) < 0) d.negate();   // + pulls the part out
+  return {p:p.clone(), d, part:ent.part, geom:g};
+}
+function axisName(a){                // named when shown, so it follows the units toggle
+  const g = a.geom;
+  switch (g.type){
+    case 'cylinder': return 'cylinder Ø' + L(2*g.r) + MM();
+    case 'circle': return g.closed ? 'circle Ø' + L(2*g.r) + MM() : 'arc R' + L(g.r) + MM();
+    case 'line': return 'edge ' + L(g.len) + MM();
+    case 'plane': return 'face normal';
+  }
+  return g.type;                     // cone, torus
+}
+
+// The distance box: shown units along the axis, from where the part sits assembled.
+function moveTyped(text){
+  const v = parseFloat(String(text).replace(',', '.'));
+  if (moveAxis && selected && Number.isFinite(v)) moveTo(selected, v / unitScale);
+  else moveSync();
+}
+function moveTo(part, v){            // put `part` v mesh units along the axis from its assembled place
+  part.moved.addScaledVector(moveAxis.d, v - part.moved.dot(moveAxis.d));
+  applyExplode();
+  moveSync();
+}
+const moveNum = v => String(+(v * unitScale).toFixed(unitsRaw ? 6 : 3));
+function moveSync(){                 // the panel, after anything that changes the axis, the part or its move
+  const p = moveAxis ? selected : null, box = $('moveDist');
+  $('axisName').textContent = moveAxis ? axisName(moveAxis) : 'none';
+  $('axisName').classList.toggle('none', !moveAxis);
+  $('btnAxisFlip').disabled = !moveAxis;
+  box.disabled = !p;
+  box.value = p ? moveNum(p.moved.dot(moveAxis.d)) : '';
+  $('moveUnit').textContent = unitsRaw ? '' : 'mm';
+  $('btnMoveReset').disabled = !(selected && selected.moved.lengthSq() > 0);
+  // textContent: a part name comes from the model file
+  $('moveHint').textContent = axisPickMode ? 'Click a straight edge, a circle, a cylinder or a flat face.'
+    : !moveAxis ? 'Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.'
+    : !p ? 'Click a part to move it along this axis.'
+    : 'Moving ' + p.name + ': type its distance from where it sits assembled, or drag the arrow. + points out of the assembly.';
+}
+
+// ── The drag handle ──────────────────────────────────────────
+// Drawn on the annotation canvas (live only: a screenshot shows neither it nor the axis), through
+// the selected part's centre, square with the screen. Dragging it slides the part along the axis to
+// where the cursor points, in round steps that suit the zoom.
+function moveGizmoOn(){ return !!moveAxis && $('explodepanel').classList.contains('show'); }
+function moveHandle(){               // CSS px on the canvas: centre c, screen direction u (null: the axis faces the eye)
+  const p = selected;
+  if (!moveGizmoOn() || !p || !p.visible) return null;
+  const c = toScreen(p.restCenter, p, viewport.clientWidth, viewport.clientHeight);
+  if (!c) return null;
+  const at = _mb.copy(p.restCenter).add(p.offset), dist = camera.position.distanceTo(at);
+  if (Math.abs(_ma.subVectors(at, camera.position).dot(moveAxis.d)) > 0.996 * dist) return {c, u:null};
+  const e = toScreen(_ma.copy(p.restCenter).addScaledVector(moveAxis.d, dist * 0.01), p, viewport.clientWidth, viewport.clientHeight);
+  const dx = e ? e.x - c.x : 0, dy = e ? e.y - c.y : 0, l = Math.hypot(dx, dy);
+  return {c, u:l > 0 ? {x:dx / l, y:dy / l} : null};
+}
+function moveGrab(e){                // is the cursor on the handle?
+  const h = !axisPickMode && moveHandle();
+  if (!h || !h.u) return false;
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left - h.c.x, y = e.clientY - r.top - h.c.y;
+  const t = Math.max(-MOVE_PX, Math.min(MOVE_PX, x * h.u.x + y * h.u.y));
+  return Math.hypot(x - t * h.u.x, y - t * h.u.y) <= MOVE_GRAB;
+}
+// Where the cursor points along the axis through c, in mesh units from c: the point of that line
+// nearest the cursor's ray. Null when the axis runs along the ray, with nothing to slide on.
+function axisParam(e, c){
+  setRay(e);
+  const r = raycaster.ray, d = moveAxis.d, b = r.direction.dot(d), den = 1 - b * b;
+  if (den < 1e-4) return null;
+  _ma.subVectors(r.origin, c);
+  return (_ma.dot(d) - b * _ma.dot(r.direction)) / den;
+}
+function moveStep(part){             // 1, 2 or 5 x 10^n shown units: the roundest step about 3 px long at the part
+  const px = 2 * camera.position.distanceTo(_ma.copy(part.restCenter).add(part.offset)) *
+             Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / (canvas.clientHeight || 1);
+  const raw = Math.max(3 * px * unitScale, 1e-9), e = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / e;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * e / unitScale;
+}
+function moveCursor(){
+  if (moveDrag) canvas.style.cursor = 'grabbing';
+  else if (moveHover) canvas.style.cursor = 'grab';
+  else if (axisPickMode) canvas.style.cursor = 'crosshair';
+  else canvas.style.cursor = '';
+}
+// A drag holds the part by the point of the axis under the cursor. That axis line runs through the
+// part's centre as it was when the drag began, fixed: measured from the moving centre instead, the
+// part only ever caught up part of the way.
+function moveDragBegin(e, part){
+  const c = part.restCenter.clone().add(part.offset), t = axisParam(e, c);
+  if (t === null) return false;
+  moveDrag = {id:e.pointerId, part, c, t0:t, v0:part.moved.dot(moveAxis.d), step:moveStep(part)};
+  return true;
+}
+function moveDragTo(e){
+  const t = axisParam(e, moveDrag.c);
+  if (t !== null) moveTo(moveDrag.part, Math.round((moveDrag.v0 + t - moveDrag.t0) / moveDrag.step) * moveDrag.step);
+}
+// Capture phase on the viewport: a grab never reaches the orbit, the controls or click-to-select.
+viewport.addEventListener('pointerdown', e=>{
+  if (e.target !== canvas || e.button !== 0 || !moveGrab(e) || !moveDragBegin(e, selected)) return;
+  e.stopPropagation(); e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  $('moveDist').blur();               // prevented, the press would not take the focus off the box
+  moveCursor();
+}, true);
+window.addEventListener('pointermove', e=>{
+  if (moveDrag){ if (e.pointerId !== moveDrag.id) return; if (e.buttons) moveDragTo(e); else moveEnd(e); return; }
+  const h = e.target === canvas && !e.buttons && moveGrab(e);
+  if (h !== moveHover){ moveHover = h; moveCursor(); }
+});
+const moveEnd = e => { if (moveDrag && e.pointerId === moveDrag.id){ moveDrag = null; moveCursor(); } };
+window.addEventListener('pointerup', moveEnd);
+window.addEventListener('pointercancel', moveEnd);
+
+// s: canvas pixels per CSS pixel. The axis runs through the feature it was picked on, and moves with
+// it; the handle is outlined so it reads on any part, and while dragged it shows the distance.
+function drawMoveGizmo(ctx, s){
+  const W = annotCanvas.width, H = annotCanvas.height, a = moveAxis, hot = !!(moveHover || moveDrag);
+  const col = whiteBg ? '#15803d' : '#5ad18f', halo = whiteBg ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.6)';
+  const p0 = toScreen(_ma.copy(a.p).addScaledVector(a.d, -modelSize), a.part, W, H);
+  const p1 = toScreen(_mb.copy(a.p).addScaledVector(a.d, modelSize), a.part, W, H);
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (p0 && p1){
+    ctx.strokeStyle = col; ctx.lineWidth = 1.3 * s; ctx.setLineDash([12*s, 4*s, 2*s, 4*s]);
+    ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  const h = moveHandle();
+  if (!h){ ctx.restore(); return; }
+  const x = h.c.x * s, y = h.c.y * s, R = MOVE_PX * s, hd = 15 * s, w = 7 * s;
+  const shape = (color, grow) => {                     // the halo pass, then the colour
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = ((hot ? 4.5 : 3) + grow) * s;
+    if (h.u){
+      const ux = h.u.x, uy = h.u.y;
+      ctx.beginPath(); ctx.moveTo(x - ux*(R - hd), y - uy*(R - hd)); ctx.lineTo(x + ux*(R - hd), y + uy*(R - hd)); ctx.stroke();
+      for (const k of [1, -1]){                        // a head at each end
+        const tx = x + k*ux*R, ty = y + k*uy*R, bx = tx - k*ux*hd, by = ty - k*uy*hd;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(bx - uy*w, by + ux*w); ctx.lineTo(bx + uy*w, by - ux*w); ctx.closePath();
+        ctx.fill(); if (grow) ctx.stroke();
+      }
+    } else { ctx.beginPath(); ctx.arc(x, y, 11 * s, 0, 2 * Math.PI); ctx.stroke(); }   // end-on: a ring
+    ctx.beginPath(); ctx.arc(x, y, (4.5 + grow / 2) * s, 0, 2 * Math.PI); ctx.fill();
+  };
+  shape(halo, 3);
+  shape(hot ? (whiteBg ? '#166534' : '#a7f3c4') : col, 0);
+  if (h.u){                                            // "+" past the + end; the distance while dragged
+    const v = selected.moved.dot(a.d), text = moveDrag ? (v > 0 ? '+' : '') + L(v) + MM() : '+';
+    ctx.font = (moveDrag ? '' : 'bold ') + Math.round((moveDrag ? 11.5 : 15) * s) + 'px ' + ANNOT_FONT;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const bw = ctx.measureText(text).width + 12 * s, bh = 19 * s, push = Math.abs(h.u.x) * bw / 2 + Math.abs(h.u.y) * bh / 2 + 4 * s;
+    const lx = Math.min(Math.max(x + h.u.x * (R + push), bw / 2), W - bw / 2), ly = Math.min(Math.max(y + h.u.y * (R + push), bh / 2), H - bh / 2);
+    if (moveDrag){
+      ctx.fillStyle = 'rgba(17,19,24,.9)'; ctx.fillRect(lx - bw/2, ly - bh/2, bw, bh);
+      ctx.strokeStyle = col; ctx.lineWidth = s; ctx.strokeRect(lx - bw/2, ly - bh/2, bw, bh);
+      ctx.fillStyle = '#ffffff';
+    } else { ctx.strokeStyle = halo; ctx.lineWidth = 3 * s; ctx.strokeText(text, lx, ly); ctx.fillStyle = col; }
+    ctx.fillText(text, lx, ly + 0.5 * s);
+  }
+  ctx.restore();
+}
 // ── Section planes ───────────────────────────────────────────
 // sectionPlane is the cut in assembled coordinates. Each part is clipped by its own copy, moved
 // with the part when the assembly is exploded, so every part keeps the cut it had assembled.
@@ -7713,6 +8030,7 @@ $('unitToggle').addEventListener('click', ()=>{
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
+  moveSync();
   toast(unitScale === 1000 ? 'Lengths shown in mm (mesh × 1000)' : 'Lengths shown in raw mesh units');
 });
 
@@ -7738,6 +8056,7 @@ window.addEventListener('keydown', e=>{
   else if (k === 'escape'){
     if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
     clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
+    if (axisPickMode) movePickCancel();
   }
 });
 

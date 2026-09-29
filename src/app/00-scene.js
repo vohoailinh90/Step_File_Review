@@ -43,7 +43,7 @@ function resize(){
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
-renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
+renderer.setAnimationLoop(()=>{ orbitStep(); controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
 
 // ── Framing ──────────────────────────────────────────────────
 function computeBBox(){
@@ -52,12 +52,13 @@ function computeBBox(){
   return box.isEmpty() ? null : box;
 }
 function frame(dir){
-  const box = (explodeAmt > 0 ? computeBBox() : bboxCached) || computeBBox();
+  const box = (exploded() ? computeBBox() : bboxCached) || computeBBox();
   if (!box) return;
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
   const dist = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)) * 1.35;
   const d = (dir || new THREE.Vector3(1, 0.75, 1)).clone().normalize();
+  orbitStop(); camera.up.set(0, 1, 0);               // upright again, however the drag left it (05-orbit.js)
   camera.position.copy(center).addScaledVector(d, dist);
   camera.near = Math.max(dist/1000, 1e-4);
   camera.far  = dist * 100;
