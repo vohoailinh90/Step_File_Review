@@ -7674,9 +7674,9 @@ function axisName(a){                // named when shown, so it follows the unit
     case 'cylinder': return 'cylinder Ø' + L(2*g.r) + MM() + m;
     case 'circle': return (g.closed ? 'circle Ø' + L(2*g.r) : 'arc R' + L(g.r)) + MM() + m;
     case 'line': return 'edge ' + L(g.len) + MM() + m;
-    case 'plane': return 'face normal';
+    case 'plane': return 'face normal' + m;
   }
-  return g.type;                     // cone, torus
+  return g.type + m;                 // cone, torus
 }
 
 // The distance box: how far along the axis the part sits from its assembled place, in shown units

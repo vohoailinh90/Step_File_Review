@@ -202,7 +202,12 @@ test('a straight edge gives its direction, a flat face its normal', () => {
     const n = v.axisFrom(planeFacing(plate, -1));    // the plate's underside: + still points out, down and away
     assert.ok(near(n.d.toArray(), [0, 1, 0], 1e-9) || near(n.d.toArray(), [0, -1, 0], 1e-9), 'square to the face');
     assert.ok(n.d.dot(plate.restCenter.clone().sub(run('modelCenter'))) >= 0, 'pointing out of the assembly');
-    assert.equal(v.axisName(n), 'face normal');
+    assert.equal(v.axisName(n), 'face normal (mesh)', 'the box has no B-rep data: its plane is fitted, and says so');
+    assert.equal(v.axisName({ ...n, exact: true }), 'face normal', 'a plane from the STEP B-rep');
+    const cone = { kind: 'face', part: cover, hit: new T.Vector3(0.02, 0.03, 0), geom: { type: 'cone',
+      apex: new T.Vector3(0.02, 0.05, 0), a: new T.Vector3(0, 1, 0), semi: 0.5 } };
+    assert.equal(v.axisName(v.axisFrom(cone)), 'cone (mesh)', 'a cone read off the mesh says so too');
+    assert.equal(v.axisName(v.axisFrom({ ...cone, exact: true })), 'cone');
     const none = v.axisFrom({ part: plate, hit: new T.Vector3(), geom: { type: 'sphere', c: new T.Vector3(), r: 0.01 } });
     assert.equal(none, null, 'a sphere has no one axis to move along');
   });

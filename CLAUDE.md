@@ -248,7 +248,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 163 mutations, all currently caught. When you ship a fix with a
+suite to notice — 165 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
