@@ -65,7 +65,7 @@ test('L() and A2() agree with fmt() on the scaled value', () => {
 // label it mm, so one click made a 10 mm plate read 10000 mm.
 // ---------------------------------------------------------------------------
 const ALL = readdirSync(join(ROOT, 'src/app')).filter(f => f.endsWith('.js')).sort().map(f => 'src/app/' + f);
-const app = loadViewer(ALL, ['setUnitsRaw', 'mmScale', 'sniff', 'L', 'A2', 'MM'], { three: 'real' });
+const app = loadViewer(ALL, ['setUnitsRaw', 'mmScale', 'sniff', 'L', 'A2', 'MM', 'loadArrayBuffer'], { three: 'real' });
 const units = () => runInContext('[unitScale, unitsRaw]', app.ctx);
 
 test('the loader takes glTF as metres and an STL as millimetres', () => {
@@ -95,6 +95,33 @@ test('the units toggle never multiplies an STL by 1000', () => {
   app.setUnitsRaw(false);
   assert.equal(app.L(10) + app.MM(), '10.00 mm', 'back to mm: still the same number');
   runInContext('unitMm = 1000; unitScale = 1000; unitsRaw = false;', app.ctx);
+});
+
+// A file's units take effect only with the file. They used to be set before the
+// parse, so a file that then failed left the old model on screen at the new
+// scale: an STL after a corrupt .glb read x1000 and still said mm (geometry
+// review of the STL fix; reproduced in headless Chromium).
+const bytes = text => new TextEncoder().encode(text).buffer;
+test('a file that fails to load leaves the model on screen at its own units', () => {
+  runInContext(`unitMm = 1; unitScale = 1; unitsRaw = false; var __failed = [];
+    fail = e => { __failed.push(e); };
+    gltfLoader.parse = (b, p, ok, bad) => bad(new Error('THREE.GLTFLoader: JSON content not found.'));`, app.ctx);
+  app.loadArrayBuffer(bytes('glTF\x02\x00\x00\x00junk'), 'bad.glb');
+  assert.deepEqual([...units(), runInContext('unitMm', app.ctx)], [1, false, 1],
+    'an STL on screen keeps its mm after a corrupt .glb, not x1000');
+  runInContext('unitMm = 1000; unitScale = 1000;', app.ctx);             // a glTF on screen now
+  app.loadArrayBuffer(bytes('ISO-10303-21;'), 'part.step');               // a STEP file handed straight to the viewer
+  assert.deepEqual([...units(), runInContext('unitMm', app.ctx)], [1000, false, 1000],
+    'and a glTF keeps its x1000 after a file it cannot open, not x1');
+  assert.equal(runInContext('__failed.length', app.ctx), 2, 'both loads failed');
+});
+
+test('a file that loads brings its own units, and mm again', () => {
+  runInContext(`unitMm = 1; unitScale = 1; unitsRaw = true;
+    gltfLoader.parse = (b, p, ok) => ok({ scene: new THREE.Group() });`, app.ctx);
+  app.loadArrayBuffer(bytes('glTF\x02\x00\x00\x00'), 'good.glb');
+  assert.deepEqual([...units(), runInContext('unitMm', app.ctx)], [1000, false, 1000], 'a glTF is metres, shown in mm');
+  runInContext('modelRoot = null; parts = []; bboxCached = null;', app.ctx);
 });
 
 // ---------------------------------------------------------------------------

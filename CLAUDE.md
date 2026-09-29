@@ -41,13 +41,13 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 ## Where the code lives
 
-2,520 lines of application code, in one shared closure, split by concern:
+2,525 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
 | `src/app/00-scene.js`    | 75  | renderer, scene, camera, lights, `unitScale` / `unitMm`, `L()`/`A2()`, framing (upright again), annotation canvas |
 | `src/app/05-orbit.js`    | 56  | left-drag turning with no end stop: about Y sideways, on over the top up and down; damping, `orbitStop()` |
-| `src/app/10-load.js`     | 159 | `sameOrigin()` runtime URL guard, format sniffing and its units (`mmScale`), `TM_brep_faces` import, GLB/GLTF/STL load, dispose, load status |
+| `src/app/10-load.js`     | 164 | `sameOrigin()` runtime URL guard, format sniffing and its units (`mmScale`), `TM_brep_faces` import, GLB/GLTF/STL load, dispose, load status |
 | `src/app/20-parts.js`    | 42  | part list, visibility, isolate, hover |
 | `src/app/30-select.js`   | 97  | pick modes, raycast, `notClipped`, highlights that follow an exploded part |
 | `src/app/31-fit.js`      | 144 | vector helpers, `fitPlane` / `fitCylinder` / `fitSphere`, `eigSym3`, `solveLin` |
@@ -248,7 +248,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 161 mutations, all currently caught. When you ship a fix with a
+suite to notice — 163 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught

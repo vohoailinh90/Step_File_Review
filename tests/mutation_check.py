@@ -750,6 +750,19 @@ MUTATIONS = [
          replace="function mmScale(kind){ return 1000; }",
          must_fail=JS),
 
+    dict(name="load/units-set-before-the-parse",
+         behaviour="a file that fails to load leaves the model on screen at its own units",
+         file="src/app/10-load.js",
+         find="  const finish = root => {\n    clearModel();\n    unitMm = unitScale = mmScale(kind);",
+         replace="  unitMm = unitScale = mmScale(kind);\n  const finish = root => {\n    clearModel();",
+         must_fail=JS),
+    dict(name="load/units-not-taken-from-the-file",
+         behaviour="a file that loads brings its own units (glTF metres, STL mm)",
+         file="src/app/10-load.js",
+         find="    unitMm = unitScale = mmScale(kind);\n",
+         replace="",
+         must_fail=JS),
+
     # ---- the face flood-fill (src/app/32-faces.js since Measure mode, PR #2) --
     dict(name="select/break-angle-widened",
          behaviour="a face must stop at a break sharper than 20 degrees",

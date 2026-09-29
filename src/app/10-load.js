@@ -74,9 +74,14 @@ function loadArrayBuffer(buf, name, startedAt){
   const t0 = startedAt || performance.now();
   spin(true, 'reading mesh');
   const kind = sniff(buf);
-  unitMm = unitScale = mmScale(kind);
-  unitsRaw = false; $('stUnits').textContent = 'mm';
-  const finish = root => { clearModel(); modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0); };
+  // The file's units take effect with the file. Set before the parse, a file that failed to load
+  // left the old model on screen at its scale: an STL after a corrupt .glb read x1000, still in mm.
+  const finish = root => {
+    clearModel();
+    unitMm = unitScale = mmScale(kind);
+    unitsRaw = false; $('stUnits').textContent = 'mm';
+    modelRoot = root; scene.add(root); afterLoad(name, buf.byteLength, performance.now()-t0);
+  };
   try {
     if (kind === 'step'){
       fail(new Error('this is a STEP file — start the viewer with stepview.py so it can be converted here'));

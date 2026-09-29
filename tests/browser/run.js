@@ -64,6 +64,7 @@ window.__qs = {THREE, camera, controls, scene, renderer, VIEWS, frame, setMode, 
   moveStep: typeof moveStep === 'function' ? moveStep : null,
   get moveAxis(){ return typeof moveAxis === 'undefined' ? null : moveAxis; },
   get axisPickMode(){ return typeof axisPickMode === 'undefined' ? false : axisPickMode; },
+  loadArrayBuffer, get unitScale(){ return unitScale; },
 };
 `;
 
