@@ -223,7 +223,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
           <span class="lbl">move</span>
           <input type="number" id="moveDist" step="any" disabled aria-label="Distance along the axis from the assembled place">
           <span class="unit" id="moveUnit">mm</span>
-          <button class="btn" id="btnMoveReset" title="Put the selected part back where it sits assembled" disabled>Reset part</button>
+          <button class="btn" id="btnMoveReset" title="Undo the selected part's own move (the explode stays)" disabled>Reset part</button>
         </div>
         <div class="row"><span class="hint" id="moveHint">Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.</span></div>
       </div>
@@ -7538,7 +7538,7 @@ document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click',
   if (explodeAxis === 'axis' && !moveAxis) movePickStart();     // explodes radially until an axis is picked
   applyExplode();
 }));
-$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); moveSync(); });
+$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); });
 function setExplodeAxis(k){
   explodeAxis = k;
   document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x.dataset.exp === k));
@@ -7579,6 +7579,7 @@ function applyExplode(){
   followers.forEach(o => { const fl = o.userData.follow; o.position.copy(fl.part.offset).sub(fl.base); });
   if (sectionActive) syncClips();
   if (mode === 'measure') renderMeasure();
+  moveSync();                        // the move box reads where the part sits, explode included
 }
 
 // ── Edges ────────────────────────────────────────────────────
@@ -7614,12 +7615,13 @@ function toggleEdges(){
 let moveAxis = null;                 // {p, d, part, geom}: a point on it (assembled), unit direction, where picked
 let axisPickMode = false, moveDrag = null, moveHover = false;
 const MOVE_PX = 60, MOVE_GRAB = 9;   // the handle's half-length, and how near the cursor must come to grab it (CSS px)
+const MOVE_END_ON = 0.996;           // cos 5°: an axis this close to the line of sight has nothing to slide along
 const _ma = new THREE.Vector3(), _mb = new THREE.Vector3();
 
 $('btnAxisPick').addEventListener('click', ()=>{ if (axisPickMode) movePickCancel(); else movePickStart(); });
 $('btnAxisFlip').addEventListener('click', ()=>{ if (moveAxis){ moveAxis.d.negate(); moveSync(); } });
 $('moveDist').addEventListener('change', e => moveTyped(e.target.value));
-$('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.set(0, 0, 0); applyExplode(); moveSync(); } });
+$('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.set(0, 0, 0); applyExplode(); } });
 
 function movePickStart(){
   if (!modelRoot){ toast('Load a model first'); return; }
@@ -7657,45 +7659,47 @@ function axisFrom(ent){
   else return null;
   d = d.clone().normalize();
   if (d.dot(_ma.subVectors(ent.part.restCenter, modelCenter)) < 0) d.negate();   // + pulls the part out
-  return {p:p.clone(), d, part:ent.part, geom:g};
+  return {p:p.clone(), d, part:ent.part, geom:g, exact:!!ent.exact};
 }
-function axisName(a){                // named when shown, so it follows the units toggle
-  const g = a.geom;
+function axisName(a){                // named when shown, so it follows the units toggle; a figure off the mesh says so
+  const g = a.geom, m = a.exact ? '' : ' (mesh)';
   switch (g.type){
-    case 'cylinder': return 'cylinder Ø' + L(2*g.r) + MM();
-    case 'circle': return g.closed ? 'circle Ø' + L(2*g.r) + MM() : 'arc R' + L(g.r) + MM();
-    case 'line': return 'edge ' + L(g.len) + MM();
+    case 'cylinder': return 'cylinder Ø' + L(2*g.r) + MM() + m;
+    case 'circle': return (g.closed ? 'circle Ø' + L(2*g.r) : 'arc R' + L(g.r)) + MM() + m;
+    case 'line': return 'edge ' + L(g.len) + MM() + m;
     case 'plane': return 'face normal';
   }
   return g.type;                     // cone, torus
 }
 
-// The distance box: shown units along the axis, from where the part sits assembled.
+// The distance box: how far along the axis the part sits from its assembled place, in shown units
+// -- its explode along the axis included, so the box always says where the part is.
 function moveTyped(text){
   const v = parseFloat(String(text).replace(',', '.'));
-  if (moveAxis && selected && Number.isFinite(v)) moveTo(selected, v / unitScale);
-  else moveSync();
-}
-function moveTo(part, v){            // put `part` v mesh units along the axis from its assembled place
-  part.moved.addScaledVector(moveAxis.d, v - part.moved.dot(moveAxis.d));
-  applyExplode();
+  if (moveAxis && selected && Math.abs(v / unitScale) > 100 * modelSize) toast('Too far: more than 100 times the size of the model');
+  else if (moveAxis && selected && Number.isFinite(v)){ moveTo(selected, v / unitScale); return; }
   moveSync();
 }
-const moveNum = v => String(+(v * unitScale).toFixed(unitsRaw ? 6 : 3));
+function moveTo(part, v){            // put `part` v mesh units along the axis from its assembled place
+  part.moved.addScaledVector(moveAxis.d, v - part.offset.dot(moveAxis.d));   // offset: explode + move, as last applied
+  applyExplode();
+}
+const moveNum = v => String(+(v * unitScale).toFixed(unitsRaw ? 9 : 6));    // what was typed, not a rounding of it
 function moveSync(){                 // the panel, after anything that changes the axis, the part or its move
   const p = moveAxis ? selected : null, box = $('moveDist');
   $('axisName').textContent = moveAxis ? axisName(moveAxis) : 'none';
   $('axisName').classList.toggle('none', !moveAxis);
+  $('axisName').title = moveAxis ? axisName(moveAxis) : '';
   $('btnAxisFlip').disabled = !moveAxis;
   box.disabled = !p;
-  box.value = p ? moveNum(p.moved.dot(moveAxis.d)) : '';
+  box.value = p ? moveNum(p.offset.dot(moveAxis.d)) : '';
   $('moveUnit').textContent = unitsRaw ? '' : 'mm';
   $('btnMoveReset').disabled = !(selected && selected.moved.lengthSq() > 0);
   // textContent: a part name comes from the model file
   $('moveHint').textContent = axisPickMode ? 'Click a straight edge, a circle, a cylinder or a flat face.'
     : !moveAxis ? 'Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.'
     : !p ? 'Click a part to move it along this axis.'
-    : 'Moving ' + p.name + ': type its distance from where it sits assembled, or drag the arrow. + points out of the assembly.';
+    : 'Moving ' + p.name + ': type how far along the axis it sits from its assembled place, or drag the arrow. + points out of the assembly.';
 }
 
 // ── The drag handle ──────────────────────────────────────────
@@ -7709,7 +7713,7 @@ function moveHandle(){               // CSS px on the canvas: centre c, screen d
   const c = toScreen(p.restCenter, p, viewport.clientWidth, viewport.clientHeight);
   if (!c) return null;
   const at = _mb.copy(p.restCenter).add(p.offset), dist = camera.position.distanceTo(at);
-  if (Math.abs(_ma.subVectors(at, camera.position).dot(moveAxis.d)) > 0.996 * dist) return {c, u:null};
+  if (Math.abs(_ma.subVectors(at, camera.position).dot(moveAxis.d)) > MOVE_END_ON * dist) return {c, u:null};
   const e = toScreen(_ma.copy(p.restCenter).addScaledVector(moveAxis.d, dist * 0.01), p, viewport.clientWidth, viewport.clientHeight);
   const dx = e ? e.x - c.x : 0, dy = e ? e.y - c.y : 0, l = Math.hypot(dx, dy);
   return {c, u:l > 0 ? {x:dx / l, y:dy / l} : null};
@@ -7722,11 +7726,12 @@ function moveGrab(e){                // is the cursor on the handle?
   return Math.hypot(x - t * h.u.x, y - t * h.u.y) <= MOVE_GRAB;
 }
 // Where the cursor points along the axis through c, in mesh units from c: the point of that line
-// nearest the cursor's ray. Null when the axis runs along the ray, with nothing to slide on.
+// nearest the cursor's ray. Null when the ray runs within 5° of the axis: there a pixel is a long
+// way along it, and a drag toward the axis's vanishing point would throw the part off to infinity.
 function axisParam(e, c){
   setRay(e);
   const r = raycaster.ray, d = moveAxis.d, b = r.direction.dot(d), den = 1 - b * b;
-  if (den < 1e-4) return null;
+  if (Math.abs(b) > MOVE_END_ON) return null;
   _ma.subVectors(r.origin, c);
   return (_ma.dot(d) - b * _ma.dot(r.direction)) / den;
 }
@@ -7748,7 +7753,7 @@ function moveCursor(){
 function moveDragBegin(e, part){
   const c = part.restCenter.clone().add(part.offset), t = axisParam(e, c);
   if (t === null) return false;
-  moveDrag = {id:e.pointerId, part, c, t0:t, v0:part.moved.dot(moveAxis.d), step:moveStep(part)};
+  moveDrag = {id:e.pointerId, part, c, t0:t, v0:part.offset.dot(moveAxis.d), step:moveStep(part)};
   return true;
 }
 function moveDragTo(e){
@@ -7805,7 +7810,7 @@ function drawMoveGizmo(ctx, s){
   shape(halo, 3);
   shape(hot ? (whiteBg ? '#166534' : '#a7f3c4') : col, 0);
   if (h.u){                                            // "+" past the + end; the distance while dragged
-    const v = selected.moved.dot(a.d), text = moveDrag ? (v > 0 ? '+' : '') + L(v) + MM() : '+';
+    const v = selected.offset.dot(a.d), text = moveDrag ? (v > 0 ? '+' : '') + L(v) + MM() : '+';
     ctx.font = (moveDrag ? '' : 'bold ') + Math.round((moveDrag ? 11.5 : 15) * s) + 'px ' + ANNOT_FONT;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const bw = ctx.measureText(text).width + 12 * s, bh = 19 * s, push = Math.abs(h.u.x) * bw / 2 + Math.abs(h.u.y) * bh / 2 + 4 * s;

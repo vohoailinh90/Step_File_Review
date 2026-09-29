@@ -98,6 +98,7 @@ const {launch, openModel, check} = L;
   await pg.$eval('#expAmount', el => { el.value = 50; el.dispatchEvent(new Event('input')); });
   s = await state();
   check('Along Axis moves parts along Z only', JSON.stringify(Object.values(s.off).map(o => [o[0], o[1]])), /^\[\[0,0\],\[0,0\],\[0,0\]\]$/);
+  check('the move box reads where the shaft sits along the axis, explode included', s.box, new RegExp('^' + String(s.off.shaft[2]).replace('.', '\\.') + '$'));
   await pg.click('#btnSection'); await pg.click('[data-sec="front"]');
   const drift = await pg.evaluate(() => Math.max(...__qs.parts.map(p => Math.abs(p.clip.distanceToPoint(p.restCenter.clone().add(p.offset)) - __qs.sectionPlane.distanceToPoint(p.restCenter)))));
   check('each moved part keeps the cut it had assembled', drift < 1e-12 ? 'ok' : String(drift), /^ok$/);

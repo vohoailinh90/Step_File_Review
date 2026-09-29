@@ -174,19 +174,31 @@ test('a cylinder gives its axis, + pointing out of the assembly through the part
     const a = v.axisFrom(cylinder(shaft));
     assert.ok(near(a.d.toArray(), [0, 1, 0], 1e-6), `the shaft sits above the centre: + is up, got ${a.d.toArray()}`);
     assert.ok(Math.abs(a.p.x + 0.03) < 1e-6 && Math.abs(a.p.z) < 1e-6, `a point on the axis, got ${a.p.toArray()}`);
-    assert.equal(v.axisName(a), 'cylinder Ø20.00 mm');
+    assert.equal(v.axisName(a), 'cylinder Ø20.00 mm (mesh)', 'fitted to the mesh here, and it says so');
     run('modelCenter = new THREE.Vector3(0, 0.1, 0);');   // now the shaft sits below it
     assert.ok(near(v.axisFrom(cylinder(shaft)).d.toArray(), [0, -1, 0], 1e-6), '+ is down');
   });
 });
 
+test('a cylinder from the STEP B-rep is named without (mesh)', () => {
+  withAssembly(() => {
+    const g = new T.CylinderGeometry(0.01, 0.01, 0.03, 64, 1, true);
+    g.userData.brep = { tri: new Array(g.index.count / 3).fill(0),
+      faces: [{ type: 'cylinder', origin: [0, 0, 0], axis: [0, 1, 0], radius: 0.01 }] };
+    const e = cylinder(part(run('modelRoot'), g, [0.04, 0.03, 0], 'pin'));
+    assert.equal(e.exact, true);
+    assert.equal(v.axisName(v.axisFrom(e)), 'cylinder Ø20.00 mm');
+  });
+});
+
 test('a straight edge gives its direction, a flat face its normal', () => {
   withAssembly(({ plate, cover }) => {
-    const line = { kind: 'edge', part: cover, hit: new T.Vector3(), geom: { type: 'line',
+    const line = { kind: 'edge', part: cover, hit: new T.Vector3(), exact: true, geom: { type: 'line',
       p0: new T.Vector3(-0.03, 0.025, 0.03), p1: new T.Vector3(0.07, 0.025, 0.03), d: new T.Vector3(1, 0, 0), len: 0.1 } };
     const a = v.axisFrom(line);
     assert.ok(near(a.d.toArray(), [1, 0, 0]) && near(a.p.toArray(), [0.02, 0.025, 0.03], 1e-12), 'along the edge, from its middle');
-    assert.equal(v.axisName(a), 'edge 100.00 mm');
+    assert.equal(v.axisName(a), 'edge 100.00 mm', 'an edge its two B-rep faces pin down');
+    assert.equal(v.axisName(v.axisFrom({ ...line, exact: false })), 'edge 100.00 mm (mesh)', 'one read off the mesh says so');
     const n = v.axisFrom(planeFacing(plate, -1));    // the plate's underside: + still points out, down and away
     assert.ok(near(n.d.toArray(), [0, 1, 0], 1e-9) || near(n.d.toArray(), [0, -1, 0], 1e-9), 'square to the face');
     assert.ok(n.d.dot(plate.restCenter.clone().sub(run('modelCenter'))) >= 0, 'pointing out of the assembly');
@@ -212,6 +224,33 @@ test('a typed distance puts the part exactly that far along the axis, in millime
     v.moveTyped('');
     assert.ok(near(shaft.moved.toArray(), [0, 0.0075, 0], 1e-15), 'an empty box moves nothing');
     assert.equal(box(), '7.5', 'and shows the distance again');
+  });
+});
+
+test('exploded, the box still reads and sets how far the part sits along the axis from assembled', () => {
+  withAssembly(({ shaft }) => {
+    useAxis(cylinder(shaft), shaft);
+    v.setExplode(0.5);                           // radial, at 50 %: the shaft sits 35 mm up already
+    run('moveSync();');
+    assert.equal(box(), '35', 'an exploded part that was never moved reads where it is, not 0');
+    v.moveTyped('60');
+    assert.ok(Math.abs(shaft.offset.y - 0.06) < 1e-15, `60 mm up from assembled, got ${shaft.offset.y}`);
+    assert.ok(Math.abs(shaft.moved.y - 0.025) < 1e-15, 'of which 25 mm is its own move');
+    assert.equal(box(), '60');
+    v.setExplode(0);
+    assert.equal(box(), '25', 'with the explode off, its own move is all that is left');
+  });
+});
+
+test('the box keeps what was typed, and refuses a distance past all sense', () => {
+  withAssembly(({ shaft }) => {
+    useAxis(cylinder(shaft), shaft);
+    v.moveTyped('12.3456');
+    assert.equal(box(), '12.3456', 'not rounded to 12.346');
+    v.moveTyped('1e300');
+    assert.ok(Math.abs(shaft.moved.y - 0.0123456) < 1e-15, `far beyond the model: nothing moves, got ${shaft.moved.y}`);
+    assert.ok(pos(shaft).every(Number.isFinite), 'and the part is still drawn');
+    assert.equal(box(), '12.3456');
   });
 });
 
@@ -310,6 +349,9 @@ test('the point under the cursor is found along the axis, from any view', () => 
   view([0, 0, 1]);
   run("moveAxis.d.set(0, 0, 1);");
   assert.equal(v.axisParam(pixel([0, 0, 0]), c), null, 'an axis pointing at the eye has nothing to slide along');
+  const a = 2 * Math.PI / 180;                   // 2 deg off the line of sight: a pixel is metres along it
+  run(`moveAxis.d.set(${Math.sin(a)}, 0, ${Math.cos(a)});`);
+  assert.equal(v.axisParam(pixel([0, 0, 0]), c), null, 'nor one a few degrees off it: a drag there would fling the part');
   run('moveAxis = null;');
 });
 

@@ -19,7 +19,7 @@ document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click',
   if (explodeAxis === 'axis' && !moveAxis) movePickStart();     // explodes radially until an axis is picked
   applyExplode();
 }));
-$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); moveSync(); });
+$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); });
 function setExplodeAxis(k){
   explodeAxis = k;
   document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x.dataset.exp === k));
@@ -60,6 +60,7 @@ function applyExplode(){
   followers.forEach(o => { const fl = o.userData.follow; o.position.copy(fl.part.offset).sub(fl.base); });
   if (sectionActive) syncClips();
   if (mode === 'measure') renderMeasure();
+  moveSync();                        // the move box reads where the part sits, explode included
 }
 
 // ── Edges ────────────────────────────────────────────────────

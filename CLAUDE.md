@@ -41,7 +41,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 ## Where the code lives
 
-2,506 lines of application code, in one shared closure, split by concern:
+2,511 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
@@ -59,8 +59,8 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 | `src/app/43-relate.js`   | 231 | `relate()` — two picks' distances and angles; Keep/Clear; the measure panel |
 | `src/app/44-mindist.js`  | 155 | `minDistance()` — BVH over the picked triangles, the "(mesh)" minimum |
 | `src/app/45-annotate.js` | 99  | dimensions drawn on the model and into screenshots |
-| `src/app/46-explode.js`  | 86  | exploded view (`EXPLODE_MAX`, along X / Y / Z / Axis, `exploded()`), feature-edge toggle |
-| `src/app/47-move.js`     | 216 | a part moved along a picked axis (`moved`): Pick…, typed distance, the drag arrow |
+| `src/app/46-explode.js`  | 87  | exploded view (`EXPLODE_MAX`, along X / Y / Z / Axis, `exploded()`), feature-edge toggle |
+| `src/app/47-move.js`     | 220 | a part moved along a picked axis (`moved`): Pick…, typed distance, the drag arrow |
 | `src/app/50-section.js`  | 162 | section planes, plane-from-circle, stencil caps, per-part cuts while exploded |
 | `src/app/60-io.js`       | 156 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload |
 | `src/ui/viewer.css`      | 119 | all styling |
@@ -248,7 +248,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 151 mutations, all currently caught. When you ship a fix with a
+suite to notice — 158 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught
