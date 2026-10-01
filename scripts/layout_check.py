@@ -21,7 +21,8 @@ Errors (exit 1):
     whose name has a `test`/`tests` word (run_tests_sample.py), or a
     JavaScript/TypeScript file named the same way or as a spec (x.test.mjs,
     test-x.js, x_test.js, test.js, app.spec.ts) -> tests/
-  - a test directory in the root other than tests/ (test_support/, testdata/)
+  - a test directory in the root other than tests/ (test_support/, testdata/,
+    or a spec/ or specs/ that holds test code)
     -> under tests/
   - a root .py that is neither an entry point nor a tool file: a library
     module, not something a user runs -> into the app's package. An entry
@@ -63,10 +64,15 @@ PYTHON_SUFFIXES = frozenset({".py", ".pyw"})
 # JavaScript/TypeScript files. Tests live in tests/ whatever the language, so a
 # root JS/TS file named like a test fails; any other JS/TS file is not checked.
 JS_SUFFIXES = frozenset({".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"})
-# Jest/Vitest's `.spec.` segment; `test` as a word is covered by is_test_name,
-# which with node --test's patterns (test.js, test-x.js, x-test.js, x_test.js,
-# x.test.js) splits on `-`, `_` and `.` exactly like the Python names.
-JS_SPEC_SEGMENT = re.compile(r"(^|[._-])spec([._-]|$)", re.IGNORECASE)
+# Jest/Vitest's `spec` word (app.spec.ts, CalculatorSpec.js); `test` as a word
+# is covered by is_test_name, which with node --test's patterns (test.js,
+# test-x.js, x-test.js, x_test.js, x.test.js) splits like the Python names.
+JS_TEST_WORDS = frozenset({"spec", "specs"})
+# RSpec/Jasmine keep tests in a root spec/ or specs/, but GitHub Spec Kit keeps
+# specification documents in specs/; such a directory is a test directory only
+# when it holds a code file named like a test (foo_spec.rb, app.spec.ts).
+SPEC_DIRS = frozenset({"spec", "specs"})
+SPEC_CODE_SUFFIXES = PYTHON_SUFFIXES | JS_SUFFIXES | {".rb"}
 # Python tooling reads these from the root by name and they carry no main guard.
 TOOL_ENTRY_POINTS = frozenset({"setup.py", "noxfile.py"})
 # `# layout: entry-point` in the first lines declares a root launcher outright.
@@ -78,12 +84,21 @@ WORD_SPLIT = re.compile(r"[_\-.]+")
 CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 
 
+def name_words(stem: str) -> list[str]:
+    """Lower-cased words of a name, split on _ - . and CamelCase: APITest -> api, test."""
+    return [word.lower() for word in WORD_SPLIT.split(CAMEL_BOUNDARY.sub("_", stem))]
+
+
 def is_test_name(stem: str) -> bool:
     """test_x, x_test, run_tests_sample, TestRunner, conftest — but not latest or attest."""
-    if stem == "conftest":
+    if stem.lower() == "conftest":
         return True
-    words = WORD_SPLIT.split(CAMEL_BOUNDARY.sub("_", stem))
-    return any(word.lower() in TEST_WORDS for word in words)
+    return any(word in TEST_WORDS for word in name_words(stem))
+
+
+def is_js_test_name(stem: str) -> bool:
+    """x.test.mjs, test-x.js, app.spec.ts, CalculatorSpec.js — but not inspect.js or special.ts."""
+    return is_test_name(stem) or any(word in JS_TEST_WORDS for word in name_words(stem))
 
 
 def has_main_guard(tree: ast.Module) -> bool:
@@ -138,6 +153,12 @@ def declares_entry_point(source: bytes) -> bool:
     return False
 
 
+def holds_test_code(directory: Path) -> bool:
+    """Whether a file below the directory is code named like a test, not a document."""
+    return any(path.suffix.lower() in SPEC_CODE_SUFFIXES and is_js_test_name(path.stem) and path.is_file()
+               for path in directory.rglob("*"))
+
+
 def check(root: Path, max_root_scripts: int) -> list[str]:
     errors: list[str] = []
     entry_points: list[str] = []
@@ -146,10 +167,10 @@ def check(root: Path, max_root_scripts: int) -> list[str]:
         if path.is_dir():
             # A hidden directory is tool state (.git, .venv, .tox, .pytest_cache)
             # and is skipped, unless it is named like a test directory.
-            if name != TEST_DIR and is_test_name(name):
+            if name != TEST_DIR and (is_test_name(name) or name.lower() in SPEC_DIRS and holds_test_code(path)):
                 errors.append(f"{name}/: test directory in the root -> move it under {TEST_DIR}/")
             continue
-        if path.suffix.lower() in JS_SUFFIXES and (is_test_name(path.stem) or JS_SPEC_SEGMENT.search(path.stem)):
+        if path.suffix.lower() in JS_SUFFIXES and is_js_test_name(path.stem):
             errors.append(f"{name}: test file in the root -> move it to {TEST_DIR}/")
             continue
         # Case-folded: Windows runs helper.PY as readily as helper.py.
@@ -202,6 +223,10 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --max-root-scripts must be >= 0", file=sys.stderr)
         return 2
     errors = check(root, args.max_root_scripts)
+    # A root file name the console encoding cannot show (a Japanese name under
+    # cp1252) must still be reported, escaped, never crash the gate.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="backslashreplace")
     for error in errors:
         print(f"ERROR {error}")
     print(f"layout_check: {len(errors)} error(s)")

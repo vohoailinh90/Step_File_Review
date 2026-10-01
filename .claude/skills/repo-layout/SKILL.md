@@ -8,7 +8,7 @@ description: Keep a repository's root to the files a user needs to run the app �
 A user opening the repository must see, in the root, which file starts the app.
 Forty `.py` files side by side — the app, its helpers and every test — hide
 that. This skill fixes where each kind of file goes, and
-`python3 scripts/layout_check.py` (repository root) is the gate: whether a root
+`python scripts/layout_check.py` (repository root) is the gate: whether a root
 `.py` is a test, a library module or an entry point is computable, so it is a
 script and a CI step, not something a reviewer eyeballs.
 
@@ -40,10 +40,11 @@ Rules, each one checked by `layout_check.py` unless marked *(judgement)*:
 
 1. **Tests live in `tests/`.** `test_*.py`, `*_test.py`, `conftest.py`, and
    anything named like a test (`run_tests_sample.py`), and JavaScript/TypeScript
-   tests (`x.test.mjs`, `test-x.js`, `x_test.js`, `test.js`, `app.spec.ts`) never
+   tests (`x.test.mjs`, `test-x.js`, `x_test.js`, `test.js`, `app.spec.ts`, `CalculatorSpec.js`) never
    sit in the root.
    Test helper directories go under `tests/` (`tests/support/`), never a root
-   `test_support/`.
+   `test_support/`. A root `spec/`/`specs/` that holds test code (`user_spec.rb`)
+   is a test directory too; a Spec Kit `specs/` of documents is not.
 2. **A root `.py` (or `.pyw`, any letter case) is an entry point** when it has a top-level
    `if __name__ == "__main__":`, or declares itself with the comment
    `# layout: entry-point` in its first 10 lines. A launcher without a main
@@ -90,7 +91,7 @@ a test run started in the root. Pick the one that matches the test runner:
 
 ## Restructuring an existing repository
 
-1. **Inventory.** `python3 scripts/layout_check.py` lists every file that must
+1. **Inventory.** `python scripts/layout_check.py` lists every file that must
    move. For each remaining root `.py`, decide: launcher users run (stays),
    module (→ package), tool (→ `scripts/`).
 2. **Move with history.** `git mv test_x.py tests/`, `git mv x.py <app>/x.py`
@@ -101,7 +102,7 @@ a test run started in the root. Pick the one that matches the test runner:
    specs, `.bat`/`.sh` launchers, CI workflows, README commands).
 4. **Fix paths.** Code that reads files with `Path(__file__).parent` now sits
    one level deeper; tests that build paths from the root likewise.
-5. **Verify.** The full test suite, `python3 scripts/layout_check.py`, and
+5. **Verify.** The full test suite, `python scripts/layout_check.py`, and
    each launcher started once (`python <app>.py --help`). A test suite that
    passes but was never collected from its new place proves nothing — check
    the collected count did not drop.

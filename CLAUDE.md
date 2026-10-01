@@ -453,7 +453,7 @@ launchers (a `.bat`/`.sh` shortcut that starts one is not counted). Tests go in 
 tooling in `scripts/`. When a change adds a Python file, test or module, or
 restructures the repository, follow `.claude/skills/repo-layout/SKILL.md`.
 
-- `python3 scripts/layout_check.py` is the verdict: a test file or test
+- `python scripts/layout_check.py` is the verdict: a test file or test
   directory in the root, a root `.py` that has neither an
   `if __name__ == "__main__":` guard nor a `# layout: entry-point` comment in
   its first lines (a library module; a Streamlit app declares itself with the
