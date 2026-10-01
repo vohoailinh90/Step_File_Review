@@ -32,6 +32,7 @@ JS_TESTS = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "tests").glob("*.tes
 # and automation and agents read the exit status.
 STAGES = [
     ("build fidelity", [PY, "build.py", "--check"]),
+    ("root layout", [PY, "scripts/layout_check.py"]),
     ("repo + product invariants", [PY, "tests/check_invariants.py"]),
     ("launcher unit tests", [PY, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]),
     (f"viewer unit tests ({len(JS_TESTS)} files)", ["node", "--test", *JS_TESTS]),

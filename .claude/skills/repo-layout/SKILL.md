@@ -42,11 +42,15 @@ Rules, each one checked by `layout_check.py` unless marked *(judgement)*:
    anything named like a test (`run_tests_sample.py`) never sit in the root.
    Test helper directories go under `tests/` (`tests/support/`), never a root
    `test_support/`.
-2. **A root `.py` is an entry point**, i.e. it has a top-level
-   `if __name__ == "__main__":`, or it is a Streamlit app (imports
-   `streamlit` at the top level; `streamlit run app.py` is how it starts). A
-   file that is neither is a library module and belongs in the package.
-   `setup.py` and `noxfile.py` are exempt.
+2. **A root `.py` is an entry point** when it has a top-level
+   `if __name__ == "__main__":`, or declares itself with the comment
+   `# layout: entry-point` in its first 10 lines. A launcher without a main
+   guard (a Streamlit app started by `streamlit run app.py`, a script a
+   scheduler runs) carries the marker. Both are read exactly; the check never
+   guesses from what the code does. Anything else is a library module and
+   belongs in the package. `setup.py` and `noxfile.py` are exempt. The marker
+   is a declaration, so it goes on real launchers only, never on a module to
+   wave it through.
 3. **At most 3 root entry points** (`--max-root-scripts` changes the limit when
    a repository genuinely ships more launchers; record why in its CLAUDE.md).
 4. **A launcher stays thin** *(judgement)*: parse arguments, call into the
@@ -55,10 +59,16 @@ Rules, each one checked by `layout_check.py` unless marked *(judgement)*:
 5. **Generated output never lands in the root** *(judgement)*: reports, logs,
    exports go to an `output/` (gitignored) or a user-chosen path.
 
-Use a plain `<app>/` package, not `src/<app>/`, for a tool users run from a
-checkout: `python <app>.py` then imports it with no install step. Switch to
-`src/` only when the project is installed as a distribution
-(`pip install .`).
+For a new tool, use a plain `<app>/` package, not `src/<app>/`: users run it
+from a checkout, and `python <app>.py` then imports it with no install step.
+Use `src/` when the project is installed as a distribution (`pip install .`).
+
+**Keep an established source layout.** The rule is about the root, not the
+shape of the package. A repository that already keeps its modules under
+`src/` (as a package, or flat with `src/` on `PYTHONPATH`) keeps that layout;
+new modules go where the existing ones are. Migrating a repository from one
+source layout to another is a separate, explicitly requested change, never a
+side effect of adding a file.
 
 ## Making tests find the package
 

@@ -454,9 +454,10 @@ tooling in `scripts/`. When a change adds a Python file, test or module, or
 restructures the repository, follow `.claude/skills/repo-layout/SKILL.md`.
 
 - `python3 scripts/layout_check.py` is the verdict: a test file or test
-  directory in the root, a root `.py` that has no
-  `if __name__ == "__main__":` guard and is not a Streamlit app (a library
-  module), or more than three root entry points fails it. Run it before
+  directory in the root, a root `.py` that has neither an
+  `if __name__ == "__main__":` guard nor a `# layout: entry-point` comment in
+  its first lines (a library module; a Streamlit app declares itself with the
+  marker), or more than three root entry points fails it. Run it before
   reporting done; reviewers run the script rather than judging the tree by eye.
 - Moving existing files is a restructure, not a typo fix: `git mv` to keep
   history, fix every import and path, and prove the test suite still collects
