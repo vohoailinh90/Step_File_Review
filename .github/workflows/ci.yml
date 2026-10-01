@@ -53,6 +53,11 @@ jobs:
       - name: viewer.html is a faithful build of src/
         run: python build.py --check
 
+      - name: Repository layout check
+        # Root holds only entry-point launchers; tests in tests/, modules in the
+        # package. See .claude/skills/repo-layout/SKILL.md.
+        run: python scripts/layout_check.py
+
       - name: Repo and product invariants
         run: python tests/check_invariants.py
 
