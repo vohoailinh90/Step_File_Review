@@ -31,7 +31,8 @@ Errors (exit 1):
     and noxfile.py are tool files and exempt
   - a root .py that cannot be read or parsed: a broken link, unreadable,
     undecodable in its declared encoding, or a syntax error
-  - more root entry points than --max-root-scripts (default 3): the user still
+  - more Python entry points (.py/.pyw) in the root than --max-root-scripts
+    (default 3; .bat/.sh shortcuts are not counted): the user still
     cannot tell which one to run -> keep the launchers, move the rest
 
 Usage:
@@ -55,6 +56,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MAX_ROOT_SCRIPTS = 3
 TEST_DIR = "tests"
+# .pyw is a Windows GUI script (pythonw), as runnable from the root as .py.
+PYTHON_SUFFIXES = frozenset({".py", ".pyw"})
 # Python tooling reads these from the root by name and they carry no main guard.
 TOOL_ENTRY_POINTS = frozenset({"setup.py", "noxfile.py"})
 # `# layout: entry-point` in the first lines declares a root launcher outright.
@@ -137,12 +140,13 @@ def check(root: Path, max_root_scripts: int) -> list[str]:
             if name != TEST_DIR and is_test_name(name):
                 errors.append(f"{name}/: test directory in the root -> move it under {TEST_DIR}/")
             continue
-        if path.suffix != ".py":
+        # Case-folded: Windows runs helper.PY as readily as helper.py.
+        if path.suffix.lower() not in PYTHON_SUFFIXES:
             continue
         if is_test_name(path.stem):
             errors.append(f"{name}: test file in the root -> move it to {TEST_DIR}/")
             continue
-        if name in TOOL_ENTRY_POINTS:
+        if name.lower() in TOOL_ENTRY_POINTS:
             continue
         try:
             # Bytes, not text: the parser then honours a UTF-8 BOM and a coding

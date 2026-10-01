@@ -448,8 +448,8 @@ tier model or add roles beyond `.claude/agents/` without being asked.
 ## Repository layout
 
 The repository root holds only what a user needs to run the app: README and
-the agent instruction files, dependency files, and at most three entry-point
-launchers. Tests go in `tests/`, the app's modules in its package, developer
+the agent instruction files, dependency files, and at most three Python entry-point
+launchers (a `.bat`/`.sh` shortcut that starts one is not counted). Tests go in `tests/`, the app's modules in its package, developer
 tooling in `scripts/`. When a change adds a Python file, test or module, or
 restructures the repository, follow `.claude/skills/repo-layout/SKILL.md`.
 
@@ -457,7 +457,7 @@ restructures the repository, follow `.claude/skills/repo-layout/SKILL.md`.
   directory in the root, a root `.py` that has neither an
   `if __name__ == "__main__":` guard nor a `# layout: entry-point` comment in
   its first lines (a library module; a Streamlit app declares itself with the
-  marker), or more than three root entry points fails it. Run it before
+  marker), or more than three Python entry points in the root fails it. Run it before
   reporting done; reviewers run the script rather than judging the tree by eye.
 - Moving existing files is a restructure, not a typo fix: `git mv` to keep
   history, fix every import and path, and prove the test suite still collects
