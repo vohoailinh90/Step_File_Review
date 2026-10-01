@@ -18,7 +18,9 @@ name glued together without a boundary (`runtests.py`) is not caught.
 
 Errors (exit 1):
   - a test file in the root: test_*.py, *_test.py, conftest.py, or any .py
-    whose name has a `test`/`tests` word (run_tests_sample.py) -> tests/
+    whose name has a `test`/`tests` word (run_tests_sample.py), or a
+    JavaScript/TypeScript file named the same way or as a spec (x.test.mjs,
+    test-x.js, x_test.js, test.js, app.spec.ts) -> tests/
   - a test directory in the root other than tests/ (test_support/, testdata/)
     -> under tests/
   - a root .py that is neither an entry point nor a tool file: a library
@@ -58,6 +60,13 @@ DEFAULT_MAX_ROOT_SCRIPTS = 3
 TEST_DIR = "tests"
 # .pyw is a Windows GUI script (pythonw), as runnable from the root as .py.
 PYTHON_SUFFIXES = frozenset({".py", ".pyw"})
+# JavaScript/TypeScript files. Tests live in tests/ whatever the language, so a
+# root JS/TS file named like a test fails; any other JS/TS file is not checked.
+JS_SUFFIXES = frozenset({".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"})
+# Jest/Vitest's `.spec.` segment; `test` as a word is covered by is_test_name,
+# which with node --test's patterns (test.js, test-x.js, x-test.js, x_test.js,
+# x.test.js) splits on `-`, `_` and `.` exactly like the Python names.
+JS_SPEC_SEGMENT = re.compile(r"(^|[._-])spec([._-]|$)", re.IGNORECASE)
 # Python tooling reads these from the root by name and they carry no main guard.
 TOOL_ENTRY_POINTS = frozenset({"setup.py", "noxfile.py"})
 # `# layout: entry-point` in the first lines declares a root launcher outright.
@@ -139,6 +148,9 @@ def check(root: Path, max_root_scripts: int) -> list[str]:
             # and is skipped, unless it is named like a test directory.
             if name != TEST_DIR and is_test_name(name):
                 errors.append(f"{name}/: test directory in the root -> move it under {TEST_DIR}/")
+            continue
+        if path.suffix.lower() in JS_SUFFIXES and (is_test_name(path.stem) or JS_SPEC_SEGMENT.search(path.stem)):
+            errors.append(f"{name}: test file in the root -> move it to {TEST_DIR}/")
             continue
         # Case-folded: Windows runs helper.PY as readily as helper.py.
         if path.suffix.lower() not in PYTHON_SUFFIXES:

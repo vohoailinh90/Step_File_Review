@@ -39,7 +39,9 @@ produces, not who performs it: it adds no role and raises no rubric dimension.
 Rules, each one checked by `layout_check.py` unless marked *(judgement)*:
 
 1. **Tests live in `tests/`.** `test_*.py`, `*_test.py`, `conftest.py`, and
-   anything named like a test (`run_tests_sample.py`) never sit in the root.
+   anything named like a test (`run_tests_sample.py`), and JavaScript/TypeScript
+   tests (`x.test.mjs`, `test-x.js`, `x_test.js`, `test.js`, `app.spec.ts`) never
+   sit in the root.
    Test helper directories go under `tests/` (`tests/support/`), never a root
    `test_support/`.
 2. **A root `.py` (or `.pyw`, any letter case) is an entry point** when it has a top-level
