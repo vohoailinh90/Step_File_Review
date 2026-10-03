@@ -21,6 +21,7 @@ t5 also needs the Python that runs `stepview.py`, with `cascadio` installed. t6 
 node run.js              all tests
 node run.js t2 t18       only these
 node run.js -v t13       stream the test's own output
+node run.js --strict     a skipped test fails the run too (what CI runs)
 ```
 
 `run.js` does the following:
@@ -29,9 +30,13 @@ node run.js -v t13       stream the test's own output
 - serves that page and `models/` on a free loopback port;
 - runs each test in its own Node process and prints one line per test, then a summary.
 
-Each test's full output goes to `out/<test>.log`, with its screenshots alongside. The exit code is 1 if anything failed. A test fails when it prints a line starting with `FAIL`, reports `N FAILURES`, or exits non-zero.
+Each test's full output goes to `out/<test>.log`, with its screenshots alongside. The exit code is 1 if anything failed. A test fails when it prints a line starting with `FAIL`, reports `N FAILURES`, exits non-zero, or the page throws an uncaught error. With `--strict`, a skipped test fails the run as well.
 
 On Windows, run the same commands in PowerShell or `cmd`. To pick the Python used for t5, set `PYTHON`, e.g. `set PYTHON=C:\Python312\python.exe`. Without it, `run.js` tries `python`, `python3` and `py`, and uses the first one that can import `cascadio`.
+
+## In CI
+
+The `browser` job in `.github/workflows/ci.yml` runs `node run.js --strict` on `windows-latest`, on every push and pull request. It installs `cascadio numpy` exactly as README.md tells users to, so t5 converts a real STEP file. It also installs `build123d` and runs `python tools/make_models.py --big-only` so that t6 and t7 have their 401-part model. With both installed, nothing may skip. Each run's `out/` folder, with logs and screenshots, is kept as the `browser-tests-out` artifact.
 
 ## The tests
 

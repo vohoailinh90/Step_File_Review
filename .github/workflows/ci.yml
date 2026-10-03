@@ -101,3 +101,61 @@ jobs:
           python-version: "3.13"
       - run: python -m pip install cascadio numpy
       - run: python stepview.py --check
+
+  # The end-to-end tests: the built viewer.html in headless Chromium, on fixture
+  # models of known dimensions (tests/browser/README.md) -- the only check here
+  # that renders. Windows only, because that is where the viewer is used and
+  # where a rendering, path or process difference would matter.
+  #
+  # --strict turns a SKIP into a failure. Locally t5 skips without cascadio and
+  # t6/t7 without the generated 401-part model; here both are installed, so a
+  # skip would mean a test silently stopped running.
+  browser:
+    name: browser tests (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The engine as README.md installs it (cascadio numpy), so t5 converts a
+      # STEP file through stepview.py's real /convert endpoint, plus build123d,
+      # which only builds the 401-part fixture for t6/t7 -- a test dependency,
+      # never the launcher's, pinned so a release cannot change the fixture. One line on purpose: the engine job's install line
+      # must stay the only copy of README's, or the mutation that guards it
+      # (product/ci-engine-job-tests-another-install) cannot tell them apart.
+      - run: python -m pip install cascadio numpy build123d==0.13.0
+
+      - name: Build the 401-part model
+        working-directory: tests/browser
+        run: python tools/make_models.py --big-only
+
+      # No package.json (CLAUDE.md): --no-save installs without writing one.
+      # Two steps, not one multi-line run: pwsh reports only the last command's
+      # exit code, so a failed npm install would otherwise pass here.
+      - name: Install Playwright
+        working-directory: tests/browser
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+
+      - name: Install Chromium for Playwright
+        working-directory: tests/browser
+        run: npx playwright install chromium
+
+      - name: Browser tests
+        working-directory: tests/browser
+        run: node run.js --strict
+
+      - name: Keep the logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-tests-out
+          path: tests/browser/out/
+          if-no-files-found: ignore
