@@ -126,8 +126,8 @@ Tests need no `cascadio` and no pip install; the geometry tests need `node`.
 `tests/browser` holds end-to-end tests that drive the real `viewer.html` in
 headless Chromium on models with known dimensions: measurements, explode,
 section caps, edge picking and, with `cascadio` installed, a STEP conversion
-through `stepview.py`. They need Node and Playwright and are not part of CI; see
-[tests/browser/README.md](tests/browser/README.md).
+through `stepview.py`. They need Node and Playwright, and CI runs them on
+Windows; see [tests/browser/README.md](tests/browser/README.md).
 
 `CLAUDE.md` has the full map, the pinned-API notes and the review policy.
 

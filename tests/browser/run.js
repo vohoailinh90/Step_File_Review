@@ -3,6 +3,7 @@
 //   node run.js              all tests
 //   node run.js t2 t18       only these
 //   node run.js -v ...       stream each test's full output
+//   node run.js --strict     a SKIP fails the run too (CI uses this: nothing may go untested)
 //
 // It builds www/viewer_test.html (viewer.html plus a window.__qs debug handle), serves it with
 // the test models on a free loopback port, and runs each test in its own Node process.
@@ -103,20 +104,27 @@ function findPython(){
   return null;
 }
 
+// everything the server prints -- [convert] lines, a traceback -- is kept in out/stepview.log
+const STEPVIEW_LOG = path.join(OUT, 'stepview.log');
 function startStepview(py, page){
   const cache = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qs-test-cache-'));
-  const proc = cp.spawn(py, [path.join(DIR, 'tools', 'serve_stepview.py'), page, cache], {stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true});
+  fs.writeFileSync(STEPVIEW_LOG, '');
+  // -u: unbuffered, so the log is complete even when the server is killed
+  const proc = cp.spawn(py, ['-u', path.join(DIR, 'tools', 'serve_stepview.py'), page, cache], {stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true});
+  proc.stderr.on('data', d => fs.appendFileSync(STEPVIEW_LOG, d));
   return new Promise((ok, fail) => {
     let buf = '';
-    const t = setTimeout(() => fail(new Error('stepview.py did not start')), 30000);
+    const t = setTimeout(() => fail(new Error('stepview.py did not start; see out/stepview.log')), 30000);
     proc.stdout.on('data', d => {
+      fs.appendFileSync(STEPVIEW_LOG, d);
       buf += d;
       const m = buf.match(/port (\d+)/);
-      if (m){ clearTimeout(t); ok({port: m[1], stop(){ proc.stdin.end(); proc.kill(); try { fs.rmSync(cache, {recursive: true, force: true}); } catch {} }}); }
+      if (m){ clearTimeout(t); ok({port: m[1], stop(){ proc.kill(); try { fs.rmSync(cache, {recursive: true, force: true}); } catch {} }}); }
     });
-    proc.on('exit', c => { clearTimeout(t); fail(new Error('stepview.py exited with ' + c)); });
+    proc.on('exit', c => { clearTimeout(t); fail(new Error('stepview.py exited with ' + c + '; see out/stepview.log')); });
   });
 }
+const logTail = (file, n) => { try { return fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).slice(-n); } catch { return []; } };
 
 function runTest(file, args, env, verbose){
   return new Promise(ok => {
@@ -130,7 +138,8 @@ function runTest(file, args, env, verbose){
 }
 
 (async () => {
-  const argv = process.argv.slice(2), verbose = argv.includes('-v'), only = argv.filter(a => a !== '-v');
+  const argv = process.argv.slice(2), verbose = argv.includes('-v'), strict = argv.includes('--strict');
+  const only = argv.filter(a => a !== '-v' && a !== '--strict');
   const tests = only.length ? TESTS.filter(([n]) => only.includes(n.split(' ')[0])) : TESTS;
   if (!tests.length){ console.error('no test matches: ' + only.join(' ')); process.exit(2); }
   try { require.resolve('playwright', {paths: [DIR, ...(process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean)]}); }
@@ -169,10 +178,12 @@ function runTest(file, args, env, verbose){
     console.log(`${status.padEnd(5)} ${name.padEnd(9)} ${((Date.now() - t0) / 1000).toFixed(1).padStart(5)} s  ${note}`);
     if (status === 'FAIL' && !verbose) fails.forEach(l => console.log('        ' + l));
     if (status === 'ERROR' && !verbose) console.log(r.out.split(/\r?\n/).slice(-8).map(l => '        ' + l).join('\n'));
+    if (name === 't5' && status !== 'PASS') console.log(['        out/stepview.log:', ...logTail(STEPVIEW_LOG, 60).map(l => '          ' + l)].join('\n'));
   }
   if (stepview) stepview.stop();
   server.close();
   const n = s => results.filter(r => r[1] === s).length;
   console.log(`\n${n('PASS')} passed, ${n('FAIL')} failed, ${n('ERROR')} errors, ${n('SKIP')} skipped`);
-  process.exit(n('FAIL') || n('ERROR') ? 1 : 0);
+  if (strict && n('SKIP')) console.log('--strict: a skipped test is a failure here; install what the SKIP line names');
+  process.exit(n('FAIL') || n('ERROR') || (strict && n('SKIP')) ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });
