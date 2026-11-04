@@ -25,6 +25,15 @@ const {launch, openModel, check} = L;
   t = await triad();
   check('from the top Z lies along the screen and shows blue', t.n.b > 20, /^true$/);
 
+  // no letter or line may be cut off by the canvas: the outermost ring of pixels stays empty in every view
+  const edgePixels = () => pg.evaluate(() => { const c = document.getElementById('axes'), w = c.width, h = c.height;
+    const d = c.getContext('2d').getImageData(0, 0, w, h).data; let n = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x === 0 || y === 0 || x === w - 1 || y === h - 1) && d[(y * w + x) * 4 + 3] > 0) n++;
+    return n; });
+  for (const v of ['front', 'top', 'right', 'iso']){
+    await pg.click('[data-view="' + v + '"]'); await settle(); await pg.waitForTimeout(100);
+    check('triad not clipped by its canvas in the ' + v + ' view', String(await edgePixels()), /^0$/);
+  }
   await pg.click('[data-view="front"]'); await settle();
   for (let i = 0; i < 6; i++) await pg.keyboard.press('ArrowDown');
   await settle();
