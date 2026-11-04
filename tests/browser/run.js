@@ -25,6 +25,7 @@ const TESTS = [
   ['t12', 't12_codex3.js'], ['t13', 't13_codex5.js'], ['t14', 't14_codex6.js'], ['t15', 't15_codex7.js'],
   ['t16', 't16_codex8.js'], ['t17', 't17_codex9.js'], ['t18', 't18_codex10.js'], ['t19', 't19_codex11.js'],
   ['t20', 't20_orbit_move.js'],
+  ['t21', 't21_axes_arrows.js'],
 ];
 const REPORT_ONLY = new Set(['t1', 't6']);         // print figures, assert nothing
 

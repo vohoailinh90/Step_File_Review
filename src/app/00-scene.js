@@ -44,7 +44,7 @@ function resize(){
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
-renderer.setAnimationLoop(()=>{ orbitStep(); controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
+renderer.setAnimationLoop(()=>{ orbitStep(); controls.update(); renderer.render(scene, camera); drawAnnotLive(); drawAxes(); });
 
 // ── Framing ──────────────────────────────────────────────────
 function computeBBox(){

@@ -107,6 +107,8 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #measurepanel .hint{font-family:var(--sans);color:var(--dim);line-height:1.5;margin-top:6px}
 #annot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
 
+#axes{position:absolute;left:8px;bottom:8px;width:110px;height:110px;pointer-events:none;z-index:1}
+
 #spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(17,19,24,.55);z-index:10;font-family:var(--mono);color:var(--accent)}
 #spin.show{display:flex}
 #toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:7px 14px;border-radius:5px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20;max-width:70%}
