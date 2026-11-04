@@ -115,6 +115,8 @@ select.btn option{background:var(--panel2);color:var(--txt)}
 #measurepanel .hint{font-family:var(--sans);color:var(--dim);line-height:1.5;margin-top:6px}
 #annot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
 
+#axes{position:absolute;left:8px;bottom:8px;width:110px;height:110px;pointer-events:none;z-index:1}
+
 #spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(17,19,24,.55);z-index:10;font-family:var(--mono);color:var(--accent)}
 #spin.show{display:flex}
 #toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:7px 14px;border-radius:5px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20;max-width:70%}
@@ -179,6 +181,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
     <div id="viewport">
       <canvas id="canvas3d"></canvas>
       <canvas id="annot"></canvas>
+      <canvas id="axes" aria-label="Axes X, Y, Z"></canvas>
 
       <div id="info"></div>
 
@@ -286,7 +289,7 @@ select.btn option{background:var(--panel2);color:var(--txt)}
     <span>bbox <b id="stBbox">–</b></span>
     <span id="unitToggle" style="cursor:pointer" title="Click if the scale looks wrong">units <b id="stUnits">mm</b></span>
     <span class="spacer"></span>
-    <span id="hintbar">LMB rotate · RMB pan · wheel zoom · click to select · H hide · I isolate · M measure</span>
+    <span id="hintbar">LMB or ←↑↓→ rotate · RMB pan · wheel zoom · click to select · H hide · I isolate · M measure</span>
   </div>
 </div>
 
@@ -5677,7 +5680,7 @@ function resize(){
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
-renderer.setAnimationLoop(()=>{ orbitStep(); controls.update(); renderer.render(scene, camera); drawAnnotLive(); });
+renderer.setAnimationLoop(()=>{ orbitStep(); controls.update(); renderer.render(scene, camera); drawAnnotLive(); drawAxes(); });
 
 // ── Framing ──────────────────────────────────────────────────
 function computeBBox(){
@@ -5761,6 +5764,19 @@ function orbitStep(){
   orbitDX -= dx; orbitDY -= dy;
   orbitBy(dx, dy);
 }
+// The arrow keys turn the model as a drag would, ARROW_STEP at a press (held down, they repeat). Left and
+// right turn it sideways, up and down tip it; a modifier is left to the browser, and so are the fields.
+const ARROW_STEP = 15 * Math.PI / 180;
+const ARROW_DRAG = {ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1]};
+window.addEventListener('keydown', e => {
+  const d = ARROW_DRAG[e.key];
+  if (!d || !controls.enabled || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
+  e.preventDefault();                                // the page must not scroll under the view
+  const px = ARROW_STEP / ORBIT_TURN * (canvas.clientHeight || 1);
+  orbitDX += d[0] * px; orbitDY += d[1] * px;        // eased in by orbitStep(), like a drag
+});
 function orbitStop(){ orbitDX = orbitDY = 0; }       // a view set outright ends any coasting turn
 // ── Load ─────────────────────────────────────────────────────
 const gltfLoader = new THREE.GLTFLoader(), stlLoader = new THREE.STLLoader();
@@ -8155,6 +8171,39 @@ if (modelUrl){
     .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
     .then(buf=>loadArrayBuffer(buf, params.get('name') || modelUrl.split('/').pop()))
     .catch(fail);
+}
+// ── Axis triad ───────────────────────────────────────────────
+// X (red), Y (green), Z (blue) of the world, drawn in the lower-left corner of the view on a canvas of its
+// own, so it turns with the camera but is not part of a screenshot. World axes: the model is not moved.
+const axesCanvas = $('axes');
+const AXES = [
+  {name:'X', v:new THREE.Vector3(1, 0, 0), color:'#ff3b30'},
+  {name:'Y', v:new THREE.Vector3(0, 1, 0), color:'#34d13c'},
+  {name:'Z', v:new THREE.Vector3(0, 0, 1), color:'#2f6bff'}
+];
+const _aq = new THREE.Quaternion(), _av = new THREE.Vector3();
+function drawAxes(){
+  if (!axesCanvas || !axesCanvas.getContext) return;
+  const ctx = axesCanvas.getContext('2d');
+  if (!ctx || !ctx.clearRect) return;
+  const css = axesCanvas.clientWidth || 110, dpr = renderer.getPixelRatio();
+  if (axesCanvas.width !== Math.round(css * dpr)){ axesCanvas.width = axesCanvas.height = Math.round(css * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, css, css);
+  const o = css * 0.42, len = css * 0.34;                    // origin sits low and left so the labels stay inside
+  _aq.copy(camera.quaternion).invert();                      // world -> camera orientation
+  const pts = AXES.map(a => {
+    _av.copy(a.v).applyQuaternion(_aq);                      // x right, y up, z toward the viewer
+    return {a, x:o + _av.x * len, y:css - o - _av.y * len, z:_av.z};
+  }).sort((p, q) => p.z - q.z);                              // far axes first, so near ones draw over them
+  ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const p of pts){
+    ctx.strokeStyle = ctx.fillStyle = p.a.color;
+    ctx.beginPath(); ctx.moveTo(o, css - o); ctx.lineTo(p.x, p.y); ctx.stroke();
+    const dx = p.x - o, dy = p.y - (css - o), d = Math.hypot(dx, dy) || 1;
+    ctx.fillText(p.a.name, p.x + dx / d * 9, p.y + dy / d * 9);   // the letter sits just past the tip
+  }
 }
 })();
 </script>

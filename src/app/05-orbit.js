@@ -53,4 +53,17 @@ function orbitStep(){
   orbitDX -= dx; orbitDY -= dy;
   orbitBy(dx, dy);
 }
+// The arrow keys turn the model as a drag would, ARROW_STEP at a press (held down, they repeat). Left and
+// right turn it sideways, up and down tip it; a modifier is left to the browser, and so are the fields.
+const ARROW_STEP = 15 * Math.PI / 180;
+const ARROW_DRAG = {ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1]};
+window.addEventListener('keydown', e => {
+  const d = ARROW_DRAG[e.key];
+  if (!d || !controls.enabled || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
+  e.preventDefault();                                // the page must not scroll under the view
+  const px = ARROW_STEP / ORBIT_TURN * (canvas.clientHeight || 1);
+  orbitDX += d[0] * px; orbitDY += d[1] * px;        // eased in by orbitStep(), like a drag
+});
 function orbitStop(){ orbitDX = orbitDY = 0; }       // a view set outright ends any coasting turn
