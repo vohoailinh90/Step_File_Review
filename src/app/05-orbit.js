@@ -2,14 +2,19 @@
 // Left-drag turns the model with no end stop. OrbitControls stopped the camera dead at its poles:
 // a drag up or down froze once the view looked straight down or up, however far the mouse went.
 // It keeps pan and zoom; turning is done here, the way it turned everywhere else — sideways about
-// the vertical (Y) like a turntable, up and down about the screen's horizontal — but straight on
+// the vertical like a turntable, up and down about the screen's horizontal — but straight on
 // over the top. Past it the model is upside down, and a sideways drag still carries its near side
 // with the cursor. One canvas height of drag is one full turn, eased by the controls' damping.
+// "The vertical" is the world axis (X, Y or Z) that points most nearly up the screen, picked when a drag or a
+// key turn begins and kept until it ends: Y in the standard views, Z once Z is up the screen, however the
+// view looks — straight along Y too, where a sideways drag then spins about the upright Z, not about the line of sight.
 const ORBIT_TURN = 2 * Math.PI;                      // radians per canvas height of drag, as OrbitControls
 const _Y = new THREE.Vector3(0, 1, 0), _oo = new THREE.Vector3(), _ox = new THREE.Vector3();
 const _oq = new THREE.Quaternion(), _oq2 = new THREE.Quaternion(), _Z = new THREE.Vector3(0, 0, 1);
 let orbitDrag = null, orbitDX = 0, orbitDY = 0;      // the pointer turning the view; drag (px) not yet applied
 let orbitDZ = 0;                                     // turn about the world Z axis (radians) not yet applied
+const _ou = new THREE.Vector3(), orbitPivot = new THREE.Vector3(0, 1, 0);   // the axis a sideways turn is about
+let orbitFlip = 1;                                   // -1 while the pivot points down the screen: the sideways turn reverses
 controls.enableRotate = false;
 
 canvas.addEventListener('pointerdown', e => {
@@ -17,6 +22,7 @@ canvas.addEventListener('pointerdown', e => {
   const mod = e.ctrlKey || e.metaKey || e.shiftKey;                            // as OrbitControls: a modifier swaps the buttons
   if (orbitDrag || !controls.enabled || !(e.pointerType === 'touch' ? e.isPrimary : e.button === (mod ? 2 : 0))) return;
   orbitDrag = {id:e.pointerId, x:e.clientX, y:e.clientY};
+  orbitPickPivot();
 });
 canvas.addEventListener('pointermove', e => {
   if (!orbitDrag || e.pointerId !== orbitDrag.id) return;
@@ -28,6 +34,18 @@ const orbitEnd = e => { if (orbitDrag && e.pointerId === orbitDrag.id) orbitDrag
 canvas.addEventListener('pointerup', orbitEnd);
 canvas.addEventListener('pointercancel', orbitEnd);
 
+// Choose the axis a sideways turn is about: the world axis most nearly up the screen, Y on a tie.
+function orbitPickPivot(){
+  orbitFlip = 1;                                     // a new turn starts the usual way up
+  _oo.subVectors(camera.position, controls.target);
+  if (!(_oo.length() > 0)){ orbitPivot.copy(_Y); return; }
+  _oo.normalize();
+  _ox.crossVectors(camera.up, _oo);                  // the screen's right, as lookAt() builds it
+  if (_ox.lengthSq() < 1e-20) _ox.setFromMatrixColumn(camera.matrixWorld, 0);
+  _ou.crossVectors(_oo, _ox.normalize());            // the screen's up
+  const x = Math.abs(_ou.x), y = Math.abs(_ou.y), z = Math.abs(_ou.z);
+  if (z > y + 1e-9 && z >= x) orbitPivot.copy(_Z); else if (x > y + 1e-9) orbitPivot.set(1, 0, 0); else orbitPivot.copy(_Y);
+}
 // Turn the camera about the target for a drag of dx, dy px (right and down are positive).
 function orbitBy(dx, dy){
   _oo.subVectors(camera.position, controls.target);
@@ -38,8 +56,10 @@ function orbitBy(dx, dy){
   if (_ox.lengthSq() < 1e-20) _ox.setFromMatrixColumn(camera.matrixWorld, 0);
   _ox.normalize();
   camera.up.crossVectors(_oo, _ox);                  // the screen's up, square to the view: it turns with it
-  const flip = camera.up.y < 0 ? -1 : 1;             // upside down, turn the other way: the model follows the cursor
-  _oq.setFromAxisAngle(_Y, -flip * ORBIT_TURN * dx / h).multiply(_oq2.setFromAxisAngle(_ox, -ORBIT_TURN * dy / h));
+  const d = camera.up.dot(orbitPivot);               // upside down (d < 0) the sideways turn reverses: the model follows the cursor
+  if (Math.abs(d) > 1e-3) orbitFlip = d < 0 ? -1 : 1;  // looking along the pivot d is rounding noise (1e-21) whose sign
+                                                     // flipped the turn every frame: then it keeps the sense it had
+  _oq.setFromAxisAngle(orbitPivot, -orbitFlip * ORBIT_TURN * dx / h).multiply(_oq2.setFromAxisAngle(_ox, -ORBIT_TURN * dy / h));
   _oo.applyQuaternion(_oq).multiplyScalar(r);
   camera.up.applyQuaternion(_oq);
   camera.position.copy(controls.target).add(_oo);
@@ -79,6 +99,7 @@ window.addEventListener('keydown', e => {
   if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
   e.preventDefault();                                // the page must not scroll under the view
   if (e.shiftKey){ orbitDZ += d[0] * ARROW_STEP; return; }
+  if (!orbitDX && !orbitDY) orbitPickPivot();
   const px = ARROW_STEP / ORBIT_TURN * (canvas.clientHeight || 1);
   orbitDX += d[0] * px; orbitDY += d[1] * px;        // eased in by orbitStep(), like a drag
 });

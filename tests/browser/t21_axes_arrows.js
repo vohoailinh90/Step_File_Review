@@ -62,6 +62,35 @@ const {launch, openModel, check} = L;
   await shiftArrow('ArrowUp'); await settle();
   check('Shift+Up does nothing', JSON.stringify(await cam()), /^\{"at":\[0,0,1\],"up":\[0,1,0\]\}$/);
 
+  // The mouse: with Z up the screen, a sideways drag spins the model about Z (it used to roll it about Y)
+  const rect = await pg.evaluate(() => { const b = document.getElementById('canvas3d').getBoundingClientRect(); return {x:b.left + b.width / 2, y:b.top + b.height / 2, h:b.height}; });
+  const dragRight = async frac => { await pg.mouse.move(rect.x, rect.y); await pg.mouse.down();
+    for (let i = 1; i <= 20; i++) await pg.mouse.move(rect.x + rect.h * frac * i / 20, rect.y);
+    await pg.mouse.up(); await settle(); };
+  await pg.evaluate(() => { const c = __qs.camera, t = __qs.controls.target; c.up.set(0, 0, 1);
+    c.position.set(t.x - 5 * __qs.modelSize, t.y, t.z); c.lookAt(t); __qs.controls.update(); });
+  await settle();
+  check('Z up the screen, camera behind X', JSON.stringify(await cam()), /^\{"at":\[-1,0,0\],"up":\[0,0,1\]\}$/);
+  await dragRight(0.25);
+  check('a drag right a quarter turn spins about Z: the camera goes round to Y, Z stays up', JSON.stringify(await cam()), /^\{"at":\[0,1,0\],"up":\[0,0,1\]\}$/);
+  await pg.click('[data-view="front"]'); await settle();
+  await dragRight(0.25);
+  check('in the front view a drag right still spins about Y', JSON.stringify(await cam()), /^\{"at":\[-1,0,0\],"up":\[0,1,0\]\}$/);
+  await pg.click('[data-view="front"]'); await settle();
+
+  // Looking along Y, as in the user's view with Z up the screen (and in Top / Bottom): a sideways drag spins
+  // the model about the upright Z. It used to follow the sign of rounding noise and swing to and fro
+  for (const [at, up] of [[[0, 1, 0.0001], [0, 0, 1]], [[0, -1, 0.0001], [0, 0, 1]], [[0, 1, 0.0001], [1, 0, 0]]]){
+    await pg.evaluate(([at, up]) => { const c = __qs.camera, t = __qs.controls.target, s = 5 * __qs.modelSize;
+      c.up.set(...up); c.position.set(t.x + at[0] * s, t.y + at[1] * s, t.z + at[2] * s); c.lookAt(t); __qs.controls.update(); }, [at, up]);
+    await settle();
+    const a = await cam();
+    await dragRight(0.1);
+    const b = await cam(), dAt = Math.hypot(...a.at.map((x, k) => x - b.at[k])), dUp = Math.hypot(...a.up.map((x, k) => x - b.up[k]));
+    check('looking along Y (' + at + ', up ' + up + ') a drag of a tenth of a turn turns the view 36 deg', (dAt + dUp).toFixed(1), /^0\.6$/);
+  }
+  await pg.click('[data-view="front"]'); await settle();
+
   // fields keep their arrows: a focused slider must not turn the view
   await pg.keyboard.press('v');
   await pg.focus('#expAmount').catch(() => {});
