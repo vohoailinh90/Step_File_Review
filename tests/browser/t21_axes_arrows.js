@@ -78,6 +78,19 @@ const {launch, openModel, check} = L;
   check('in the front view a drag right still spins about Y', JSON.stringify(await cam()), /^\{"at":\[-1,0,0\],"up":\[0,1,0\]\}$/);
   await pg.click('[data-view="front"]'); await settle();
 
+  // Looking along Y (Top / Bottom, or straight down after a drag) a sideways drag must still turn the model:
+  // its sense used to follow rounding noise and the view swung to and fro instead
+  for (const at of [[0, 1, 0.0001], [0, -1, 0.0001]]){
+    await pg.evaluate(([at]) => { const c = __qs.camera, t = __qs.controls.target, s = 5 * __qs.modelSize;
+      c.up.set(1, 0, 0); c.position.set(t.x + at[0] * s, t.y + at[1] * s, t.z + at[2] * s); c.lookAt(t); __qs.controls.update(); }, [at]);
+    await settle();
+    const u0 = (await cam()).up;
+    await dragRight(0.1);
+    const u1 = (await cam()).up, moved = Math.hypot(...u0.map((x, k) => x - u1[k]));
+    check('looking along Y (' + at + ') a drag of a tenth of a turn turns the view 36 deg (up moves 0.62)', moved.toFixed(1), /^0\.6$/);
+  }
+  await pg.click('[data-view="front"]'); await settle();
+
   // fields keep their arrows: a focused slider must not turn the view
   await pg.keyboard.press('v');
   await pg.focus('#expAmount').catch(() => {});

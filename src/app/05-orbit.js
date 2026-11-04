@@ -14,6 +14,7 @@ const _oq = new THREE.Quaternion(), _oq2 = new THREE.Quaternion(), _Z = new THRE
 let orbitDrag = null, orbitDX = 0, orbitDY = 0;      // the pointer turning the view; drag (px) not yet applied
 let orbitDZ = 0;                                     // turn about the world Z axis (radians) not yet applied
 const _ou = new THREE.Vector3(), orbitPivot = new THREE.Vector3(0, 1, 0);   // the axis a sideways turn is about
+let orbitFlip = 1;                                   // -1 while the pivot points down the screen: the sideways turn reverses
 controls.enableRotate = false;
 
 canvas.addEventListener('pointerdown', e => {
@@ -35,6 +36,7 @@ canvas.addEventListener('pointercancel', orbitEnd);
 
 // Choose the axis a sideways turn is about: the world axis most nearly up the screen, Y on a tie.
 function orbitPickPivot(){
+  orbitFlip = 1;                                     // a new turn starts the usual way up
   _oo.subVectors(camera.position, controls.target);
   if (!(_oo.length() > 0) || Math.abs(_oo.y) > 0.95 * _oo.length()){ orbitPivot.copy(_Y); return; }  // along Y: the in-plane turn
   _oo.normalize();
@@ -54,8 +56,10 @@ function orbitBy(dx, dy){
   if (_ox.lengthSq() < 1e-20) _ox.setFromMatrixColumn(camera.matrixWorld, 0);
   _ox.normalize();
   camera.up.crossVectors(_oo, _ox);                  // the screen's up, square to the view: it turns with it
-  const flip = camera.up.dot(orbitPivot) < 0 ? -1 : 1;             // upside down, turn the other way: the model follows the cursor
-  _oq.setFromAxisAngle(orbitPivot, -flip * ORBIT_TURN * dx / h).multiply(_oq2.setFromAxisAngle(_ox, -ORBIT_TURN * dy / h));
+  const d = camera.up.dot(orbitPivot);               // upside down (d < 0) the sideways turn reverses: the model follows the cursor
+  if (Math.abs(d) > 1e-3) orbitFlip = d < 0 ? -1 : 1;  // looking along the pivot d is rounding noise (1e-21) whose sign
+                                                     // flipped the turn every frame: then it keeps the sense it had
+  _oq.setFromAxisAngle(orbitPivot, -orbitFlip * ORBIT_TURN * dx / h).multiply(_oq2.setFromAxisAngle(_ox, -ORBIT_TURN * dy / h));
   _oo.applyQuaternion(_oq).multiplyScalar(r);
   camera.up.applyQuaternion(_oq);
   camera.position.copy(controls.target).add(_oo);
