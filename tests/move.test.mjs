@@ -23,7 +23,7 @@ import { loadViewer, ROOT } from './harness.mjs';
 
 const MODULES = readdirSync(join(ROOT, 'src/app')).filter(f => f.endsWith('.js')).sort()
   .map(f => 'src/app/' + f);
-const v = loadViewer(MODULES, ['orbitBy', 'orbitStep', 'orbitZBy', 'axisFrom', 'axisName', 'moveTo', 'moveTyped',
+const v = loadViewer(MODULES, ['orbitBy', 'orbitStep', 'orbitZBy', 'orbitPickPivot', 'axisFrom', 'axisName', 'moveTo', 'moveTyped',
   'moveStep', 'axisParam', 'moveDragBegin', 'moveDragTo', 'pick', 'setExplode', 'topology',
   'faceEntity', 'relate', 'minDistance', 'renderMeasure'], { three: 'real' });
 const T = v.THREE;
@@ -115,6 +115,26 @@ test('a turn about the world Z axis spins the model clockwise seen from +Z, and 
     `from the side it swings about Z at a constant height along Z, got ${p}`);
   const f = run('camera.getWorldDirection(new THREE.Vector3()).dot(camera.position)');
   assert.ok(f < 0, 'and still looks at the target');
+});
+
+test('a sideways drag turns about the axis most nearly up the screen: Z once Z is upright', () => {
+  view([-5, 0, 0], [0, 0, 1]);                   // X toward the viewer's back, Y to the left, Z up
+  v.orbitPickPivot();
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 0, 1]), `Z is up the screen, got ${run('orbitPivot.toArray()')}`);
+  v.orbitBy(H / 4, 0);                           // a quarter turn to the right carries the near side with the cursor
+  assert.ok(near(at(), [0, 5, 0]), `the camera swings about Z to the screen's left, got ${at()}`);
+  assert.ok(near(up(), [0, 0, 1]), 'and Z stays up');
+  view([0, 0, 5]); v.orbitPickPivot();
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in the front view');
+  view([3, 2, 4]); v.orbitPickPivot();
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in an iso view');
+  view([0, 5, 0.0001], [0, 1, 0]); v.orbitPickPivot();
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in the Top view: the turn in the plane of the screen');
+  view([5, 0, 0], [0, 1, 0]); v.orbitPickPivot();
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in the Right view');
+  view([0, 0, 5], [1, 0, 0]); v.orbitPickPivot();
+  assert.ok(near(run('orbitPivot.toArray()'), [1, 0, 0]), 'X when X is up the screen');
+  run('orbitPivot.set(0, 1, 0)');
 });
 
 test('a turn about Z eases in with the damping and lands on exactly the angle asked', () => {
