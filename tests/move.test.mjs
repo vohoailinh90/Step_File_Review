@@ -23,7 +23,7 @@ import { loadViewer, ROOT } from './harness.mjs';
 
 const MODULES = readdirSync(join(ROOT, 'src/app')).filter(f => f.endsWith('.js')).sort()
   .map(f => 'src/app/' + f);
-const v = loadViewer(MODULES, ['orbitBy', 'orbitStep', 'axisFrom', 'axisName', 'moveTo', 'moveTyped',
+const v = loadViewer(MODULES, ['orbitBy', 'orbitStep', 'orbitZBy', 'axisFrom', 'axisName', 'moveTo', 'moveTyped',
   'moveStep', 'axisParam', 'moveDragBegin', 'moveDragTo', 'pick', 'setExplode', 'topology',
   'faceEntity', 'relate', 'minDistance', 'renderMeasure'], { three: 'real' });
 const T = v.THREE;
@@ -99,6 +99,33 @@ test('from any view a sideways drag keeps the model\'s vertical upright on scree
   run('camera.updateMatrixWorld()');
   assert.ok(Math.abs(run('new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).y')) < 1e-9,
     'the screen\'s horizontal stays level: no roll creeps in');
+});
+
+test('a turn about the world Z axis spins the model clockwise seen from +Z, and leaves the camera\'s Z alone', () => {
+  view([0, 0, 5]);                               // from the front the Z axis is the line of sight: an in-plane spin
+  v.orbitZBy(Math.PI / 2);
+  assert.ok(near(at(), [0, 0, 5]), `still looking along Z from the same place, got ${at()}`);
+  assert.ok(near(up(), [-1, 0, 0]), `+X is at the bottom of the screen: the model turned clockwise, got ${up()}`);
+  v.orbitZBy(-Math.PI / 2);
+  assert.ok(near(up(), [0, 1, 0]), `and back, got ${up()}`);
+  view([3, 2, 4]);
+  v.orbitZBy(0.7);
+  const p = at();
+  assert.ok(Math.abs(p[2] - 4) < 1e-9 && Math.abs(Math.hypot(p[0], p[1]) - Math.hypot(3, 2)) < 1e-9,
+    `from the side it swings about Z at a constant height along Z, got ${p}`);
+  const f = run('camera.getWorldDirection(new THREE.Vector3()).dot(camera.position)');
+  assert.ok(f < 0, 'and still looks at the target');
+});
+
+test('a turn about Z eases in with the damping and lands on exactly the angle asked', () => {
+  view([0, 0, 5]);
+  run('orbitDZ = Math.PI / 2;');
+  v.orbitStep();
+  const a = Math.PI / 2 * 0.12;
+  assert.ok(near(up(), [-Math.sin(a), Math.cos(a), 0], 1e-9), `the first frame turns 12 %, got ${up()}`);
+  let n = 1;
+  while (run('orbitDZ !== 0') && n < 1000){ v.orbitStep(); n++; }
+  assert.ok(n < 1000 && near(up(), [-1, 0, 0], 1e-9), `it comes to rest a quarter turn on, got ${up()}`);
 });
 
 test('the drag eases in with the damping, and lands on exactly the distance dragged', () => {
