@@ -5717,8 +5717,8 @@ $('btnFit').addEventListener('click', ()=> frame());
 // over the top. Past it the model is upside down, and a sideways drag still carries its near side
 // with the cursor. One canvas height of drag is one full turn, eased by the controls' damping.
 // "The vertical" is the world axis (X, Y or Z) that points most nearly up the screen, picked when a drag or a
-// key turn begins and kept until it ends: Y in the standard views, Z once Z is up the screen. Looking nearly
-// along Y (the Top view) it stays Y, the turn in the plane of the screen.
+// key turn begins and kept until it ends: Y in the standard views, Z once Z is up the screen, however the
+// view looks — straight along Y too, where a sideways drag then spins about the upright Z, not about the line of sight.
 const ORBIT_TURN = 2 * Math.PI;                      // radians per canvas height of drag, as OrbitControls
 const _Y = new THREE.Vector3(0, 1, 0), _oo = new THREE.Vector3(), _ox = new THREE.Vector3();
 const _oq = new THREE.Quaternion(), _oq2 = new THREE.Quaternion(), _Z = new THREE.Vector3(0, 0, 1);
@@ -5749,7 +5749,7 @@ canvas.addEventListener('pointercancel', orbitEnd);
 function orbitPickPivot(){
   orbitFlip = 1;                                     // a new turn starts the usual way up
   _oo.subVectors(camera.position, controls.target);
-  if (!(_oo.length() > 0) || Math.abs(_oo.y) > 0.95 * _oo.length()){ orbitPivot.copy(_Y); return; }  // along Y: the in-plane turn
+  if (!(_oo.length() > 0)){ orbitPivot.copy(_Y); return; }
   _oo.normalize();
   _ox.crossVectors(camera.up, _oo);                  // the screen's right, as lookAt() builds it
   if (_ox.lengthSq() < 1e-20) _ox.setFromMatrixColumn(camera.matrixWorld, 0);

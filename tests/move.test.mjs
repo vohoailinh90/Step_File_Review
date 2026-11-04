@@ -129,7 +129,11 @@ test('a sideways drag turns about the axis most nearly up the screen: Z once Z i
   view([3, 2, 4]); v.orbitPickPivot();
   assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in an iso view');
   view([0, 5, 0.0001], [0, 1, 0]); v.orbitPickPivot();
-  assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in the Top view: the turn in the plane of the screen');
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 0, 1]), 'Z in the Top view: the screen\'s up there is -Z, not the line of sight');
+  view([0, 5, 0], [0, 0, 1]); v.orbitPickPivot();                       // Z up, looking along Y, as the user's view
+  assert.ok(near(run('orbitPivot.toArray()'), [0, 0, 1]), 'Z when looking along Y with Z upright');
+  v.orbitBy(H / 4, 0);
+  assert.ok(near(at(), [5, 0, 0]) && near(up(), [0, 0, 1]), `a drag right spins about Z, not about the line of sight, got ${at()} up ${up()}`);
   view([5, 0, 0], [0, 1, 0]); v.orbitPickPivot();
   assert.ok(near(run('orbitPivot.toArray()'), [0, 1, 0]), 'Y in the Right view');
   view([0, 0, 5], [1, 0, 0]); v.orbitPickPivot();
@@ -137,11 +141,11 @@ test('a sideways drag turns about the axis most nearly up the screen: Z once Z i
   run('orbitPivot.set(0, 1, 0)');
 });
 
-test('looking along the pivot a sideways drag still turns the model, one way, however the rounding falls', () => {
-  // from the Top or Bottom view (looking along Y) up.y is rounding noise of either sign; its sign once decided
+test('with the pivot along the line of sight a sideways drag still turns the model, one way, whatever the rounding', () => {
+  // looking along Y with Y as the pivot, up.y is rounding noise of either sign; its sign once decided
   // the sense of the turn, so the model swung to and fro and a drag across the view went nowhere
   for (const [pos, u] of [[[0, 5, 0.0005], [1, 0, 0]], [[0, -5, 0.0005], [1, 0, 0]], [[0, 5, 0], [0, 0, -1]]]) {
-    view(pos, u); v.orbitPickPivot();
+    view(pos, u); run('orbitPivot.set(0, 1, 0); orbitFlip = 1;');         // the pivot along the line of sight, as can happen mid-drag
     const u0 = up();
     for (let i = 0; i < 10; i++) v.orbitBy(6, 0);      // ten steps: 36 deg in all
     const cos = up().reduce((a, x, k) => a + x * u0[k], 0);

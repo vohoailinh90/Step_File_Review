@@ -78,16 +78,16 @@ const {launch, openModel, check} = L;
   check('in the front view a drag right still spins about Y', JSON.stringify(await cam()), /^\{"at":\[-1,0,0\],"up":\[0,1,0\]\}$/);
   await pg.click('[data-view="front"]'); await settle();
 
-  // Looking along Y (Top / Bottom, or straight down after a drag) a sideways drag must still turn the model:
-  // its sense used to follow rounding noise and the view swung to and fro instead
-  for (const at of [[0, 1, 0.0001], [0, -1, 0.0001]]){
-    await pg.evaluate(([at]) => { const c = __qs.camera, t = __qs.controls.target, s = 5 * __qs.modelSize;
-      c.up.set(1, 0, 0); c.position.set(t.x + at[0] * s, t.y + at[1] * s, t.z + at[2] * s); c.lookAt(t); __qs.controls.update(); }, [at]);
+  // Looking along Y, as in the user's view with Z up the screen (and in Top / Bottom): a sideways drag spins
+  // the model about the upright Z. It used to follow the sign of rounding noise and swing to and fro
+  for (const [at, up] of [[[0, 1, 0.0001], [0, 0, 1]], [[0, -1, 0.0001], [0, 0, 1]], [[0, 1, 0.0001], [1, 0, 0]]]){
+    await pg.evaluate(([at, up]) => { const c = __qs.camera, t = __qs.controls.target, s = 5 * __qs.modelSize;
+      c.up.set(...up); c.position.set(t.x + at[0] * s, t.y + at[1] * s, t.z + at[2] * s); c.lookAt(t); __qs.controls.update(); }, [at, up]);
     await settle();
-    const u0 = (await cam()).up;
+    const a = await cam();
     await dragRight(0.1);
-    const u1 = (await cam()).up, moved = Math.hypot(...u0.map((x, k) => x - u1[k]));
-    check('looking along Y (' + at + ') a drag of a tenth of a turn turns the view 36 deg (up moves 0.62)', moved.toFixed(1), /^0\.6$/);
+    const b = await cam(), dAt = Math.hypot(...a.at.map((x, k) => x - b.at[k])), dUp = Math.hypot(...a.up.map((x, k) => x - b.up[k]));
+    check('looking along Y (' + at + ', up ' + up + ') a drag of a tenth of a turn turns the view 36 deg', (dAt + dUp).toFixed(1), /^0\.6$/);
   }
   await pg.click('[data-view="front"]'); await settle();
 
