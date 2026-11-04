@@ -48,6 +48,20 @@ const {launch, openModel, check} = L;
   await settle();
   check('six of Left undo it', JSON.stringify(await cam()), /^\{"at":\[0,0,1\],"up":\[0,1,0\]\}$/);
 
+  // Shift with Left / Right turns the model about the world Z axis: from the front, the line of sight
+  await pg.click('[data-view="front"]'); await settle();
+  const shiftArrow = async k => { await pg.keyboard.down('Shift'); await pg.keyboard.press(k); await pg.keyboard.up('Shift'); };
+  for (let i = 0; i < 6; i++) await shiftArrow('ArrowRight');
+  await settle();
+  check('six presses of Shift+Right turn the model 90 deg clockwise about Z: +X at the bottom', JSON.stringify(await cam()), /^\{"at":\[0,0,1\],"up":\[-1,0,0\]\}$/);
+  t = await triad();
+  check('and the triad still draws all three axes', JSON.stringify([t.n.r > 20, t.n.g > 20, t.n.b > 0]), /^\[true,true,true\]$/);
+  for (let i = 0; i < 6; i++) await shiftArrow('ArrowLeft');
+  await settle();
+  check('six of Shift+Left undo it', JSON.stringify(await cam()), /^\{"at":\[0,0,1\],"up":\[0,1,0\]\}$/);
+  await shiftArrow('ArrowUp'); await settle();
+  check('Shift+Up does nothing', JSON.stringify(await cam()), /^\{"at":\[0,0,1\],"up":\[0,1,0\]\}$/);
+
   // fields keep their arrows: a focused slider must not turn the view
   await pg.keyboard.press('v');
   await pg.focus('#expAmount').catch(() => {});
