@@ -8094,8 +8094,8 @@ function drawMoveGizmo(ctx, s){
 // Face mode when it is flat, or else the next face clicked. The camera goes out along the face's normal on the side it was
 // seen from, so the face is looked at from the outside; asked again while already square to it, it
 // looks from the other side. A flat face uses its plane's normal (exact from the B-rep when the file
-// carries it); a curved face the normal of the triangle under the click, and says so. Up is the world
-// axis the standard views use: Y, or for a face looking up or down, as Top and Bottom do.
+// carries it); a curved face the normal of the triangle under the click, and says so. The view turns as
+// little as it can from where it is, and stands the nearest world axis upright (viewUp).
 // Ctrl+1 … Ctrl+6 are Front, Rear, Top, Bottom, Left, Right; Ctrl+7 is Iso.
 let normalPickMode = false;
 const NORMAL_SAME = 0.9999;          // cos 0.8°: the view is already square to this face
@@ -8152,10 +8152,32 @@ function faceViewDir(ent, hit){
   if (_nu.subVectors(camera.position, controls.target).normalize().dot(_nd) > NORMAL_SAME) _nd.negate();
   return _nd;
 }
-// Up for a view along d: world Y kept square to d; looking up or down, as Bottom and Top.
+// Up for a view along d (unit, face to camera): the least turn from the view as it is now. The camera's
+// direction is swung onto d by the shortest rotation and its up is carried along; asked to flip to the
+// back (d opposite the view) it keeps its up. That up is then squared to the nearest world axis that can
+// stand on the screen — a world axis projected square to d — so a view with Z up the screen, looking
+// near X, lands on the ZY plane with Z up and Y to the right, not turned to Y up. Ties go to the standard
+// views' order: Y up, then -Z (Top), then +Z (Bottom).
+const UP_AXES = [[0, 1, 0], [0, 0, -1], [0, 0, 1], [0, -1, 0], [1, 0, 0], [-1, 0, 0]].map(a => new THREE.Vector3(...a));
+const _vq = new THREE.Quaternion(), _vc = new THREE.Vector3(), _vu = new THREE.Vector3();
 function viewUp(d, out){
-  if (Math.abs(d.y) > 0.99) return out.set(0, 0, d.y > 0 ? -1 : 1);
-  return out.set(0, 1, 0).addScaledVector(d, -d.y).normalize();
+  _vc.subVectors(camera.position, controls.target);
+  out.copy(camera.up);
+  if (_vc.lengthSq() > 0){
+    _vc.normalize();
+    if (_vc.dot(d) > -0.9999) out.applyQuaternion(_vq.setFromUnitVectors(_vc, d));
+  }
+  out.addScaledVector(d, -out.dot(d));
+  if (out.lengthSq() < 1e-12) out.set(0, 1, 0).addScaledVector(d, -d.y);   // no up left to carry: Y, as the views
+  out.normalize();
+  let best = -2, pick = null;
+  for (const a of UP_AXES){
+    _vu.copy(a).addScaledVector(d, -a.dot(d));
+    if (_vu.lengthSq() < 0.01) continue;                // this axis runs along the line of sight
+    const score = _vu.normalize().dot(out);
+    if (score > best + 1e-9){ best = score; pick = a; }
+  }
+  return out.copy(pick).addScaledVector(d, -pick.dot(d)).normalize();
 }
 function lookAtFace(ent, hit){
   const d = faceViewDir(ent, hit);

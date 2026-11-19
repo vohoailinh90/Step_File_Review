@@ -133,8 +133,37 @@ test('a face seen from behind is looked at from the side it was seen', () => {
   });
 });
 test('an oblique normal keeps world Y upright, square to the view', () => {
-  const d = new T.Vector3(1, 1, 0).normalize(), u = v.viewUp(d, new T.Vector3());
-  assert.ok(Math.abs(u.dot(d)) < 1e-12 && u.y > 0 && Math.abs(u.length() - 1) < 1e-12, `up ${u.toArray()}`);
+  withModel([part(plate())], () => {
+    v.setView('front');
+    const d = new T.Vector3(1, 1, 0).normalize(), u = v.viewUp(d, new T.Vector3());
+    assert.ok(Math.abs(u.dot(d)) < 1e-12 && u.y > 0 && Math.abs(u.length() - 1) < 1e-12, `up ${u.toArray()}`);
+  });
+});
+
+/** Look at the origin from `pos` with `u` up, as a drag would leave it. */
+function look(pos, u) {
+  Object.assign(v.ctx, { __p: pos, __u: u });
+  run('orbitStop(); controls.target.set(0, 0, 0); camera.position.set(...__p); camera.up.set(...__u); camera.lookAt(controls.target); camera.updateMatrixWorld();');
+}
+test('Normal to keeps the orientation the view already has: Z up, looking near X, lands on ZY with Z up', () => {
+  withModel([part(plate())], p => {
+    look([5, -1.5, 1.2], [0, 0, 1]);                 // the owner's screenshot: Z up the screen, Y to the right
+    v.lookAtFace(faceOf(p, 'x', 1), null);
+    assert.ok(near(viewDir(), [1, 0, 0], 1e-9), `square to the +X face, got ${viewDir()}`);
+    assert.ok(near(up(), [0, 0, 1], 1e-9), `Z stays up, not turned to Y, got ${up()}`);
+    v.lookAtFace(faceOf(p, 'x', 1), null);            // again: from behind, still Z up
+    assert.ok(near(viewDir(), [-1, 0, 0], 1e-9) && near(up(), [0, 0, 1], 1e-9), `flipped: ${viewDir()} / ${up()}`);
+  });
+});
+test('Normal to a face looking up from a view near the front tips over with the far side at the top', () => {
+  withModel([part(plate())], p => {
+    look([0.3, 2, 5], [0, 1, 0]);                    // near Front, a little from above
+    v.lookAtFace(faceOf(p, 'y', 1), null);
+    assert.ok(near(viewDir(), [0, 1, 0], 1e-9) && near(up(), [0, 0, -1], 1e-9), `as Top: ${viewDir()} / ${up()}`);
+    look([5, 2, 0.3], [0, 1, 0]);                    // near Right, a little from above
+    v.lookAtFace(faceOf(p, 'y', 1), null);
+    assert.ok(near(viewDir(), [0, 1, 0], 1e-9) && near(up(), [-1, 0, 0], 1e-9), `the least turn from Right: ${viewDir()} / ${up()}`);
+  });
 });
 
 // ---------------------------------------------------------------------------
