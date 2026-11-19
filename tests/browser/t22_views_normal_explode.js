@@ -40,6 +40,7 @@ const {launch, openModel, check} = L;
   // Explode, scope Picked
   await pg.click('[data-view="iso"]'); await pg.waitForTimeout(80);
   await pg.click('#btnExplode');
+  check('Flip is off while every part explodes', await pg.evaluate(() => document.getElementById('btnExpFlip').disabled), /^true$/);
   await pg.click('#btnExpPick');
   await pg.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await pg.waitForTimeout(60);
   await pg.click('#btnExpPick');

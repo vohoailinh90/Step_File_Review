@@ -18,7 +18,7 @@ import { loadViewer, ROOT } from './harness.mjs';
 
 const MODULES = readdirSync(join(ROOT, 'src/app')).filter(f => f.endsWith('.js')).sort()
   .map(f => 'src/app/' + f);
-const v = loadViewer(MODULES, ['setView', 'viewKey', 'normalTo', 'lookAtFace', 'viewUp', 'topology', 'faceEntity',
+const v = loadViewer(MODULES, ['setView', 'endPickModes', 'viewKey', 'normalTo', 'lookAtFace', 'viewUp', 'topology', 'faceEntity',
   'setExplode', 'explodeToggle', 'setExplodeScope'], { three: 'real' });
 const T = v.THREE;
 const run = src => runInContext(src, v.ctx);
@@ -174,5 +174,34 @@ test('scope All keeps the original explode for every part', () => {
     v.setExplode(1);
     assert.ok(near(a.offset.toArray(), [0.2, 0, 0], 1e-12) && near(b.offset.toArray(), [-0.1, 0, 0.04], 1e-12),
       `${a.offset.toArray()} / ${b.offset.toArray()}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// One pick mode at a time, and the scope follows the picks (geometry review).
+// ---------------------------------------------------------------------------
+test('starting one pick mode ends the others: the next click goes where the last button said', () => {
+  withModel([part(plate())], () => {
+    run('explodePickStart();');
+    v.normalTo();
+    assert.equal(run('JSON.stringify([explodePickMode, normalPickMode])'), JSON.stringify([false, true]), 'Normal to… ends Pick parts…');
+    run('movePickStart();');
+    assert.equal(run('JSON.stringify([normalPickMode, axisPickMode])'), JSON.stringify([false, true]), 'Pick axis… ends Normal to…');
+    run('explodePickStart();');
+    assert.equal(run('JSON.stringify([axisPickMode, explodePickMode])'), JSON.stringify([false, true]), 'Pick parts… ends Pick axis…');
+    run('circlePickMode = true; normalTo();');
+    assert.equal(run('JSON.stringify([circlePickMode, explodePickMode, normalPickMode])'), JSON.stringify([false, false, true]), 'and Plane from circle…');
+    run('resetExplode();');
+    assert.equal(run('normalPickMode'), false, 'a new model ends a pick mode left on');
+  });
+});
+// (the harness's DOM stub shares one element across every id, so Flip's disabled state is checked in t22)
+test('taking out the last picked part returns the scope to All', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A');
+  withModel([a], () => {
+    v.explodeToggle(a);
+    assert.equal(run('explodeScope'), 'picked');
+    v.explodeToggle(a);
+    assert.equal(run('explodeScope'), 'all');
   });
 });

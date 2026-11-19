@@ -16,12 +16,19 @@ function normalTo(){
   if (!modelRoot){ toast('Load a model first'); return; }
   if (normalPickMode){ normalPickCancel(); return; }
   if (selectedFace && selectedFace.geom.type === 'plane') return lookAtFace(selectedFace, null);
-  if (axisPickMode) movePickCancel();
-  if (explodePickMode) explodePickCancel();
+  endPickModes();
   normalPickMode = true;
   $('btnNormal').classList.add('active');
   moveCursor();
   toast('Click a face to look square at it (Esc cancels)', 4000);
+}
+// One pick mode at a time: Pick axis…, Pick parts…, Normal to… and Plane from circle… each take the next
+// click, so starting one ends the others (and a new model ends them all, via resetExplode()).
+function endPickModes(){
+  if (axisPickMode) movePickCancel();
+  if (normalPickMode) normalPickCancel();
+  if (explodePickMode) explodePickCancel();
+  if (circlePickMode){ circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
 }
 function normalPickCancel(){
   normalPickMode = false;

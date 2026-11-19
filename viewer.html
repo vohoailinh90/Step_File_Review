@@ -311,7 +311,7 @@ select.btn option{background:var(--raised);color:var(--text)}
             <button class="btn" data-exp="z">Z</button>
             <button class="btn" data-exp="axis" title="Along the picked axis">Axis</button>
           </div>
-          <button class="btn" id="btnExpFlip" title="Picked parts: move towards minus X / Y / Z, or against the axis">Flip</button>
+          <button class="btn" id="btnExpFlip" disabled title="Picked parts: move towards minus X / Y / Z, or against the axis">Flip</button>
           <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
         </div>
         <div class="row"><span class="hint">All: parts slide away from the assembly centre. Picked: only the
@@ -7737,12 +7737,12 @@ $('btnExpFlip').addEventListener('click', ()=>{
 function setExplodeScope(k){
   explodeScope = k;
   document.querySelectorAll('[data-expscope]').forEach(x => x.classList.toggle('active', x.dataset.expscope === k));
+  $('btnExpFlip').disabled = k !== 'picked';         // Flip turns the picked group; scope All has nothing to flip
   applyExplode();
 }
 function explodePickStart(){
   if (!modelRoot){ toast('Load a model first'); return; }
-  if (axisPickMode) movePickCancel();
-  if (normalPickMode) normalPickCancel();
+  endPickModes();
   explodePickMode = true;
   $('btnExpPick').classList.add('active');
   moveCursor();
@@ -7758,7 +7758,9 @@ function explodeToggle(p){
   if (p.rowEl) p.rowEl.classList.toggle('expsel', explodeSel.has(p));
   if (p !== selected && p !== hovered) emis(p, baseEmis(p));
   $('expPickCount').textContent = explodeSel.size;
-  if (explodeSel.size && explodeScope !== 'picked') setExplodeScope('picked'); else applyExplode();
+  if (explodeSel.size && explodeScope !== 'picked') setExplodeScope('picked');
+  else if (!explodeSel.size && explodeScope === 'picked') setExplodeScope('all');   // the last one taken out
+  else applyExplode();
 }
 // The click while Pick parts… is on, or a Ctrl+click in Part mode with the panel open (30-select.js).
 function pickExplodePart(){
@@ -7788,7 +7790,7 @@ function setExplode(v){
 }
 function resetExplode(){             // a newly loaded model starts assembled
   explodeAmt = 0;
-  explodeSel.clear(); $('expPickCount').textContent = 0; explodePickCancel();
+  explodeSel.clear(); $('expPickCount').textContent = 0; endPickModes();
   explodeSign = 1; $('btnExpFlip').classList.remove('active'); setExplodeScope('all');
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
   moveReset();
@@ -7882,6 +7884,7 @@ $('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.
 
 function movePickStart(){
   if (!modelRoot){ toast('Load a model first'); return; }
+  endPickModes();
   axisPickMode = true;
   if (!edgesOn) toggleEdges();       // an edge is easier to aim at when it is drawn
   $('btnAxisPick').classList.add('active');
@@ -8099,12 +8102,19 @@ function normalTo(){
   if (!modelRoot){ toast('Load a model first'); return; }
   if (normalPickMode){ normalPickCancel(); return; }
   if (selectedFace && selectedFace.geom.type === 'plane') return lookAtFace(selectedFace, null);
-  if (axisPickMode) movePickCancel();
-  if (explodePickMode) explodePickCancel();
+  endPickModes();
   normalPickMode = true;
   $('btnNormal').classList.add('active');
   moveCursor();
   toast('Click a face to look square at it (Esc cancels)', 4000);
+}
+// One pick mode at a time: Pick axis…, Pick parts…, Normal to… and Plane from circle… each take the next
+// click, so starting one ends the others (and a new model ends them all, via resetExplode()).
+function endPickModes(){
+  if (axisPickMode) movePickCancel();
+  if (normalPickMode) normalPickCancel();
+  if (explodePickMode) explodePickCancel();
+  if (circlePickMode){ circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
 }
 function normalPickCancel(){
   normalPickMode = false;
@@ -8205,6 +8215,7 @@ $('btnCaps').addEventListener('click', ()=>{
 });
 $('btnPickCircle').addEventListener('click', ()=>{
   if (pickedCircle){ applyCirclePlane(); return; }
+  endPickModes();
   circlePickMode = true;
   setMode('edge');
   $('btnPickCircle').classList.add('active');

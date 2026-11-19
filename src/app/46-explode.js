@@ -31,12 +31,12 @@ $('btnExpFlip').addEventListener('click', ()=>{
 function setExplodeScope(k){
   explodeScope = k;
   document.querySelectorAll('[data-expscope]').forEach(x => x.classList.toggle('active', x.dataset.expscope === k));
+  $('btnExpFlip').disabled = k !== 'picked';         // Flip turns the picked group; scope All has nothing to flip
   applyExplode();
 }
 function explodePickStart(){
   if (!modelRoot){ toast('Load a model first'); return; }
-  if (axisPickMode) movePickCancel();
-  if (normalPickMode) normalPickCancel();
+  endPickModes();
   explodePickMode = true;
   $('btnExpPick').classList.add('active');
   moveCursor();
@@ -52,7 +52,9 @@ function explodeToggle(p){
   if (p.rowEl) p.rowEl.classList.toggle('expsel', explodeSel.has(p));
   if (p !== selected && p !== hovered) emis(p, baseEmis(p));
   $('expPickCount').textContent = explodeSel.size;
-  if (explodeSel.size && explodeScope !== 'picked') setExplodeScope('picked'); else applyExplode();
+  if (explodeSel.size && explodeScope !== 'picked') setExplodeScope('picked');
+  else if (!explodeSel.size && explodeScope === 'picked') setExplodeScope('all');   // the last one taken out
+  else applyExplode();
 }
 // The click while Pick parts… is on, or a Ctrl+click in Part mode with the panel open (30-select.js).
 function pickExplodePart(){
@@ -82,7 +84,7 @@ function setExplode(v){
 }
 function resetExplode(){             // a newly loaded model starts assembled
   explodeAmt = 0;
-  explodeSel.clear(); $('expPickCount').textContent = 0; explodePickCancel();
+  explodeSel.clear(); $('expPickCount').textContent = 0; endPickModes();
   explodeSign = 1; $('btnExpFlip').classList.remove('active'); setExplodeScope('all');
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
   moveReset();

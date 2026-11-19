@@ -19,6 +19,7 @@ $('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.
 
 function movePickStart(){
   if (!modelRoot){ toast('Load a model first'); return; }
+  endPickModes();
   axisPickMode = true;
   if (!edgesOn) toggleEdges();       // an edge is easier to aim at when it is drawn
   $('btnAxisPick').classList.add('active');

@@ -41,6 +41,7 @@ $('btnCaps').addEventListener('click', ()=>{
 });
 $('btnPickCircle').addEventListener('click', ()=>{
   if (pickedCircle){ applyCirclePlane(); return; }
+  endPickModes();
   circlePickMode = true;
   setMode('edge');
   $('btnPickCircle').classList.add('active');
