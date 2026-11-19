@@ -31,7 +31,7 @@ function dimText(it){
 }
 // s: canvas pixels per CSS pixel, so lines and text keep their size in hi-res screenshots
 function drawAnnotations(ctx, W, H, s, items){
-  const dimCol = whiteBg ? '#c2410c' : '#ffb454', axisCol = whiteBg ? '#2563eb' : '#5aa7e8', labels = [];
+  const dimCol = lightVp() ? '#c2410c' : '#ffb454', axisCol = lightVp() ? '#2563eb' : '#5aa7e8', labels = [];
   const th = 19 * s;
   ctx.save();
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';

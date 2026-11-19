@@ -2,7 +2,7 @@
 // Click a face or an edge (an edge wins within a few pixels of the cursor) for its size;
 // click a second one for the distances between the two. Everything is computed on the
 // assembled geometry, from the exact B-rep surfaces when the file carries them.
-const COL_A = '#ff7a45', COL_B = '#5aa7e8', EDGE_PX = 7;
+const COL_A = '#d9480f', COL_B = '#1c6fd1', EDGE_PX = 7;
 const PAR = Math.cos(THREE.MathUtils.degToRad(0.5)), PERP = Math.sin(THREE.MathUtils.degToRad(0.5));
 let measA = null, measB = null, measMd = null, measItems = [], keptItems = [];
 

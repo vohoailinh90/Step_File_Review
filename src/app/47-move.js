@@ -13,12 +13,15 @@ const MOVE_END_ON = 0.996;           // cos 5°: an axis this close to the line 
 const _ma = new THREE.Vector3(), _mb = new THREE.Vector3();
 
 $('btnAxisPick').addEventListener('click', ()=>{ if (axisPickMode) movePickCancel(); else movePickStart(); });
-$('btnAxisFlip').addEventListener('click', ()=>{ if (moveAxis){ moveAxis.d.negate(); moveSync(); } });
+$('btnAxisFlip').addEventListener('click', flipAxis);
+// Reversing the axis moves a picked group exploding along it (46-explode.js) to the other side, so re-apply.
+function flipAxis(){ if (moveAxis){ moveAxis.d.negate(); applyExplode(); moveSync(); } }
 $('moveDist').addEventListener('change', e => moveTyped(e.target.value));
 $('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.set(0, 0, 0); applyExplode(); } });
 
 function movePickStart(){
   if (!modelRoot){ toast('Load a model first'); return; }
+  endPickModes();
   axisPickMode = true;
   if (!edgesOn) toggleEdges();       // an edge is easier to aim at when it is drawn
   $('btnAxisPick').classList.add('active');
@@ -113,7 +116,7 @@ function moveHandle(){               // CSS px on the canvas: centre c, screen d
   return {c, u:l > 0 ? {x:dx / l, y:dy / l} : null};
 }
 function moveGrab(e){                // is the cursor on the handle?
-  const h = !axisPickMode && moveHandle();
+  const h = !pickModeOn() && moveHandle();       // a pick mode takes the next click, the handle included
   if (!h || !h.u) return false;
   const r = canvas.getBoundingClientRect(), x = e.clientX - r.left - h.c.x, y = e.clientY - r.top - h.c.y;
   const t = Math.max(-MOVE_PX, Math.min(MOVE_PX, x * h.u.x + y * h.u.y));
@@ -138,7 +141,7 @@ function moveStep(part){             // 1, 2 or 5 x 10^n shown units: the rounde
 function moveCursor(){
   if (moveDrag) canvas.style.cursor = 'grabbing';
   else if (moveHover) canvas.style.cursor = 'grab';
-  else if (axisPickMode) canvas.style.cursor = 'crosshair';
+  else if (axisPickMode || normalPickMode || explodePickMode) canvas.style.cursor = 'crosshair';
   else canvas.style.cursor = '';
 }
 // A drag holds the part by the point of the axis under the cursor. That axis line runs through the
@@ -175,7 +178,7 @@ window.addEventListener('pointercancel', moveEnd);
 // it; the handle is outlined so it reads on any part, and while dragged it shows the distance.
 function drawMoveGizmo(ctx, s){
   const W = annotCanvas.width, H = annotCanvas.height, a = moveAxis, hot = !!(moveHover || moveDrag);
-  const col = whiteBg ? '#15803d' : '#5ad18f', halo = whiteBg ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.6)';
+  const col = lightVp() ? '#15803d' : '#5ad18f', halo = lightVp() ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.6)';
   const p0 = toScreen(_ma.copy(a.p).addScaledVector(a.d, -modelSize), a.part, W, H);
   const p1 = toScreen(_mb.copy(a.p).addScaledVector(a.d, modelSize), a.part, W, H);
   ctx.save();
@@ -202,7 +205,7 @@ function drawMoveGizmo(ctx, s){
     ctx.beginPath(); ctx.arc(x, y, (4.5 + grow / 2) * s, 0, 2 * Math.PI); ctx.fill();
   };
   shape(halo, 3);
-  shape(hot ? (whiteBg ? '#166534' : '#a7f3c4') : col, 0);
+  shape(hot ? (lightVp() ? '#166534' : '#a7f3c4') : col, 0);
   if (h.u){                                            // "+" past the + end; the distance while dragged
     const v = selected.offset.dot(a.d), text = moveDrag ? (v > 0 ? '+' : '') + L(v) + MM() : '+';
     ctx.font = (moveDrag ? '' : 'bold ') + Math.round((moveDrag ? 11.5 : 15) * s) + 'px ' + ANNOT_FONT;

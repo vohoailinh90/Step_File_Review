@@ -96,7 +96,7 @@ function chainFrom(lineObj, hitIndex){
 }
 function drawEdgeOverlay(points, part){
   const g = new THREE.BufferGeometry().setFromPoints(points);
-  edgeOverlay = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xff7a45, depthTest:false}));
+  edgeOverlay = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xd9480f, depthTest:false}));
   edgeOverlay.renderOrder = 4;
   if (part) follow(edgeOverlay, part, part.offset);      // points are where the part is drawn now
   scene.add(edgeOverlay);

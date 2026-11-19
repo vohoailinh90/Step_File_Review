@@ -1,39 +1,57 @@
 <div id="app">
   <div id="topbar">
-    <span id="brand"><b>QuickSTEP</b> viewer</span>
-    <span id="fname"></span>
-    <span id="loadtime" class="empty">— no model —</span>
+    <span id="brand"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5 20.5 7.25v9.5L12 21.5 3.5 16.75v-9.5zM3.5 7.25 12 12l8.5-4.75M12 12v9.5"/></svg><b>QuickSTEP</b></span>
+    <span id="fileinfo">
+      <span id="fname"></span>
+      <span id="loadtime" class="empty">— no model —</span>
+    </span>
     <span class="spacer"></span>
 
-    <span class="lbl">select</span>
-    <div class="btn-group" role="group" aria-label="Selection mode">
-      <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
-      <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
-      <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
-      <button class="btn" data-mode="measure" title="Measure diameters, radii and distances between faces and edges (4 / M)">Measure</button>
+    <div class="tb-group" role="group" aria-label="Select">
+      <span class="tb-label" aria-hidden="true">Select</span>
+      <div class="btn-group" role="group" aria-label="Selection mode">
+        <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
+        <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
+        <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
+        <button class="btn" data-mode="measure" title="Measure diameters, radii and distances between faces and edges (4 / M)">Measure</button>
+      </div>
     </div>
-    <span class="sep"></span>
 
-    <button class="btn" id="btnSection" title="Section views (X)">Section</button>
-    <button class="btn" id="btnExplode" title="Exploded view (V)">Explode</button>
-    <button class="btn" id="btnParts" title="Show or hide part list">Parts</button>
-    <div class="btn-group" role="group" aria-label="Standard views">
-      <button class="btn" data-view="iso">Iso</button>
-      <button class="btn" data-view="front">Front</button>
-      <button class="btn" data-view="top">Top</button>
-      <button class="btn" data-view="right">Right</button>
+    <div class="tb-group" role="group" aria-label="View">
+      <span class="tb-label" aria-hidden="true">View</span>
+      <div class="btn-group" role="group" aria-label="Standard views">
+        <button class="btn" data-view="iso" title="Isometric (Ctrl+7)">Iso</button>
+        <button class="btn" data-view="front" title="Front (Ctrl+1)">Front</button>
+        <button class="btn" data-view="rear" title="Rear (Ctrl+2)">Rear</button>
+        <button class="btn" data-view="top" title="Top (Ctrl+3)">Top</button>
+        <button class="btn" data-view="bottom" title="Bottom (Ctrl+4)">Bottom</button>
+        <button class="btn" data-view="left" title="Left (Ctrl+5)">Left</button>
+        <button class="btn" data-view="right" title="Right (Ctrl+6)">Right</button>
+      </div>
+      <button class="btn collapsible" id="btnNormal" aria-label="Normal to face" title="Normal to: look square at the selected flat face, or at the next face you click; again flips to the other side (Ctrl+8)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 13.5h13M8 13.5V2.5M5.5 5 8 2.5 10.5 5M8 11h2.5v2.5"/></svg><span class="t">Normal to</span></button>
+      <button class="btn collapsible" id="btnFit" aria-label="Fit" title="Fit model in view (F)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/><rect x="5.5" y="5.5" width="5" height="5" rx=".5"/></svg><span class="t">Fit</span></button>
+      <button class="btn collapsible" id="btnEdges" aria-label="Edges" title="Toggle feature edges (E)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5zM2 5l6 3.5L14 5M8 8.5v6"/></svg><span class="t">Edges</span></button>
+      <button class="btn collapsible" id="btnBg" aria-label="White BG" title="White background for reports (B)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6"/><path class="fill" d="M8 2a6 6 0 0 1 0 12z"/></svg><span class="t">White BG</span></button>
     </div>
-    <button class="btn" id="btnFit" title="Fit model in view (F)">Fit</button>
-    <button class="btn" id="btnEdges" title="Toggle feature edges (E)">Edges</button>
-    <button class="btn" id="btnBg" title="White background for reports (B)">White BG</button>
-    <button class="btn" id="btnShot" title="Save PNG screenshot (S)">Screenshot</button>
-    <select class="btn" id="quality" title="Tessellation quality used when converting STEP">
-      <option value="coarse">Coarse</option>
-      <option value="normal" selected>Normal</option>
-      <option value="fine">Fine</option>
-    </select>
-    <button class="btn" id="btnOpen">Open file…</button>
-    <input type="file" id="fileinput" accept=".step,.stp,.glb,.gltf,.stl" style="display:none">
+
+    <div class="tb-group" role="group" aria-label="Tools">
+      <span class="tb-label" aria-hidden="true">Tools</span>
+      <button class="btn collapsible" id="btnSection" aria-label="Section" title="Section views (X)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M1 10 15 6" stroke-dasharray="2 2"/></svg><span class="t">Section</span></button>
+      <button class="btn collapsible" id="btnExplode" aria-label="Explode" title="Exploded view (V)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="5" height="5" rx="1"/><path d="M1.5 4V1.5H4M12 1.5h2.5V4M1.5 12v2.5H4M12 14.5h2.5V12"/></svg><span class="t">Explode</span></button>
+      <button class="btn collapsible" id="btnParts" aria-label="Parts" title="Show or hide part list"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 4h8.5M6 8h8.5M6 12h8.5"/><path class="fill" d="M2 3h2v2H2zM2 7h2v2H2zM2 11h2v2H2z"/></svg><span class="t">Parts</span></button>
+    </div>
+
+    <div class="tb-group" role="group" aria-label="File">
+      <span class="tb-label" aria-hidden="true">File</span>
+      <select class="btn" id="quality" aria-label="Tessellation quality" title="Tessellation quality used when converting STEP">
+        <option value="coarse">Coarse</option>
+        <option value="normal" selected>Normal</option>
+        <option value="fine">Fine</option>
+      </select>
+      <button class="btn collapsible" id="btnShot" aria-label="Screenshot" title="Save PNG screenshot (S)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 5.5h2.8l1.2-2h5l1.2 2h2.8v8h-13z"/><circle cx="8" cy="9.25" r="2.5"/></svg><span class="t">Screenshot</span></button>
+      <button class="btn primary" id="btnOpen" title="Open a STEP, GLB, GLTF or STL file"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 4.5v8.5h13V6.5H8L6.5 4.5z"/></svg>Open file…</button>
+      <input type="file" id="fileinput" accept=".step,.stp,.glb,.gltf,.stl" style="display:none">
+    </div>
   </div>
 
   <div id="main">
@@ -65,6 +83,16 @@
       </div>
 
       <div id="explodepanel">
+        <div class="phead"><span class="ptitle">Explode &amp; move</span><span class="pkey">toggle <kbd>V</kbd></span></div>
+        <div class="row">
+          <span class="lbl">parts</span>
+          <div class="btn-group" role="group" aria-label="Which parts explode">
+            <button class="btn active" data-expscope="all" title="Every part explodes">All</button>
+            <button class="btn" data-expscope="picked" title="Only the picked parts move, together, along the chosen direction">Picked <b id="expPickCount">0</b></button>
+          </div>
+          <button class="btn" id="btnExpPick" title="Pick parts: click parts to add or remove them (or Ctrl+click a part, in the view or the list)">Pick parts…</button>
+          <button class="btn" id="btnExpClear" title="Forget the picked parts">Clear</button>
+        </div>
         <div class="row">
           <span class="lbl">amount</span>
           <input type="range" id="expAmount" min="0" max="100" step="1" value="0">
@@ -79,10 +107,12 @@
             <button class="btn" data-exp="z">Z</button>
             <button class="btn" data-exp="axis" title="Along the picked axis">Axis</button>
           </div>
+          <button class="btn" id="btnExpFlip" disabled title="Picked parts: move towards minus X / Y / Z, or against the axis">Flip</button>
           <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
         </div>
-        <div class="row"><span class="hint">Parts slide away from the assembly centre. Measurements keep
-          using the assembled positions.</span></div>
+        <div class="row"><span class="hint">All: parts slide away from the assembly centre. Picked: only the
+          picked parts move, as one group, along the chosen direction. Measurements keep using the
+          assembled positions.</span></div>
         <div class="div"></div>
         <div class="row">
           <span class="lbl">axis</span>
@@ -100,9 +130,10 @@
       </div>
 
       <div id="sectionpanel">
+        <div class="phead"><span class="ptitle">Section</span><span class="pkey">toggle <kbd>X</kbd></span></div>
         <div class="row">
           <span class="lbl">plane</span>
-          <div class="btn-group">
+          <div class="btn-group" role="group" aria-label="Section plane">
             <button class="btn" data-sec="right">Right</button>
             <button class="btn" data-sec="top">Top</button>
             <button class="btn" data-sec="front">Front</button>
@@ -128,7 +159,8 @@
       </div>
 
       <div id="drop">
-        <div class="clock">00.00 s</div>
+        <div class="dropcard">
+        <svg class="dropicon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 14.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4.5"/></svg>
         <div class="big">Drop a STEP file here</div>
         <div class="sub">
           Accepts <code>.step</code> / <code>.stp</code>, and already-converted
@@ -136,7 +168,10 @@
           The first open of a large assembly tessellates it once on this machine;
           every open after that loads from cache in seconds.
         </div>
-        <button class="btn" id="btnOpen2">Choose a file</button>
+        <button class="btn primary" id="btnOpen2">Choose a file</button>
+        <div class="keys">Then <kbd>LMB</kbd> rotate · <kbd>F</kbd> fit · <kbd>M</kbd> measure · <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>6</kbd> views</div>
+        <div class="clock">00.00 s</div>
+        </div>
         <div id="enginewarn">
           <b>STEP conversion is unavailable on this machine.</b>
           <span id="engineproblem">The tessellation engine is not installed for the Python running this viewer.</span>
@@ -155,8 +190,8 @@
     <span>triangles <b id="stTris">0</b></span>
     <span>size <b id="stSize">–</b></span>
     <span>bbox <b id="stBbox">–</b></span>
-    <span id="unitToggle" style="cursor:pointer" title="Click if the scale looks wrong">units <b id="stUnits">mm</b></span>
+    <button type="button" id="unitToggle" title="Units — click if the scale looks wrong">units <b id="stUnits">mm</b></button>
     <span class="spacer"></span>
-    <span id="hintbar">LMB or ←↑↓→ rotate · RMB pan · wheel zoom · click to select · H hide · I isolate · M measure</span>
+    <span id="hintbar"><kbd>LMB</kbd> or <kbd>←↑↓→</kbd> rotate · <kbd>RMB</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>F</kbd> fit · <kbd>H</kbd> hide · <kbd>I</kbd> isolate · <kbd>M</kbd> measure · <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>6</kbd> views · <kbd>Ctrl</kbd>+<kbd>8</kbd> normal to · <kbd>Esc</kbd> clear</span>
   </div>
 </div>

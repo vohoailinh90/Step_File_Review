@@ -9,8 +9,10 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
-const DARK_BG = 0x191c21, LIGHT_BG = 0xffffff;
+const DARK_BG = 0xdde4ec, LIGHT_BG = 0xffffff;   // a light blue-grey viewport (= --bg in viewer.css); White BG for reports
 let whiteBg = false;
+const BG_IS_LIGHT = true;            // DARK_BG is light: drawings on the view take their dark-on-light colours
+function lightVp(){ return whiteBg || BG_IS_LIGHT; }
 scene.background = new THREE.Color(DARK_BG);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 1e6);
@@ -52,24 +54,34 @@ function computeBBox(){
   if (modelRoot) box.expandByObject(modelRoot);
   return box.isEmpty() ? null : box;
 }
-function frame(dir){
+function frame(dir, up){
   const box = (exploded() ? computeBBox() : bboxCached) || computeBBox();
   if (!box) return;
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
   const dist = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)) * 1.35;
   const d = (dir || new THREE.Vector3(1, 0.75, 1)).clone().normalize();
-  orbitStop(); camera.up.set(0, 1, 0);               // upright again, however the drag left it (05-orbit.js)
+  orbitStop(); camera.up.copy(up || _Y0);           // upright again, however the drag left it (05-orbit.js)
   camera.position.copy(center).addScaledVector(d, dist);
   camera.near = Math.max(dist/1000, 1e-4);
   camera.far  = dist * 100;
   camera.updateProjectionMatrix();
   controls.target.copy(center); controls.update();
 }
+// The standard views, as SolidWorks names them (Y up, +Z towards the viewer in Front): each is the
+// direction from the model to the camera and the screen's up. Top has the front of the model at the
+// bottom of the screen, Bottom at the top; the rest stand upright. Ctrl+1 … Ctrl+6 (55-views.js).
+const _Y0 = new THREE.Vector3(0, 1, 0);
 const VIEWS = {
-  iso:new THREE.Vector3(1,.8,1), front:new THREE.Vector3(0,0,1),
-  top:new THREE.Vector3(0,1,.0001), right:new THREE.Vector3(1,0,0)
+  iso:   {d:new THREE.Vector3(1, .8, 1),  up:_Y0},
+  front: {d:new THREE.Vector3(0, 0, 1),   up:_Y0},
+  rear:  {d:new THREE.Vector3(0, 0, -1),  up:_Y0},
+  top:   {d:new THREE.Vector3(0, 1, 0),   up:new THREE.Vector3(0, 0, -1)},
+  bottom:{d:new THREE.Vector3(0, -1, 0),  up:new THREE.Vector3(0, 0, 1)},
+  left:  {d:new THREE.Vector3(-1, 0, 0),  up:_Y0},
+  right: {d:new THREE.Vector3(1, 0, 0),   up:_Y0}
 };
-document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', ()=> frame(VIEWS[b.dataset.view])));
+function setView(k){ const v = VIEWS[k]; if (v) frame(v.d, v.up); }
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', ()=> setView(b.dataset.view)));
 $('btnFit').addEventListener('click', ()=> frame());
 

@@ -181,7 +181,7 @@ test('a standard view is upright again, and ends a coasting turn', () => {
   try {
     view([0, 0, -5], [0, -1, 0]);
     run('orbitDX = 300; orbitDY = 40;');
-    run('frame(VIEWS.front)');
+    run("setView('front')");
     assert.ok(near(up(), [0, 1, 0], 0), `upright, got ${up()}`);
     assert.equal(run('orbitDX === 0 && orbitDY === 0'), true, 'no turn left to carry on after the view is set');
     const p = at();
