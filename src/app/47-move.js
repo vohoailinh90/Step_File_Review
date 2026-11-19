@@ -13,7 +13,9 @@ const MOVE_END_ON = 0.996;           // cos 5°: an axis this close to the line 
 const _ma = new THREE.Vector3(), _mb = new THREE.Vector3();
 
 $('btnAxisPick').addEventListener('click', ()=>{ if (axisPickMode) movePickCancel(); else movePickStart(); });
-$('btnAxisFlip').addEventListener('click', ()=>{ if (moveAxis){ moveAxis.d.negate(); moveSync(); } });
+$('btnAxisFlip').addEventListener('click', flipAxis);
+// Reversing the axis moves a picked group exploding along it (46-explode.js) to the other side, so re-apply.
+function flipAxis(){ if (moveAxis){ moveAxis.d.negate(); applyExplode(); moveSync(); } }
 $('moveDist').addEventListener('change', e => moveTyped(e.target.value));
 $('btnMoveReset').addEventListener('click', ()=>{ if (selected){ selected.moved.set(0, 0, 0); applyExplode(); } });
 
@@ -114,7 +116,7 @@ function moveHandle(){               // CSS px on the canvas: centre c, screen d
   return {c, u:l > 0 ? {x:dx / l, y:dy / l} : null};
 }
 function moveGrab(e){                // is the cursor on the handle?
-  const h = !axisPickMode && moveHandle();
+  const h = !pickModeOn() && moveHandle();       // a pick mode takes the next click, the handle included
   if (!h || !h.u) return false;
   const r = canvas.getBoundingClientRect(), x = e.clientX - r.left - h.c.x, y = e.clientY - r.top - h.c.y;
   const t = Math.max(-MOVE_PX, Math.min(MOVE_PX, x * h.u.x + y * h.u.y));

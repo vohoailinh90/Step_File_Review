@@ -30,6 +30,7 @@ function endPickModes(){
   if (explodePickMode) explodePickCancel();
   if (circlePickMode){ circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
 }
+function pickModeOn(){ return axisPickMode || normalPickMode || explodePickMode || circlePickMode; }
 function normalPickCancel(){
   normalPickMode = false;
   $('btnNormal').classList.remove('active');

@@ -205,3 +205,34 @@ test('taking out the last picked part returns the scope to All', () => {
     assert.equal(run('explodeScope'), 'all');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review findings on PR #12.
+// ---------------------------------------------------------------------------
+test('flipping the picked axis moves a picked group exploding along it to the other side at once', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A');
+  withModel([a], () => {
+    v.explodeToggle(a);
+    run("moveAxis = {p:new THREE.Vector3(), d:new THREE.Vector3(0, 0, 1), part:parts[0], geom:{type:'line'}}; explodeAxis = 'axis';");
+    v.setExplode(0.5);
+    assert.ok(Math.abs(a.offset.z - 0.05) < 1e-12, `along +Z first, got ${a.offset.toArray()}`);
+    run('flipAxis();');
+    assert.ok(Math.abs(a.offset.z + 0.05) < 1e-12, `Flip moves it to -Z without another slider move, got ${a.offset.toArray()}`);
+    run('moveAxis = null;');
+  });
+});
+test('a pick mode keeps the move handle from taking its click', () => {
+  withModel([part(plate())], () => {
+    run('__mh = moveHandle; moveHandle = () => ({c:{x:5, y:5}, u:{x:1, y:0}});');   // a handle under the cursor
+    try {
+      const at = { clientX: 5, clientY: 5 };
+      v.ctx.__e = at;
+      assert.equal(run('moveGrab(__e)'), true, 'no pick mode: the handle is grabbed');
+      for (const m of ['axisPickMode', 'normalPickMode', 'explodePickMode', 'circlePickMode']) {
+        run(`${m} = true;`);
+        assert.equal(run('moveGrab(__e)'), false, `${m}: the click goes to the pick`);
+        run(`${m} = false;`);
+      }
+    } finally { run('moveHandle = __mh;'); }
+  });
+});
