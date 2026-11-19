@@ -141,7 +141,7 @@ function afterLoad(name, bytes, ms){
     bboxCached.getCenter(modelCenter);
     $('stBbox').textContent = [s.x,s.y,s.z].map(v=>L(v)).join(' × ') + ' mm';
   }
-  frame(VIEWS.iso);
+  setView('iso');
   buildPartList();
 
   $('fname').textContent = name;

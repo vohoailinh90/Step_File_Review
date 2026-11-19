@@ -14,7 +14,7 @@ application code at the bottom, split into `src/app/`.
 
 | The change is about | Open |
 |---|---|
-| camera, lighting, background, fit/iso/front/top/right, resize | `src/app/00-scene.js` |
+| camera, lighting, background, fit and the standard views (`VIEWS`, `setView`), resize | `src/app/00-scene.js` |
 | mouse rotation: turning, the end stop at the poles, its damping | `src/app/05-orbit.js` |
 | units, `L()` / `A2()` scaling, `unitScale` | `src/app/00-scene.js` |
 | opening a file, format sniffing, GLB/GLTF/STL, load status, dispose | `src/app/10-load.js` |
@@ -29,7 +29,8 @@ application code at the bottom, split into `src/app/`.
 | Measure: two picks' distances/angles (`relate`), Keep/Clear, panel | `src/app/43-relate.js` |
 | Measure: the "min distance (mesh)" row | `src/app/44-mindist.js` |
 | dimensions drawn on the model and in screenshots | `src/app/45-annotate.js` |
-| exploded view, feature-edge toggle | `src/app/46-explode.js` |
+| exploded view, scope All / Picked, feature-edge toggle | `src/app/46-explode.js` |
+| Normal to a face, the Ctrl+1…8 view keys | `src/app/48-views.js` |
 | moving a part along a picked axis: Pick…, the distance box, the drag arrow | `src/app/47-move.js` |
 | section planes, offset/flip, plane-from-circle, stencil caps, cuts while exploded | `src/app/50-section.js` |
 | drag & drop, `/convert`, `/status`, screenshot, keyboard, autoload | `src/app/60-io.js` |

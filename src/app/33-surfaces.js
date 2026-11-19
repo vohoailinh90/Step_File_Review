@@ -145,6 +145,7 @@ function selectFace(part, faceIndex, point){
   const topo = topology(part.mesh.geometry);
   const ent = faceEntity(part, topo.faceId[faceIndex], point);
   faceOverlay = entityOverlay(ent, 0xff7a45);
+  selectedFace = ent;
   const d = describe(ent);
   showInfo({title:'FACE', rows:[['part', part.name], ['triangles', ent.count.toLocaleString()],
                                 ['type', d.title.toLowerCase()], ...d.rows], foot:FACE_FOOT[topo.source]});

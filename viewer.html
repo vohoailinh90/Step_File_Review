@@ -7,165 +7,255 @@
 <title>QuickSTEP Viewer</title>
 <style>
 :root{
-  --bg:#191c21; --panel:#111318; --panel2:#1e2229; --line:#2a2f38;
-  --txt:#d7dbe2; --dim:#8b93a1; --accent:#5aa7e8; --ok:#5ad18f; --warn:#ffb454; --pick:#ff7a45;
-  --mono:"JetBrains Mono","Cascadia Code",ui-monospace,Consolas,monospace;
-  --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+  /* surfaces */
+  --bg:#191c21;            /* = DARK_BG in 00-scene.js: viewport, drop screen */
+  --surface:#13161b;       /* toolbar, sidebar, status bar */
+  --raised:#1f242c;        /* buttons, inputs, chips */
+  --hover:#272d37;
+  --overlay:rgba(19,22,27,.95);
+  --accent-tint:#1b2c3e;   /* fill of an active control */
+  --pick-tint:rgba(255,122,69,.12);
+  --warn-tint:rgba(255,180,84,.08);
+  /* lines */
+  --border:#333a45;        /* decorative dividers */
+  --border-ctl:#3d4552;    /* button outline (buttons are identified by their label) */
+  --border-strong:#687284; /* input boundary, >=3:1 non-text */
+  /* text and signal: every text colour >= 4.5:1 on --bg, --surface and --raised (--subtle never on --hover) */
+  --text:#e4e7ec; --muted:#a3abb8; --subtle:#8a93a2;
+  --accent:#6cb4f0; --accent-strong:#8cc6f5; --on-accent:#0b1520;
+  --ok:#5fd496; --warn:#ffb454; --pick:#ff7a45; --danger:#ff6b6b; --focus:#9fd0ff;
+  --expsel:#4aa3e8;        /* a part picked for the explode (its 3D tint is 0x0b3350, 20-parts.js) */
+  /* shape */
+  --r:6px; --r-sm:4px; --ctl-h:28px; --shadow:0 8px 28px rgba(0,0,0,.38);
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,ui-monospace,monospace;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  /* legacy names: older rules use them */
+  --panel:var(--surface); --panel2:var(--raised); --line:var(--border); --txt:var(--text); --dim:var(--muted);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:13px}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px}
 #app{display:flex;flex-direction:column;height:100%}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:var(--mono);font-size:10px;line-height:15px;text-align:center;color:var(--text);background:#262c35;border:1px solid var(--border-ctl);border-bottom-width:2px;border-radius:3px;white-space:nowrap}
 
-#topbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap}
-#brand{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--dim)}
-#brand b{color:var(--txt);font-weight:600}
-#fname{font-family:var(--mono);font-size:12px;color:var(--accent);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#loadtime{font-family:var(--mono);font-size:12px;color:var(--ok)}
-#loadtime.empty{color:var(--dim)}
+/* Toolbar: labelled clusters, Select | View | Tools | File */
+#topbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0;min-height:40px;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+#brand{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);white-space:nowrap;flex-shrink:0;padding-right:10px}
+#brand svg{width:18px;height:18px;color:var(--accent);fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+#brand b{color:var(--text);font-weight:600}
+#fileinfo{display:flex;align-items:baseline;gap:8px;min-width:0;padding-left:10px;border-left:1px solid var(--border)}
+#fname{font-family:var(--mono);font-size:12px;color:var(--text);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#loadtime{font-family:var(--mono);font-size:11px;color:var(--ok);white-space:nowrap;font-variant-numeric:tabular-nums}
+#loadtime.empty{color:var(--subtle)}
 .spacer{flex:1}
-.sep{width:1px;height:20px;background:var(--line)}
-.btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--sans);transition:border-color .12s}
-.btn:hover{border-color:var(--accent)}
-.btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.btn.active{border-color:var(--accent);color:var(--accent)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-select.btn{padding:5px 6px;appearance:none;-webkit-appearance:none;text-align:center}
-select.btn option{background:var(--panel2);color:var(--txt)}
-.btn-group{display:flex}
-.btn-group .btn{border-radius:0;border-right-width:0}
-.btn-group .btn:first-child{border-radius:4px 0 0 4px}
-.btn-group .btn:last-child{border-radius:0 4px 4px 0;border-right-width:1px}
-.lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+.tb-group{display:flex;align-items:center;gap:4px;padding:0 8px;border-left:1px solid var(--border);flex-shrink:0}
+.spacer + .tb-group{border-left:0}
+.tb-group:last-child{padding-right:0}
+.tb-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle);margin-right:3px;user-select:none}
+.sep{width:1px;height:18px;background:var(--border);margin:0 2px;flex-shrink:0}
+.lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle)}
 
-#main{display:flex;flex:1;min-height:0}
-#sidebar{width:250px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--ctl-h);min-width:28px;padding:0 10px;background:var(--raised);border:1px solid var(--border-ctl);border-radius:var(--r-sm);color:var(--text);font-family:var(--sans);font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:background-color .12s,border-color .12s,color .12s}
+.btn svg{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.btn svg .fill{fill:currentColor;stroke:none}
+.btn:hover{background:var(--hover);border-color:var(--border-strong)}
+.btn:active{background:var(--surface)}
+.btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px;position:relative;z-index:2}
+.btn.active{background:var(--accent-tint);border-color:var(--accent);color:var(--accent-strong);box-shadow:inset 0 -2px 0 var(--accent)}
+.btn.active:hover{background:#21364c}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled:hover{background:var(--raised);border-color:var(--border-ctl)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}
+.btn b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+select.btn{padding:0 24px 0 9px;appearance:none;-webkit-appearance:none;text-align:left;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:right 12px center,right 8px center;background-size:4px 4px;background-repeat:no-repeat}
+select.btn option{background:var(--raised);color:var(--text)}
+.btn-group{display:flex;flex-shrink:0}
+.btn-group .btn{border-radius:0;margin-left:-1px}
+.btn-group .btn:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm);margin-left:0}
+.btn-group .btn:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
+.btn-group .btn.active{position:relative;z-index:1}
+
+/* Sidebar */
+#main{display:flex;flex:1;min-height:0;position:relative}
+#sidebar{width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
 #sidebar.hidden{display:none}
-#sidehead{padding:8px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-#sidehead span:first-child{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
-#partcount{font-family:var(--mono);font-size:11px;color:var(--accent)}
-#parts{flex:1;overflow-y:auto;padding:4px 0}
-.part{display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:pointer;user-select:none;border-left:2px solid transparent}
-.part:hover{background:var(--panel2)}
-.part.hiddenpart{opacity:.38}
-.part.highlight{border-left-color:var(--warn);background:var(--panel2)}
-.part.selected{border-left-color:var(--pick);background:rgba(255,122,69,.10)}
-.part.selected .nm{color:var(--pick)}
-.part .eye{width:14px;height:14px;flex-shrink:0;color:var(--dim)}
-.part .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-.part .tri{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--dim);flex-shrink:0}
-#sidefoot{padding:8px 12px;border-top:1px solid var(--line);display:flex;gap:6px}
-#sidefoot .btn{flex:1;font-size:11px;padding:4px 6px}
+#sidehead{height:36px;padding:0 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+#sidehead span:first-child{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+#partcount{font-family:var(--mono);font-size:11px;color:var(--text);background:var(--raised);border:1px solid var(--border);border-radius:10px;padding:0 8px;line-height:18px;font-variant-numeric:tabular-nums}
+#partcount:empty{display:none}
+#parts{flex:1;overflow-y:auto;padding:4px 0;scrollbar-width:thin;scrollbar-color:var(--border-ctl) transparent}
+.part{display:flex;align-items:center;gap:8px;min-height:28px;padding:4px 12px 4px 10px;cursor:pointer;user-select:none;border-left:2px solid transparent}
+.part:hover{background:var(--raised)}
+.part:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.part.hiddenpart{opacity:.45}
+.part.highlight{border-left-color:var(--warn);background:var(--raised)}
+.part.selected{border-left-color:var(--pick);background:var(--pick-tint)}
+.part.selected .nm{color:var(--pick);font-weight:600}
+.part.expsel .nm::before{content:"\25C6  ";color:var(--expsel)}
+.part .eye{width:14px;height:14px;flex-shrink:0;color:var(--muted)}
+.part .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.part .tri{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--subtle);flex-shrink:0;font-variant-numeric:tabular-nums}
+#sidefoot{padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px}
+#sidefoot .btn{flex:1}
 
+/* Viewport and the empty / drop state */
 #viewport{flex:1;position:relative;min-width:0}
 #canvas3d{display:block;width:100%;height:100%}
-
-#drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg);z-index:5}
+#drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:var(--bg);z-index:5;text-align:center}
 #drop.hidden{display:none}
-#drop .big{font-size:17px}
-#drop .sub{color:var(--dim);max-width:480px;text-align:center;line-height:1.6}
-#drop .sub code{font-family:var(--mono);color:var(--accent);font-size:12px}
-#drop.dragover{outline:2px dashed var(--accent);outline-offset:-14px}
-#drop .clock{font-family:var(--mono);font-size:44px;color:var(--line);letter-spacing:.05em}
-#enginewarn{display:none;max-width:620px;margin-top:6px;padding:12px 16px;border:1px solid var(--warn);border-radius:6px;line-height:1.65;font-size:12px;background:rgba(255,180,84,.06)}
+#drop .dropcard{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(520px,100%);padding:32px 28px 24px;border:2px dashed var(--border-ctl);border-radius:12px;background:rgba(255,255,255,.015);transition:border-color .15s,background-color .15s}
+#drop .dropicon{width:44px;height:44px;color:var(--accent);fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+#drop .big{font-size:18px;font-weight:600;color:var(--text)}
+#drop .sub{color:var(--muted);max-width:440px;line-height:1.6}
+#drop .sub code{font-family:var(--mono);color:var(--accent-strong);font-size:12px;background:var(--raised);border:1px solid var(--border);border-radius:3px;padding:0 4px}
+#drop .dropcard .btn{height:34px;padding:0 18px;font-size:13px;margin-top:4px}
+#drop .keys{font-size:12px;color:var(--subtle)}
+#drop .clock{font-family:var(--mono);font-size:11px;color:var(--subtle);letter-spacing:.04em;font-variant-numeric:tabular-nums}
+#drop.dragover .dropcard{border-style:solid;border-color:var(--accent);background:var(--accent-tint)}
+#enginewarn{display:none;max-width:620px;padding:12px 16px;border:1px solid var(--warn);border-left-width:4px;border-radius:var(--r);line-height:1.6;font-size:12px;text-align:left;background:var(--warn-tint);color:var(--text)}
 #enginewarn.show{display:block}
 #enginewarn b{color:var(--warn);display:block;margin-bottom:4px}
-#enginewarn code{font-family:var(--mono);color:var(--accent);font-size:11px;user-select:all}
+#enginewarn code{font-family:var(--mono);color:var(--accent-strong);font-size:11px;user-select:all;background:var(--raised);border:1px solid var(--border);border-radius:3px;padding:1px 5px}
 
-/* Floating panels */
-#info{position:absolute;top:10px;left:10px;background:rgba(17,19,24,.92);border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-family:var(--mono);font-size:11px;line-height:1.75;max-width:290px;display:none;z-index:6}
+/* Floating panels: one look */
+#info,#measurepanel,#sectionpanel,#explodepanel{position:absolute;display:none;background:var(--overlay);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+.phead{display:flex;align-items:center;gap:8px;margin:-2px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.phead .pkey{font-size:10px;color:var(--subtle);white-space:nowrap}
+.phead .ptitle{flex:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
+
+#info{top:10px;left:10px;padding:10px 12px;font-family:var(--mono);font-size:11.5px;line-height:1.7;max-width:300px;z-index:6;font-variant-numeric:tabular-nums}
 #info.show{display:block}
-#info .k{color:var(--dim)}
-#info .v{color:var(--txt)}
-#info .hd{color:var(--pick);margin-bottom:3px;letter-spacing:.06em}
+#info .k{color:var(--muted)}
+#info .v{color:var(--text)}
+#info .hd{color:var(--pick);font-weight:600;margin-bottom:4px;letter-spacing:.02em}
 
-#sectionpanel,#explodepanel{position:absolute;bottom:14px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:11px 13px;width:288px;display:none;z-index:7}
-#explodepanel{left:auto;right:10px;width:330px}
+#sectionpanel,#explodepanel{padding:12px 14px;z-index:7}
+#sectionpanel{top:10px;right:10px;width:300px}
+#explodepanel{bottom:12px;right:10px;width:360px}
 #sectionpanel.show,#explodepanel.show{display:block}
-#explodepanel .btn-group .btn{padding:5px 9px}
-#explodepanel .div{border-top:1px solid var(--line);margin:2px 0 10px}
-#explodepanel input[type=number]{width:96px;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:4px 6px;font-family:var(--mono);font-size:12px}
-#explodepanel input[type=number]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-#explodepanel input[type=number]:disabled{opacity:.4}
-#explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--dim)}
-#axisName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--ok)}
-#axisName.none{color:var(--dim)}
-#btnMoveReset{margin-left:auto}
-#sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+#sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:6px;margin-bottom:10px;min-width:0}
 #sectionpanel .row:last-child,#explodepanel .row:last-child{margin-bottom:0}
-#sectionpanel .row .lbl,#explodepanel .row .lbl{width:44px;flex-shrink:0}
+#sectionpanel .row .lbl,#explodepanel .row .lbl{width:48px;flex-shrink:0}
 #explodepanel .row .lbl{width:52px}
-#sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
-#sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent);width:58px;text-align:right;flex-shrink:0}
-#sectionpanel .hint,#explodepanel .hint{font-size:11px;color:var(--dim);line-height:1.55}
-#sectionpanel .hint b{color:var(--pick)}
+#sectionpanel .btn-group .btn,#explodepanel .btn-group .btn{padding:0 9px}
+#sectionpanel .div,#explodepanel .div{border-top:1px solid var(--border);margin:4px 0 12px}
+#sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;min-width:0;height:20px;accent-color:var(--accent);cursor:pointer}
+#sectionpanel input[type=range]:disabled,#explodepanel input[type=range]:disabled{opacity:.4;cursor:not-allowed}
+#explodepanel input[type=number]{width:96px;min-width:0;height:var(--ctl-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);color:var(--text);padding:0 8px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+#explodepanel input[type=number]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
+#explodepanel input[type=number]:disabled{opacity:.45;cursor:not-allowed}
+#explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#axisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none{color:var(--subtle)}
+#btnMoveReset{margin-left:auto}
+#sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent-strong);min-width:58px;text-align:right;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+#sectionpanel .hint,#explodepanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}
+#sectionpanel .hint b{color:var(--pick);font-weight:600}
+#expPickCount{color:var(--expsel)}
 
-#measurepanel{position:absolute;top:10px;left:10px;background:rgba(17,19,24,.94);border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-family:var(--mono);font-size:11px;line-height:1.7;width:310px;max-height:calc(100% - 20px);overflow-y:auto;display:none;z-index:7}
+#measurepanel{top:10px;left:10px;padding:10px 12px;font-family:var(--mono);font-size:11.5px;line-height:1.7;width:320px;max-height:calc(100% - 20px);overflow-y:auto;z-index:7;font-variant-numeric:tabular-nums}
 #measurepanel.show{display:block}
-#measurepanel .mhead{display:flex;align-items:center;gap:6px;margin-bottom:4px}
-#measurepanel .mhead .hd{color:var(--pick);letter-spacing:.06em;flex:1}
-#measurepanel .mhead .btn{font-size:11px;padding:2px 9px}
+#measurepanel .mhead{display:flex;align-items:center;gap:6px;margin:-2px 0 8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+#measurepanel .mhead .hd{flex:1;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--text)}
+#measurepanel .mhead .btn{height:24px;font-size:11px;padding:0 10px}
 #measurepanel .ent{display:flex;align-items:baseline;gap:6px;min-width:0}
 #measurepanel .ent i{width:9px;height:9px;border-radius:2px;flex-shrink:0;align-self:center}
-#measurepanel .ent .nm{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#measurepanel .ent .nm{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #measurepanel .r{display:flex;justify-content:space-between;gap:12px}
-#measurepanel .r .k{color:var(--dim);flex-shrink:0}
+#measurepanel .r .k{color:var(--muted);flex-shrink:0}
 #measurepanel .r .v{text-align:right;overflow-wrap:anywhere}
-#measurepanel .r.main .v{color:var(--warn)}
-#measurepanel .div{border-top:1px solid var(--line);margin:5px 0}
-#measurepanel .hint{font-family:var(--sans);color:var(--dim);line-height:1.5;margin-top:6px}
+#measurepanel .r.main .v{color:var(--warn);font-weight:600}
+#measurepanel .div{border-top:1px solid var(--border);margin:6px 0}
+#measurepanel .hint{font-family:var(--sans);color:var(--muted);line-height:1.5;margin-top:6px}
 #annot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
-
 #axes{position:absolute;left:8px;bottom:8px;width:110px;height:110px;pointer-events:none;z-index:1}
 
-#spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(17,19,24,.55);z-index:10;font-family:var(--mono);color:var(--accent)}
+#spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:10px;background:rgba(19,22,27,.6);z-index:10;font-family:var(--mono);font-size:12px;color:var(--accent-strong);font-variant-numeric:tabular-nums}
 #spin.show{display:flex}
-#toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:7px 14px;border-radius:5px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20;max-width:70%}
-#toast.show{opacity:1}
+#spin::before{content:"";width:16px;height:16px;border:2px solid var(--border-ctl);border-top-color:var(--accent);border-radius:50%;animation:qs-spin .8s linear infinite}
+@keyframes qs-spin{to{transform:rotate(360deg)}}
+#toast{position:absolute;bottom:16px;left:50%;transform:translate(-50%,6px);background:var(--raised);border:1px solid var(--border-ctl);box-shadow:var(--shadow);padding:8px 14px;border-radius:var(--r);font-size:12.5px;line-height:1.45;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:20;max-width:min(70%,560px)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
 
-#statusbar{display:flex;gap:16px;padding:4px 12px;background:var(--panel);border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--dim);flex-shrink:0;flex-wrap:wrap}
-#statusbar b{color:var(--txt);font-weight:500}
+/* Status bar */
+#statusbar{display:flex;align-items:center;flex-wrap:wrap;gap:2px 18px;min-height:26px;padding:3px 12px;background:var(--surface);border-top:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+#statusbar > span{white-space:nowrap}
+#statusbar b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+#unitToggle{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;margin:0 -6px;background:none;border:1px solid transparent;border-radius:var(--r-sm);font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer}
+#unitToggle:hover{background:var(--raised);border-color:var(--border-ctl)}
+#unitToggle:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 #hintbar{color:var(--dim)}
-@media (prefers-reduced-motion: reduce){.btn{transition:none}#toast{transition:none}}
-@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%}#sectionpanel,#explodepanel{width:250px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:260px}}
+#hintbar{font-family:var(--sans)}
+
+/* Responsive: drop cluster labels, then icon-button text, then hints */
+@media (max-width:2099px){.tb-label{display:none}}
+@media (max-width:1859px){.btn.collapsible .t{display:none}.btn.collapsible{width:var(--ctl-h);padding:0}}
+@media (max-width:1279px){#hintbar{display:none}#fname{max-width:160px}}
+@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel{width:auto;left:10px;right:10px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
+@media (prefers-reduced-motion:reduce){*,*::before{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="topbar">
-    <span id="brand"><b>QuickSTEP</b> viewer</span>
-    <span id="fname"></span>
-    <span id="loadtime" class="empty">— no model —</span>
+    <span id="brand"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5 20.5 7.25v9.5L12 21.5 3.5 16.75v-9.5zM3.5 7.25 12 12l8.5-4.75M12 12v9.5"/></svg><b>QuickSTEP</b></span>
+    <span id="fileinfo">
+      <span id="fname"></span>
+      <span id="loadtime" class="empty">— no model —</span>
+    </span>
     <span class="spacer"></span>
 
-    <span class="lbl">select</span>
-    <div class="btn-group" role="group" aria-label="Selection mode">
-      <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
-      <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
-      <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
-      <button class="btn" data-mode="measure" title="Measure diameters, radii and distances between faces and edges (4 / M)">Measure</button>
+    <div class="tb-group" role="group" aria-label="Select">
+      <span class="tb-label" aria-hidden="true">Select</span>
+      <div class="btn-group" role="group" aria-label="Selection mode">
+        <button class="btn active" data-mode="part" title="Select whole components (1)">Part</button>
+        <button class="btn" data-mode="face" title="Select a face (2)">Face</button>
+        <button class="btn" data-mode="edge" title="Select an edge — circles report their diameter (3)">Edge</button>
+        <button class="btn" data-mode="measure" title="Measure diameters, radii and distances between faces and edges (4 / M)">Measure</button>
+      </div>
     </div>
-    <span class="sep"></span>
 
-    <button class="btn" id="btnSection" title="Section views (X)">Section</button>
-    <button class="btn" id="btnExplode" title="Exploded view (V)">Explode</button>
-    <button class="btn" id="btnParts" title="Show or hide part list">Parts</button>
-    <div class="btn-group" role="group" aria-label="Standard views">
-      <button class="btn" data-view="iso">Iso</button>
-      <button class="btn" data-view="front">Front</button>
-      <button class="btn" data-view="top">Top</button>
-      <button class="btn" data-view="right">Right</button>
+    <div class="tb-group" role="group" aria-label="View">
+      <span class="tb-label" aria-hidden="true">View</span>
+      <div class="btn-group" role="group" aria-label="Standard views">
+        <button class="btn" data-view="iso" title="Isometric (Ctrl+7)">Iso</button>
+        <button class="btn" data-view="front" title="Front (Ctrl+1)">Front</button>
+        <button class="btn" data-view="rear" title="Rear (Ctrl+2)">Rear</button>
+        <button class="btn" data-view="top" title="Top (Ctrl+3)">Top</button>
+        <button class="btn" data-view="bottom" title="Bottom (Ctrl+4)">Bottom</button>
+        <button class="btn" data-view="left" title="Left (Ctrl+5)">Left</button>
+        <button class="btn" data-view="right" title="Right (Ctrl+6)">Right</button>
+      </div>
+      <button class="btn collapsible" id="btnNormal" aria-label="Normal to face" title="Normal to: look square at the selected flat face, or at the next face you click; again flips to the other side (Ctrl+8)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 13.5h13M8 13.5V2.5M5.5 5 8 2.5 10.5 5M8 11h2.5v2.5"/></svg><span class="t">Normal to</span></button>
+      <button class="btn collapsible" id="btnFit" aria-label="Fit" title="Fit model in view (F)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/><rect x="5.5" y="5.5" width="5" height="5" rx=".5"/></svg><span class="t">Fit</span></button>
+      <button class="btn collapsible" id="btnEdges" aria-label="Edges" title="Toggle feature edges (E)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5zM2 5l6 3.5L14 5M8 8.5v6"/></svg><span class="t">Edges</span></button>
+      <button class="btn collapsible" id="btnBg" aria-label="White BG" title="White background for reports (B)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6"/><path class="fill" d="M8 2a6 6 0 0 1 0 12z"/></svg><span class="t">White BG</span></button>
     </div>
-    <button class="btn" id="btnFit" title="Fit model in view (F)">Fit</button>
-    <button class="btn" id="btnEdges" title="Toggle feature edges (E)">Edges</button>
-    <button class="btn" id="btnBg" title="White background for reports (B)">White BG</button>
-    <button class="btn" id="btnShot" title="Save PNG screenshot (S)">Screenshot</button>
-    <select class="btn" id="quality" title="Tessellation quality used when converting STEP">
-      <option value="coarse">Coarse</option>
-      <option value="normal" selected>Normal</option>
-      <option value="fine">Fine</option>
-    </select>
-    <button class="btn" id="btnOpen">Open file…</button>
-    <input type="file" id="fileinput" accept=".step,.stp,.glb,.gltf,.stl" style="display:none">
+
+    <div class="tb-group" role="group" aria-label="Tools">
+      <span class="tb-label" aria-hidden="true">Tools</span>
+      <button class="btn collapsible" id="btnSection" aria-label="Section" title="Section views (X)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M1 10 15 6" stroke-dasharray="2 2"/></svg><span class="t">Section</span></button>
+      <button class="btn collapsible" id="btnExplode" aria-label="Explode" title="Exploded view (V)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="5" height="5" rx="1"/><path d="M1.5 4V1.5H4M12 1.5h2.5V4M1.5 12v2.5H4M12 14.5h2.5V12"/></svg><span class="t">Explode</span></button>
+      <button class="btn collapsible" id="btnParts" aria-label="Parts" title="Show or hide part list"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 4h8.5M6 8h8.5M6 12h8.5"/><path class="fill" d="M2 3h2v2H2zM2 7h2v2H2zM2 11h2v2H2z"/></svg><span class="t">Parts</span></button>
+    </div>
+
+    <div class="tb-group" role="group" aria-label="File">
+      <span class="tb-label" aria-hidden="true">File</span>
+      <select class="btn" id="quality" aria-label="Tessellation quality" title="Tessellation quality used when converting STEP">
+        <option value="coarse">Coarse</option>
+        <option value="normal" selected>Normal</option>
+        <option value="fine">Fine</option>
+      </select>
+      <button class="btn collapsible" id="btnShot" aria-label="Screenshot" title="Save PNG screenshot (S)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 5.5h2.8l1.2-2h5l1.2 2h2.8v8h-13z"/><circle cx="8" cy="9.25" r="2.5"/></svg><span class="t">Screenshot</span></button>
+      <button class="btn primary" id="btnOpen" title="Open a STEP, GLB, GLTF or STL file"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 4.5v8.5h13V6.5H8L6.5 4.5z"/></svg>Open file…</button>
+      <input type="file" id="fileinput" accept=".step,.stp,.glb,.gltf,.stl" style="display:none">
+    </div>
   </div>
 
   <div id="main">
@@ -197,6 +287,16 @@ select.btn option{background:var(--panel2);color:var(--txt)}
       </div>
 
       <div id="explodepanel">
+        <div class="phead"><span class="ptitle">Explode &amp; move</span><span class="pkey">toggle <kbd>V</kbd></span></div>
+        <div class="row">
+          <span class="lbl">parts</span>
+          <div class="btn-group" role="group" aria-label="Which parts explode">
+            <button class="btn active" data-expscope="all" title="Every part explodes">All</button>
+            <button class="btn" data-expscope="picked" title="Only the picked parts move, together, along the chosen direction">Picked <b id="expPickCount">0</b></button>
+          </div>
+          <button class="btn" id="btnExpPick" title="Pick parts: click parts to add or remove them (or Ctrl+click a part, in the view or the list)">Pick parts…</button>
+          <button class="btn" id="btnExpClear" title="Forget the picked parts">Clear</button>
+        </div>
         <div class="row">
           <span class="lbl">amount</span>
           <input type="range" id="expAmount" min="0" max="100" step="1" value="0">
@@ -211,10 +311,12 @@ select.btn option{background:var(--panel2);color:var(--txt)}
             <button class="btn" data-exp="z">Z</button>
             <button class="btn" data-exp="axis" title="Along the picked axis">Axis</button>
           </div>
+          <button class="btn" id="btnExpFlip" title="Picked parts: move towards minus X / Y / Z, or against the axis">Flip</button>
           <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
         </div>
-        <div class="row"><span class="hint">Parts slide away from the assembly centre. Measurements keep
-          using the assembled positions.</span></div>
+        <div class="row"><span class="hint">All: parts slide away from the assembly centre. Picked: only the
+          picked parts move, as one group, along the chosen direction. Measurements keep using the
+          assembled positions.</span></div>
         <div class="div"></div>
         <div class="row">
           <span class="lbl">axis</span>
@@ -232,9 +334,10 @@ select.btn option{background:var(--panel2);color:var(--txt)}
       </div>
 
       <div id="sectionpanel">
+        <div class="phead"><span class="ptitle">Section</span><span class="pkey">toggle <kbd>X</kbd></span></div>
         <div class="row">
           <span class="lbl">plane</span>
-          <div class="btn-group">
+          <div class="btn-group" role="group" aria-label="Section plane">
             <button class="btn" data-sec="right">Right</button>
             <button class="btn" data-sec="top">Top</button>
             <button class="btn" data-sec="front">Front</button>
@@ -260,7 +363,8 @@ select.btn option{background:var(--panel2);color:var(--txt)}
       </div>
 
       <div id="drop">
-        <div class="clock">00.00 s</div>
+        <div class="dropcard">
+        <svg class="dropicon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 14.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4.5"/></svg>
         <div class="big">Drop a STEP file here</div>
         <div class="sub">
           Accepts <code>.step</code> / <code>.stp</code>, and already-converted
@@ -268,7 +372,10 @@ select.btn option{background:var(--panel2);color:var(--txt)}
           The first open of a large assembly tessellates it once on this machine;
           every open after that loads from cache in seconds.
         </div>
-        <button class="btn" id="btnOpen2">Choose a file</button>
+        <button class="btn primary" id="btnOpen2">Choose a file</button>
+        <div class="keys">Then <kbd>LMB</kbd> rotate · <kbd>F</kbd> fit · <kbd>M</kbd> measure · <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>6</kbd> views</div>
+        <div class="clock">00.00 s</div>
+        </div>
         <div id="enginewarn">
           <b>STEP conversion is unavailable on this machine.</b>
           <span id="engineproblem">The tessellation engine is not installed for the Python running this viewer.</span>
@@ -287,9 +394,9 @@ select.btn option{background:var(--panel2);color:var(--txt)}
     <span>triangles <b id="stTris">0</b></span>
     <span>size <b id="stSize">–</b></span>
     <span>bbox <b id="stBbox">–</b></span>
-    <span id="unitToggle" style="cursor:pointer" title="Click if the scale looks wrong">units <b id="stUnits">mm</b></span>
+    <button type="button" id="unitToggle" title="Units — click if the scale looks wrong">units <b id="stUnits">mm</b></button>
     <span class="spacer"></span>
-    <span id="hintbar">LMB or ←↑↓→ rotate · RMB pan · wheel zoom · click to select · H hide · I isolate · M measure</span>
+    <span id="hintbar"><kbd>LMB</kbd> or <kbd>←↑↓→</kbd> rotate · <kbd>RMB</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>F</kbd> fit · <kbd>H</kbd> hide · <kbd>I</kbd> isolate · <kbd>M</kbd> measure · <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>6</kbd> views · <kbd>Ctrl</kbd>+<kbd>8</kbd> normal to · <kbd>Esc</kbd> clear</span>
   </div>
 </div>
 
@@ -5688,25 +5795,35 @@ function computeBBox(){
   if (modelRoot) box.expandByObject(modelRoot);
   return box.isEmpty() ? null : box;
 }
-function frame(dir){
+function frame(dir, up){
   const box = (exploded() ? computeBBox() : bboxCached) || computeBBox();
   if (!box) return;
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
   const dist = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)) * 1.35;
   const d = (dir || new THREE.Vector3(1, 0.75, 1)).clone().normalize();
-  orbitStop(); camera.up.set(0, 1, 0);               // upright again, however the drag left it (05-orbit.js)
+  orbitStop(); camera.up.copy(up || _Y0);           // upright again, however the drag left it (05-orbit.js)
   camera.position.copy(center).addScaledVector(d, dist);
   camera.near = Math.max(dist/1000, 1e-4);
   camera.far  = dist * 100;
   camera.updateProjectionMatrix();
   controls.target.copy(center); controls.update();
 }
+// The standard views, as SolidWorks names them (Y up, +Z towards the viewer in Front): each is the
+// direction from the model to the camera and the screen's up. Top has the front of the model at the
+// bottom of the screen, Bottom at the top; the rest stand upright. Ctrl+1 … Ctrl+6 (55-views.js).
+const _Y0 = new THREE.Vector3(0, 1, 0);
 const VIEWS = {
-  iso:new THREE.Vector3(1,.8,1), front:new THREE.Vector3(0,0,1),
-  top:new THREE.Vector3(0,1,.0001), right:new THREE.Vector3(1,0,0)
+  iso:   {d:new THREE.Vector3(1, .8, 1),  up:_Y0},
+  front: {d:new THREE.Vector3(0, 0, 1),   up:_Y0},
+  rear:  {d:new THREE.Vector3(0, 0, -1),  up:_Y0},
+  top:   {d:new THREE.Vector3(0, 1, 0),   up:new THREE.Vector3(0, 0, -1)},
+  bottom:{d:new THREE.Vector3(0, -1, 0),  up:new THREE.Vector3(0, 0, 1)},
+  left:  {d:new THREE.Vector3(-1, 0, 0),  up:_Y0},
+  right: {d:new THREE.Vector3(1, 0, 0),   up:_Y0}
 };
-document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', ()=> frame(VIEWS[b.dataset.view])));
+function setView(k){ const v = VIEWS[k]; if (v) frame(v.d, v.up); }
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', ()=> setView(b.dataset.view)));
 $('btnFit').addEventListener('click', ()=> frame());
 
 // ── Orbit ────────────────────────────────────────────────────
@@ -5958,7 +6075,7 @@ function afterLoad(name, bytes, ms){
     bboxCached.getCenter(modelCenter);
     $('stBbox').textContent = [s.x,s.y,s.z].map(v=>L(v)).join(' × ') + ' mm';
   }
-  frame(VIEWS.iso);
+  setView('iso');
   buildPartList();
 
   $('fname').textContent = name;
@@ -5991,7 +6108,10 @@ function buildPartList(){
     row.querySelector('.nm').textContent = p.name;
     row.querySelector('.tri').textContent = p.tris >= 1000 ? Math.round(p.tris/1000)+'k' : p.tris;
     row.title = p.name;
-    row.addEventListener('click', ()=>{ selectPart(p, false); setPartVisible(p, !p.visible); });
+    row.addEventListener('click', e=>{
+      if ((e.ctrlKey || e.metaKey) && $('explodepanel').classList.contains('show')){ explodeToggle(p); return; }
+      selectPart(p, false); setPartVisible(p, !p.visible);
+    });
     row.addEventListener('dblclick', ()=> isolate(p));
     row.addEventListener('mouseenter', ()=> hover(p, true));
     row.addEventListener('mouseleave', ()=> hover(p, false));
@@ -6010,8 +6130,9 @@ function isolate(p){
 }
 let hovered = null;
 function emis(p, hex){ const m = p.mesh.material; if (m && m.emissive) m.emissive.setHex(hex); }
+function baseEmis(p){ return explodeSel.has(p) ? 0x0b3350 : 0; }   // a part picked for the explode keeps a blue tint
 function hover(p, on){
-  if (hovered && hovered !== selected){ emis(hovered, 0); hovered.rowEl.classList.remove('highlight'); }
+  if (hovered && hovered !== selected){ emis(hovered, baseEmis(hovered)); hovered.rowEl.classList.remove('highlight'); }
   hovered = null;
   if (on && p !== selected){ emis(p, 0x24402a); p.rowEl.classList.add('highlight'); hovered = p; }
 }
@@ -6025,6 +6146,7 @@ $('btnParts').addEventListener('click', ()=>{
 let mode = 'part';
 let selected = null;            // selected part
 let faceOverlay = null, edgeOverlay = null;
+let selectedFace = null;        // the face entity picked in Face mode: Normal to (48-views.js) looks at it
 let pickedCircle = null;        // {center, axis, radius}
 const followers = new Set();    // highlight meshes that move with their part in an exploded view
 
@@ -6051,18 +6173,19 @@ function disposeOverlay(o){
 }
 function clearSubSelection(){
   if (faceOverlay){ disposeOverlay(faceOverlay); faceOverlay = null; }
+  selectedFace = null;
   if (edgeOverlay){ disposeOverlay(edgeOverlay); edgeOverlay = null; }
   showInfo(null);
 }
 function clearSelection(){
   clearSubSelection();
-  if (selected){ emis(selected, 0); selected.rowEl.classList.remove('selected'); }
+  if (selected){ emis(selected, baseEmis(selected)); selected.rowEl.classList.remove('selected'); }
   selected = null;
   moveSync();                     // the explode panel moves the selected part
 }
 function selectPart(p, scroll){
   if (selected === p) return;
-  if (selected){ emis(selected, 0); selected.rowEl.classList.remove('selected'); }
+  if (selected){ emis(selected, baseEmis(selected)); selected.rowEl.classList.remove('selected'); }
   selected = p;
   if (p){
     emis(p, 0x5a2410);
@@ -6102,6 +6225,9 @@ function pick(e){
   if (!modelRoot) return;
   setRay(e);
   if (axisPickMode) return pickAxis(e);           // Explode → Pick axis… (47-move.js)
+  if (normalPickMode) return pickNormal(e);       // Normal to… (48-views.js)
+  if (explodePickMode || (mode === 'part' && (e.ctrlKey || e.metaKey) && $('explodepanel').classList.contains('show')))
+    return pickExplodePart();                     // Explode → Pick parts…, or Ctrl+click (46-explode.js)
   if (circlePickMode || mode === 'edge') return pickEdge();
   if (mode === 'measure') return pickMeasure(e);
 
@@ -6539,6 +6665,7 @@ function selectFace(part, faceIndex, point){
   const topo = topology(part.mesh.geometry);
   const ent = faceEntity(part, topo.faceId[faceIndex], point);
   faceOverlay = entityOverlay(ent, 0xff7a45);
+  selectedFace = ent;
   const d = describe(ent);
   showInfo({title:'FACE', rows:[['part', part.name], ['triangles', ent.count.toLocaleString()],
                                 ['type', d.title.toLowerCase()], ...d.rows], foot:FACE_FOOT[topo.source]});
@@ -7583,15 +7710,65 @@ function drawAnnotations(ctx, W, H, s, items){
 // along a picked axis (`moved`, 47-move.js). The move is made in world space and turned into the
 // part's parent frame, so nested assemblies stay consistent; edges, section caps and
 // highlights move along. Measurements keep using the assembled geometry.
-let explodeAmt = 0, explodeAxis = 'all';
+// Scope Picked explodes only the parts picked for it (Pick parts…, or Ctrl+click a part in the view or
+// the list): they move together, as one rigid group, along the chosen direction — X, Y or Z (Flip for
+// the minus side), the picked axis, or with All straight away from the assembly centre through the
+// group's own centre — up to EXPLODE_PICKED model sizes at 100 %. Every other part stays assembled.
+let explodeAmt = 0, explodeAxis = 'all', explodeScope = 'all', explodeSign = 1, explodePickMode = false;
 const EXPLODE_MAX = 2;               // at 100 % a part ends up three times as far from the centre
+const EXPLODE_PICKED = 1;            // at 100 % a picked group has moved one model size (largest bbox side)
+const explodeSel = new Set();        // the parts Scope Picked explodes
 $('btnExplode').addEventListener('click', ()=>{
   if (!modelRoot){ toast('Load a model first'); return; }
   const open = $('explodepanel').classList.toggle('show');
   $('btnExplode').classList.toggle('active', open);
   if (open && parts.length < 2) toast('A single part — nothing to explode');
   if (!open && axisPickMode) movePickCancel();
+  if (!open && explodePickMode) explodePickCancel();
 });
+document.querySelectorAll('[data-expscope]').forEach(b => b.addEventListener('click', ()=> setExplodeScope(b.dataset.expscope)));
+$('btnExpPick').addEventListener('click', ()=>{ if (explodePickMode) explodePickCancel(); else explodePickStart(); });
+$('btnExpClear').addEventListener('click', ()=>{ [...explodeSel].forEach(p => explodeToggle(p)); setExplodeScope('all'); });
+$('btnExpFlip').addEventListener('click', ()=>{
+  explodeSign = -explodeSign;
+  $('btnExpFlip').classList.toggle('active', explodeSign < 0);
+  applyExplode();
+});
+function setExplodeScope(k){
+  explodeScope = k;
+  document.querySelectorAll('[data-expscope]').forEach(x => x.classList.toggle('active', x.dataset.expscope === k));
+  applyExplode();
+}
+function explodePickStart(){
+  if (!modelRoot){ toast('Load a model first'); return; }
+  if (axisPickMode) movePickCancel();
+  if (normalPickMode) normalPickCancel();
+  explodePickMode = true;
+  $('btnExpPick').classList.add('active');
+  moveCursor();
+}
+function explodePickCancel(){
+  explodePickMode = false;
+  $('btnExpPick').classList.remove('active');
+  moveCursor();
+}
+// Add a part to the picked group, or take it out; the first one picked switches the scope to Picked.
+function explodeToggle(p){
+  if (explodeSel.has(p)) explodeSel.delete(p); else explodeSel.add(p);
+  if (p.rowEl) p.rowEl.classList.toggle('expsel', explodeSel.has(p));
+  if (p !== selected && p !== hovered) emis(p, baseEmis(p));
+  $('expPickCount').textContent = explodeSel.size;
+  if (explodeSel.size && explodeScope !== 'picked') setExplodeScope('picked'); else applyExplode();
+}
+// The click while Pick parts… is on, or a Ctrl+click in Part mode with the panel open (30-select.js).
+function pickExplodePart(){
+  const hit = raycaster.intersectObjects(parts.filter(p => p.visible).map(p => p.mesh), false)
+                       .find(h => notClipped(h.point, h.object));
+  if (!hit) return;
+  const part = parts.find(p => p.mesh === hit.object);
+  explodeToggle(part);
+  selectPart(part);
+}
 $('expAmount').addEventListener('input', e => setExplode(e.target.value / 100));
 document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', ()=>{
   setExplodeAxis(b.dataset.exp);
@@ -7611,15 +7788,35 @@ function setExplode(v){
 }
 function resetExplode(){             // a newly loaded model starts assembled
   explodeAmt = 0;
+  explodeSel.clear(); $('expPickCount').textContent = 0; explodePickCancel();
+  explodeSign = 1; $('btnExpFlip').classList.remove('active'); setExplodeScope('all');
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
   moveReset();
 }
 function exploded(){ return parts.some(p => p.offset.lengthSq() > 0); }    // any part drawn off its assembled place
-const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3();
+const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3(), _zero = new THREE.Vector3(), _gs = new THREE.Vector3();
+// The one vector the picked group moves by: along X / Y / Z (signed by Flip), the picked axis (its own
+// direction, signed by Flip too), or All: away from the assembly centre through the group's centre.
+function groupShift(){
+  _gs.set(0, 0, 0);
+  if (!explodeSel.size) return _gs;
+  const k = {x:0, y:1, z:2}[explodeAxis];
+  if (k !== undefined) _gs.setComponent(k, explodeSign);
+  else if (explodeAxis === 'axis' && moveAxis) _gs.copy(moveAxis.d).multiplyScalar(explodeSign);
+  else {
+    explodeSel.forEach(p => _gs.add(p.restCenter));
+    _gs.divideScalar(explodeSel.size).sub(modelCenter);
+    if (_gs.lengthSq() < 1e-12 * modelSize * modelSize) _gs.set(0, 1, 0);   // a group on the centre goes up
+    _gs.normalize().multiplyScalar(explodeSign);
+  }
+  return _gs.multiplyScalar(explodeAmt * EXPLODE_PICKED * modelSize);
+}
 function applyExplode(){
   if (!modelRoot) return;
   const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis], ax = explodeAxis === 'axis' && moveAxis ? moveAxis.d : null;
+  const group = explodeScope === 'picked' ? groupShift() : null;
   parts.forEach(p=>{
+    if (group){ p.offset.copy(explodeSel.has(p) ? group : _zero).add(p.moved); return; }
     p.offset.subVectors(p.restCenter, modelCenter);
     if (k !== undefined) for (let i = 0; i < 3; i++) if (i !== k) p.offset.setComponent(i, 0);
     if (ax){ const s = p.offset.dot(ax); p.offset.copy(ax).multiplyScalar(s); }
@@ -7804,7 +8001,7 @@ function moveStep(part){             // 1, 2 or 5 x 10^n shown units: the rounde
 function moveCursor(){
   if (moveDrag) canvas.style.cursor = 'grabbing';
   else if (moveHover) canvas.style.cursor = 'grab';
-  else if (axisPickMode) canvas.style.cursor = 'crosshair';
+  else if (axisPickMode || normalPickMode || explodePickMode) canvas.style.cursor = 'crosshair';
   else canvas.style.cursor = '';
 }
 // A drag holds the part by the point of the axis under the cursor. That axis line runs through the
@@ -7884,6 +8081,87 @@ function drawMoveGizmo(ctx, s){
   }
   ctx.restore();
 }
+// ── Normal to a face, and the standard-view shortcuts ───────
+// Normal to (Ctrl+8, as in SolidWorks) turns the view to look square at a face: the face selected in
+// Face mode when it is flat, or else the next face clicked. The camera goes out along the face's normal on the side it was
+// seen from, so the face is looked at from the outside; asked again while already square to it, it
+// looks from the other side. A flat face uses its plane's normal (exact from the B-rep when the file
+// carries it); a curved face the normal of the triangle under the click, and says so. Up is the world
+// axis the standard views use: Y, or for a face looking up or down, as Top and Bottom do.
+// Ctrl+1 … Ctrl+6 are Front, Rear, Top, Bottom, Left, Right; Ctrl+7 is Iso.
+let normalPickMode = false;
+const NORMAL_SAME = 0.9999;          // cos 0.8°: the view is already square to this face
+const _nd = new THREE.Vector3(), _nu = new THREE.Vector3(), _nv = new THREE.Vector3();
+const _nmx = new THREE.Matrix3();
+$('btnNormal').addEventListener('click', normalTo);
+
+function normalTo(){
+  if (!modelRoot){ toast('Load a model first'); return; }
+  if (normalPickMode){ normalPickCancel(); return; }
+  if (selectedFace && selectedFace.geom.type === 'plane') return lookAtFace(selectedFace, null);
+  if (axisPickMode) movePickCancel();
+  if (explodePickMode) explodePickCancel();
+  normalPickMode = true;
+  $('btnNormal').classList.add('active');
+  moveCursor();
+  toast('Click a face to look square at it (Esc cancels)', 4000);
+}
+function normalPickCancel(){
+  normalPickMode = false;
+  $('btnNormal').classList.remove('active');
+  moveCursor();
+}
+// The click after Normal to… (pick() in 30-select.js sends it here; the ray is already set).
+function pickNormal(){
+  const hit = raycaster.intersectObjects(parts.filter(p => p.visible).map(p => p.mesh), false)
+                       .find(h => notClipped(h.point, h.object));
+  if (!hit){ toast('No face there — click a face of the model'); return; }
+  normalPickCancel();
+  const part = parts.find(p => p.mesh === hit.object);
+  const topo = topology(part.mesh.geometry);
+  lookAtFace(faceEntity(part, topo.faceId[hit.faceIndex], hit.point.clone().sub(part.offset)), hit);
+}
+// The direction from a face to the camera that looks square at it, or null; `hit` is the raycast
+// (drawn position) when there is one. Sets `faceNormalExact`: false when it is a triangle's normal.
+let faceNormalExact = true;
+function faceViewDir(ent, hit){
+  if (ent.geom.type === 'plane'){ _nd.copy(ent.geom.n); faceNormalExact = true; }
+  else if (hit && hit.face){
+    _nd.copy(hit.face.normal).applyMatrix3(_nmx.getNormalMatrix(hit.object.matrixWorld)); faceNormalExact = false;
+  } else return null;
+  if (!(_nd.lengthSq() > 0)) return null;
+  _nd.normalize();
+  const at = hit ? hit.point : _nv.copy(ent.hit).add(ent.part.offset);
+  if (_nu.subVectors(camera.position, at).dot(_nd) < 0) _nd.negate();      // the side it is seen from
+  if (_nu.subVectors(camera.position, controls.target).normalize().dot(_nd) > NORMAL_SAME) _nd.negate();
+  return _nd;
+}
+// Up for a view along d: world Y kept square to d; looking up or down, as Bottom and Top.
+function viewUp(d, out){
+  if (Math.abs(d.y) > 0.99) return out.set(0, 0, d.y > 0 ? -1 : 1);
+  return out.set(0, 1, 0).addScaledVector(d, -d.y).normalize();
+}
+function lookAtFace(ent, hit){
+  const d = faceViewDir(ent, hit);
+  if (!d){ toast('That face has no single normal to look along'); return; }
+  frame(d.clone(), viewUp(d, new THREE.Vector3()));
+  toast(faceNormalExact ? 'Normal to the face' : 'Curved face — square to it at the point clicked');
+}
+
+// Ctrl (⌘ on a Mac) + 1 … 8, by key position so it works on any keyboard layout. Ctrl+1 … 8 switch
+// tabs in most browsers; a page may take them, and this one does while the focus is not in a field.
+const VIEW_KEYS = {1:'front', 2:'rear', 3:'top', 4:'bottom', 5:'left', 6:'right', 7:'iso'};
+function viewKey(e){
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return false;
+  const m = /^(?:Digit|Numpad)([1-8])$/.exec(e.code || '');
+  if (!m) return false;
+  e.preventDefault();
+  if (m[1] === '8') normalTo(); else setView(VIEW_KEYS[m[1]]);
+  return true;
+}
+window.addEventListener('keydown', viewKey);
 // ── Section planes ───────────────────────────────────────────
 // sectionPlane is the cut in assembled coordinates. Each part is clipped by its own copy, moved
 // with the part when the assembly is exploded, so every part keeps the cut it had assembled.
@@ -8109,6 +8387,7 @@ $('unitToggle').addEventListener('click', ()=>{
 // ── Keyboard ─────────────────────────────────────────────────
 window.addEventListener('keydown', e=>{
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;     // Ctrl+1 … 8 are the views (48-views.js); the rest stay the browser's
   const k = e.key.toLowerCase();
   if (k === 'f') frame();
   else if (k === 's') screenshot();
@@ -8129,6 +8408,8 @@ window.addEventListener('keydown', e=>{
     if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
     clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
     if (axisPickMode) movePickCancel();
+    if (normalPickMode) normalPickCancel();
+    if (explodePickMode) explodePickCancel();
   }
 });
 

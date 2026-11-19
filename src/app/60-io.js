@@ -61,6 +61,7 @@ $('unitToggle').addEventListener('click', ()=>{
 // ── Keyboard ─────────────────────────────────────────────────
 window.addEventListener('keydown', e=>{
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;     // Ctrl+1 … 8 are the views (48-views.js); the rest stay the browser's
   const k = e.key.toLowerCase();
   if (k === 'f') frame();
   else if (k === 's') screenshot();
@@ -81,6 +82,8 @@ window.addEventListener('keydown', e=>{
     if (mode === 'measure') measureClear(!measA);     // first Esc drops the picks, the next the kept dimensions
     clearSelection(); circlePickMode = false; $('btnPickCircle').classList.remove('active');
     if (axisPickMode) movePickCancel();
+    if (normalPickMode) normalPickCancel();
+    if (explodePickMode) explodePickCancel();
   }
 });
 

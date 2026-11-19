@@ -2,6 +2,7 @@
 let mode = 'part';
 let selected = null;            // selected part
 let faceOverlay = null, edgeOverlay = null;
+let selectedFace = null;        // the face entity picked in Face mode: Normal to (48-views.js) looks at it
 let pickedCircle = null;        // {center, axis, radius}
 const followers = new Set();    // highlight meshes that move with their part in an exploded view
 
@@ -28,18 +29,19 @@ function disposeOverlay(o){
 }
 function clearSubSelection(){
   if (faceOverlay){ disposeOverlay(faceOverlay); faceOverlay = null; }
+  selectedFace = null;
   if (edgeOverlay){ disposeOverlay(edgeOverlay); edgeOverlay = null; }
   showInfo(null);
 }
 function clearSelection(){
   clearSubSelection();
-  if (selected){ emis(selected, 0); selected.rowEl.classList.remove('selected'); }
+  if (selected){ emis(selected, baseEmis(selected)); selected.rowEl.classList.remove('selected'); }
   selected = null;
   moveSync();                     // the explode panel moves the selected part
 }
 function selectPart(p, scroll){
   if (selected === p) return;
-  if (selected){ emis(selected, 0); selected.rowEl.classList.remove('selected'); }
+  if (selected){ emis(selected, baseEmis(selected)); selected.rowEl.classList.remove('selected'); }
   selected = p;
   if (p){
     emis(p, 0x5a2410);
@@ -79,6 +81,9 @@ function pick(e){
   if (!modelRoot) return;
   setRay(e);
   if (axisPickMode) return pickAxis(e);           // Explode → Pick axis… (47-move.js)
+  if (normalPickMode) return pickNormal(e);       // Normal to… (48-views.js)
+  if (explodePickMode || (mode === 'part' && (e.ctrlKey || e.metaKey) && $('explodepanel').classList.contains('show')))
+    return pickExplodePart();                     // Explode → Pick parts…, or Ctrl+click (46-explode.js)
   if (circlePickMode || mode === 'edge') return pickEdge();
   if (mode === 'measure') return pickMeasure(e);
 

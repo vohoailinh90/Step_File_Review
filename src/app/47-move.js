@@ -138,7 +138,7 @@ function moveStep(part){             // 1, 2 or 5 x 10^n shown units: the rounde
 function moveCursor(){
   if (moveDrag) canvas.style.cursor = 'grabbing';
   else if (moveHover) canvas.style.cursor = 'grab';
-  else if (axisPickMode) canvas.style.cursor = 'crosshair';
+  else if (axisPickMode || normalPickMode || explodePickMode) canvas.style.cursor = 'crosshair';
   else canvas.style.cursor = '';
 }
 // A drag holds the part by the point of the axis under the cursor. That axis line runs through the

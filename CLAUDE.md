@@ -45,7 +45,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 | file | lines | owns |
 |---|---|---|
-| `src/app/00-scene.js`    | 75  | renderer, scene, camera, lights, `unitScale` / `unitMm`, `L()`/`A2()`, framing (upright again), annotation canvas |
+| `src/app/00-scene.js`    | 75  | renderer, scene, camera, lights, `unitScale` / `unitMm`, `L()`/`A2()`, framing (`frame(dir, up)`, the seven `VIEWS`, `setView`), annotation canvas |
 | `src/app/05-orbit.js`    | 56  | left-drag turning with no end stop: about Y sideways, on over the top up and down; damping, `orbitStop()` |
 | `src/app/10-load.js`     | 164 | `sameOrigin()` runtime URL guard, format sniffing and its units (`mmScale`), `TM_brep_faces` import, GLB/GLTF/STL load, dispose, load status |
 | `src/app/20-parts.js`    | 42  | part list, visibility, isolate, hover |
@@ -61,6 +61,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 | `src/app/45-annotate.js` | 99  | dimensions drawn on the model and into screenshots |
 | `src/app/46-explode.js`  | 87  | exploded view (`EXPLODE_MAX`, along X / Y / Z / Axis, `exploded()`), feature-edge toggle |
 | `src/app/47-move.js`     | 220 | a part moved along a picked axis (`moved`): Pick…, typed distance, the drag arrow |
+| `src/app/48-views.js`    | 81  | Normal to a face (`normalTo`, `faceViewDir`, `viewUp`), the Ctrl+1…8 view keys (`viewKey`) |
 | `src/app/50-section.js`  | 162 | section planes, plane-from-circle, stencil caps, per-part cuts while exploded |
 | `src/app/60-io.js`       | 163 | drag & drop, `/convert`, `/status`, screenshot, units toggle (`setUnitsRaw`), keyboard, autoload |
 | `src/ui/viewer.css`      | 119 | all styling |
@@ -232,7 +233,7 @@ with work outstanding is a signal to report the partial result and the remaining
 risk — not to spawn past it. `architecture-critic` runs **one** round; a second
 round requires unresolved critical findings and must resume the same critic.
 
-`.claude/agents/` holds the roster. `test-engineer` is **escalation only**:
+`.claude/agents/` holds the roster. Two advisory roles sit outside the tier budget's reviewer slots and run only when asked: `ui-ux-designer` (visual and usability design of `src/ui/`, backed by the `ui-ux-pro-max` skill vendored unchanged from `vohoailinh90/Automation-UI-Kit` into `.claude/skills/ui-ux-pro-max/`) and `cad-expert` (does a feature serve real CAD work, and could it mislead). `test-engineer` is **escalation only**:
 invoke it after a reviewer reports that verification needs designing (a
 headless-WebGL harness, a large-assembly rehearsal, a concurrency probe), never
 as a routine second reviewer.
@@ -248,7 +249,7 @@ a verdict all belong in a script — `tests/check_invariants.py` or
 **Mutation checking is the worked example.** A passing test proves nothing on its
 own; a test that would still pass with the behavior deleted reports safety that
 is not there. `tests/mutation_check.py` breaks each behavior and requires the
-suite to notice — 165 mutations, all currently caught. When you ship a fix with a
+suite to notice — 175 mutations, all currently caught. When you ship a fix with a
 test, add the mutation that would have caught it.
 
 This is not theoretical. The first version of this suite reported 20/20 caught

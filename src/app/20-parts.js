@@ -10,7 +10,10 @@ function buildPartList(){
     row.querySelector('.nm').textContent = p.name;
     row.querySelector('.tri').textContent = p.tris >= 1000 ? Math.round(p.tris/1000)+'k' : p.tris;
     row.title = p.name;
-    row.addEventListener('click', ()=>{ selectPart(p, false); setPartVisible(p, !p.visible); });
+    row.addEventListener('click', e=>{
+      if ((e.ctrlKey || e.metaKey) && $('explodepanel').classList.contains('show')){ explodeToggle(p); return; }
+      selectPart(p, false); setPartVisible(p, !p.visible);
+    });
     row.addEventListener('dblclick', ()=> isolate(p));
     row.addEventListener('mouseenter', ()=> hover(p, true));
     row.addEventListener('mouseleave', ()=> hover(p, false));
@@ -29,8 +32,9 @@ function isolate(p){
 }
 let hovered = null;
 function emis(p, hex){ const m = p.mesh.material; if (m && m.emissive) m.emissive.setHex(hex); }
+function baseEmis(p){ return explodeSel.has(p) ? 0x0b3350 : 0; }   // a part picked for the explode keeps a blue tint
 function hover(p, on){
-  if (hovered && hovered !== selected){ emis(hovered, 0); hovered.rowEl.classList.remove('highlight'); }
+  if (hovered && hovered !== selected){ emis(hovered, baseEmis(hovered)); hovered.rowEl.classList.remove('highlight'); }
   hovered = null;
   if (on && p !== selected){ emis(p, 0x24402a); p.rowEl.classList.add('highlight'); hovered = p; }
 }
