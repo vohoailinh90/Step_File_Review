@@ -44,7 +44,7 @@ function selectPart(p, scroll){
   if (selected){ emis(selected, baseEmis(selected)); selected.rowEl.classList.remove('selected'); }
   selected = p;
   if (p){
-    emis(p, 0x5a2410);
+    emis(p, 0x8a2a06);
     p.rowEl.classList.add('selected');
     if (scroll !== false) p.rowEl.scrollIntoView({block:'nearest'});
     if ($('sidebar').classList.contains('hidden') && parts.length > 1){

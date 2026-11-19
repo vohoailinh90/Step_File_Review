@@ -1,25 +1,25 @@
 :root{
-  color-scheme:dark;
-  /* surfaces */
-  --bg:#191c21;            /* = DARK_BG in 00-scene.js: viewport, drop screen */
-  --surface:#13161b;       /* toolbar, sidebar, status bar */
-  --raised:#1f242c;        /* buttons, inputs, chips */
-  --hover:#272d37;
-  --overlay:rgba(19,22,27,.95);
-  --accent-tint:#1b2c3e;   /* fill of an active control */
-  --pick-tint:rgba(255,122,69,.12);
-  --warn-tint:rgba(255,180,84,.08);
+  color-scheme:light;
+  /* surfaces: a light CAD theme (design: .claude/agents/ui-ux-designer.md, variant A) */
+  --bg:#dde4ec;            /* = DARK_BG in 00-scene.js: viewport, drop screen */
+  --surface:#f4f6f9;       /* toolbar, sidebar, status bar */
+  --raised:#ffffff;        /* buttons, inputs, chips */
+  --hover:#e6ebf2;
+  --overlay:rgba(251,252,253,.96);
+  --accent-tint:#dce9fa;   /* fill of an active control */
+  --pick-tint:rgba(180,56,6,.10);
+  --warn-tint:rgba(217,119,6,.08);
   /* lines */
-  --border:#333a45;        /* decorative dividers */
-  --border-ctl:#3d4552;    /* button outline (buttons are identified by their label) */
-  --border-strong:#687284; /* input boundary, >=3:1 non-text */
-  /* text and signal: every text colour >= 4.5:1 on --bg, --surface and --raised (--subtle never on --hover) */
-  --text:#e4e7ec; --muted:#a3abb8; --subtle:#8a93a2;
-  --accent:#6cb4f0; --accent-strong:#8cc6f5; --on-accent:#0b1520;
-  --ok:#5fd496; --warn:#ffb454; --pick:#ff7a45; --danger:#ff6b6b; --focus:#9fd0ff;
-  --expsel:#4aa3e8;        /* a part picked for the explode (its 3D tint is 0x0b3350, 20-parts.js) */
+  --border:#d3dae3;        /* decorative dividers */
+  --border-ctl:#b3bdca;    /* button outline (buttons are identified by their label) */
+  --border-strong:#7a8799; /* input boundary, >=3:1 non-text */
+  /* text and signal: every text colour >= 4.5:1 on --surface, --raised and --overlay (--subtle never on --hover) */
+  --text:#1a2230; --muted:#465163; --subtle:#586376;
+  --accent:#1b66c9; --accent-strong:#0f4fa8; --on-accent:#ffffff;   /* strong is the DARKER accent on a light theme */
+  --ok:#17703f; --warn:#854a00; --pick:#b43806; --danger:#c0262d; --focus:#0b5bd3;
+  --expsel:#0f5bb5;        /* a part picked for the explode (its 3D tint is 0x00506a, 20-parts.js) */
   /* shape */
-  --r:6px; --r-sm:4px; --ctl-h:28px; --shadow:0 8px 28px rgba(0,0,0,.38);
+  --r:6px; --r-sm:4px; --ctl-h:28px; --shadow:0 6px 20px rgba(30,45,65,.18);
   --mono:"Cascadia Mono","Cascadia Code",Consolas,ui-monospace,monospace;
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
   /* legacy names: older rules use them */
@@ -30,7 +30,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #app{display:flex;flex-direction:column;height:100%}
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:var(--mono);font-size:10px;line-height:15px;text-align:center;color:var(--text);background:#262c35;border:1px solid var(--border-ctl);border-bottom-width:2px;border-radius:3px;white-space:nowrap}
+kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:var(--mono);font-size:10px;line-height:15px;text-align:center;color:var(--text);background:#e9edf3;border:1px solid var(--border-ctl);border-bottom-width:2px;border-radius:3px;white-space:nowrap}
 
 /* Toolbar: labelled clusters, Select | View | Tools | File */
 #topbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0;min-height:40px;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -50,18 +50,18 @@ kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:v
 .lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle)}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--ctl-h);min-width:28px;padding:0 10px;background:var(--raised);border:1px solid var(--border-ctl);border-radius:var(--r-sm);color:var(--text);font-family:var(--sans);font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:background-color .12s,border-color .12s,color .12s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--ctl-h);min-width:28px;padding:0 10px;background:var(--raised);border:1px solid var(--border-ctl);border-radius:var(--r-sm);color:var(--text);font-family:var(--sans);font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 1px 1px rgba(20,32,48,.07);transition:background-color .12s,border-color .12s,color .12s}
 .btn svg{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .btn svg .fill{fill:currentColor;stroke:none}
 .btn:hover{background:var(--hover);border-color:var(--border-strong)}
-.btn:active{background:var(--surface)}
+.btn:active{background:var(--hover);box-shadow:none}
 .btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px;position:relative;z-index:2}
 .btn.active{background:var(--accent-tint);border-color:var(--accent);color:var(--accent-strong);box-shadow:inset 0 -2px 0 var(--accent)}
-.btn.active:hover{background:#21364c}
+.btn.active:hover{background:#cfe0f6}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:disabled:hover{background:var(--raised);border-color:var(--border-ctl)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
-.btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}
+.btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:var(--on-accent)}
 .btn b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
 select.btn{padding:0 24px 0 9px;appearance:none;-webkit-appearance:none;text-align:left;
   background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
@@ -101,7 +101,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 #canvas3d{display:block;width:100%;height:100%}
 #drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:var(--bg);z-index:5;text-align:center}
 #drop.hidden{display:none}
-#drop .dropcard{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(520px,100%);padding:32px 28px 24px;border:2px dashed var(--border-ctl);border-radius:12px;background:rgba(255,255,255,.015);transition:border-color .15s,background-color .15s}
+#drop .dropcard{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(520px,100%);padding:32px 28px 24px;border:2px dashed var(--border-strong);border-radius:12px;background:rgba(255,255,255,.6);box-shadow:0 1px 2px rgba(30,45,65,.08);transition:border-color .15s,background-color .15s}
 #drop .dropicon{width:44px;height:44px;color:var(--accent);fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 #drop .big{font-size:18px;font-weight:600;color:var(--text)}
 #drop .sub{color:var(--muted);max-width:440px;line-height:1.6}
@@ -168,7 +168,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 #annot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
 #axes{position:absolute;left:8px;bottom:8px;width:110px;height:110px;pointer-events:none;z-index:1}
 
-#spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:10px;background:rgba(19,22,27,.6);z-index:10;font-family:var(--mono);font-size:12px;color:var(--accent-strong);font-variant-numeric:tabular-nums}
+#spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:10px;background:rgba(244,246,249,.72);z-index:10;font-family:var(--mono);font-size:12px;color:var(--accent-strong);font-variant-numeric:tabular-nums}
 #spin.show{display:flex}
 #spin::before{content:"";width:16px;height:16px;border:2px solid var(--border-ctl);border-top-color:var(--accent);border-radius:50%;animation:qs-spin .8s linear infinite}
 @keyframes qs-spin{to{transform:rotate(360deg)}}
@@ -191,3 +191,4 @@ select.btn option{background:var(--raised);color:var(--text)}
 @media (max-width:1279px){#hintbar{display:none}#fname{max-width:160px}}
 @media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel{width:auto;left:10px;right:10px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
 @media (prefers-reduced-motion:reduce){*,*::before{transition:none!important;animation:none!important}}
+

@@ -32,11 +32,11 @@ function isolate(p){
 }
 let hovered = null;
 function emis(p, hex){ const m = p.mesh.material; if (m && m.emissive) m.emissive.setHex(hex); }
-function baseEmis(p){ return explodeSel.has(p) ? 0x0b3350 : 0; }   // a part picked for the explode keeps a blue tint
+function baseEmis(p){ return explodeSel.has(p) ? 0x00506a : 0; }   // a part picked for the explode keeps a teal tint
 function hover(p, on){
   if (hovered && hovered !== selected){ emis(hovered, baseEmis(hovered)); hovered.rowEl.classList.remove('highlight'); }
   hovered = null;
-  if (on && p !== selected){ emis(p, 0x24402a); p.rowEl.classList.add('highlight'); hovered = p; }
+  if (on && p !== selected){ emis(p, 0x4a3c00); p.rowEl.classList.add('highlight'); hovered = p; }
 }
 $('btnShowAll').addEventListener('click', ()=> parts.forEach(p=>setPartVisible(p, true)));
 $('btnInvert').addEventListener('click', ()=> parts.forEach(p=>setPartVisible(p, !p.visible)));

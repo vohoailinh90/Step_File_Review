@@ -8,12 +8,12 @@ const {launch, openModel, check} = L;
   const settle = async () => { await pg.waitForFunction(() => __qs.orbitPending === 0, null, {timeout:10000}); await pg.waitForTimeout(80); };
   const cam = () => pg.evaluate(() => { const o = __qs.camera.position.clone().sub(__qs.controls.target).normalize();
     return {at: o.toArray().map(v => +v.toFixed(2) || 0), up: __qs.camera.up.toArray().map(v => +v.toFixed(2) || 0)}; });
-  // the triad: which of red / green / blue pixels it has drawn, and whether it sits in the lower-left corner
+  // the triad: which of red / green / blue pixels it has drawn (the dark-on-light #d92d20 / #15803d / #1d4ed8, 70-axes.js), and whether it sits in the lower-left corner
   const triad = () => pg.evaluate(() => {
     const c = document.getElementById('axes'), r = c.getBoundingClientRect(), v = document.getElementById('viewport').getBoundingClientRect();
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, n = {r:0, g:0, b:0};
     for (let i = 0; i < d.length; i += 4){ if (d[i+3] < 200) continue;
-      if (d[i] > 200 && d[i+1] < 100 && d[i+2] < 100) n.r++; else if (d[i+1] > 150 && d[i] < 100 && d[i+2] < 100) n.g++; else if (d[i+2] > 200 && d[i] < 100 && d[i+1] < 150) n.b++; }
+      if (d[i] > 180 && d[i+1] < 100 && d[i+2] < 100) n.r++; else if (d[i+1] > 110 && d[i] < 80 && d[i+2] < 110) n.g++; else if (d[i+2] > 180 && d[i] < 100 && d[i+1] < 150) n.b++; }
     return {n, left: Math.round(r.left - v.left), bottom: Math.round(v.bottom - r.bottom)};
   });
 

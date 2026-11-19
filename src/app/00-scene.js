@@ -9,8 +9,10 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
-const DARK_BG = 0x191c21, LIGHT_BG = 0xffffff;
+const DARK_BG = 0xdde4ec, LIGHT_BG = 0xffffff;   // a light blue-grey viewport (= --bg in viewer.css); White BG for reports
 let whiteBg = false;
+const BG_IS_LIGHT = true;            // DARK_BG is light: drawings on the view take their dark-on-light colours
+function lightVp(){ return whiteBg || BG_IS_LIGHT; }
 scene.background = new THREE.Color(DARK_BG);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 1e6);

@@ -3,9 +3,9 @@
 // own, so it turns with the camera but is not part of a screenshot. World axes: the model is not moved.
 const axesCanvas = $('axes');
 const AXES = [
-  {name:'X', v:new THREE.Vector3(1, 0, 0), color:'#ff3b30'},
-  {name:'Y', v:new THREE.Vector3(0, 1, 0), color:'#34d13c'},
-  {name:'Z', v:new THREE.Vector3(0, 0, 1), color:'#2f6bff'}
+  {name:'X', v:new THREE.Vector3(1, 0, 0), color:'#d92d20'},
+  {name:'Y', v:new THREE.Vector3(0, 1, 0), color:'#15803d'},
+  {name:'Z', v:new THREE.Vector3(0, 0, 1), color:'#1d4ed8'}
 ];
 const _aq = new THREE.Quaternion(), _av = new THREE.Vector3();
 function drawAxes(){
@@ -27,9 +27,12 @@ function drawAxes(){
   ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const p of pts){
-    ctx.strokeStyle = ctx.fillStyle = p.a.color;
-    ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
     const dx = p.x - o, dy = p.y - o, d = Math.hypot(dx, dy) || 1;
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeText(p.a.name, p.x + dx / d * 9, p.y + dy / d * 9);
+    ctx.lineWidth = 2; ctx.strokeStyle = ctx.fillStyle = p.a.color;
+    ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
     ctx.fillText(p.a.name, p.x + dx / d * 9, p.y + dy / d * 9);   // the letter sits just past the tip
   }
 }

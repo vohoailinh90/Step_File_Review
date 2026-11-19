@@ -7,27 +7,27 @@
 <title>QuickSTEP Viewer</title>
 <style>
 :root{
-  color-scheme:dark;
-  /* surfaces */
-  --bg:#191c21;            /* = DARK_BG in 00-scene.js: viewport, drop screen */
-  --surface:#13161b;       /* toolbar, sidebar, status bar */
-  --raised:#1f242c;        /* buttons, inputs, chips */
-  --hover:#272d37;
-  --overlay:rgba(19,22,27,.95);
-  --accent-tint:#1b2c3e;   /* fill of an active control */
-  --pick-tint:rgba(255,122,69,.12);
-  --warn-tint:rgba(255,180,84,.08);
+  color-scheme:light;
+  /* surfaces: a light CAD theme (design: .claude/agents/ui-ux-designer.md, variant A) */
+  --bg:#dde4ec;            /* = DARK_BG in 00-scene.js: viewport, drop screen */
+  --surface:#f4f6f9;       /* toolbar, sidebar, status bar */
+  --raised:#ffffff;        /* buttons, inputs, chips */
+  --hover:#e6ebf2;
+  --overlay:rgba(251,252,253,.96);
+  --accent-tint:#dce9fa;   /* fill of an active control */
+  --pick-tint:rgba(180,56,6,.10);
+  --warn-tint:rgba(217,119,6,.08);
   /* lines */
-  --border:#333a45;        /* decorative dividers */
-  --border-ctl:#3d4552;    /* button outline (buttons are identified by their label) */
-  --border-strong:#687284; /* input boundary, >=3:1 non-text */
-  /* text and signal: every text colour >= 4.5:1 on --bg, --surface and --raised (--subtle never on --hover) */
-  --text:#e4e7ec; --muted:#a3abb8; --subtle:#8a93a2;
-  --accent:#6cb4f0; --accent-strong:#8cc6f5; --on-accent:#0b1520;
-  --ok:#5fd496; --warn:#ffb454; --pick:#ff7a45; --danger:#ff6b6b; --focus:#9fd0ff;
-  --expsel:#4aa3e8;        /* a part picked for the explode (its 3D tint is 0x0b3350, 20-parts.js) */
+  --border:#d3dae3;        /* decorative dividers */
+  --border-ctl:#b3bdca;    /* button outline (buttons are identified by their label) */
+  --border-strong:#7a8799; /* input boundary, >=3:1 non-text */
+  /* text and signal: every text colour >= 4.5:1 on --surface, --raised and --overlay (--subtle never on --hover) */
+  --text:#1a2230; --muted:#465163; --subtle:#586376;
+  --accent:#1b66c9; --accent-strong:#0f4fa8; --on-accent:#ffffff;   /* strong is the DARKER accent on a light theme */
+  --ok:#17703f; --warn:#854a00; --pick:#b43806; --danger:#c0262d; --focus:#0b5bd3;
+  --expsel:#0f5bb5;        /* a part picked for the explode (its 3D tint is 0x00506a, 20-parts.js) */
   /* shape */
-  --r:6px; --r-sm:4px; --ctl-h:28px; --shadow:0 8px 28px rgba(0,0,0,.38);
+  --r:6px; --r-sm:4px; --ctl-h:28px; --shadow:0 6px 20px rgba(30,45,65,.18);
   --mono:"Cascadia Mono","Cascadia Code",Consolas,ui-monospace,monospace;
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
   /* legacy names: older rules use them */
@@ -38,7 +38,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #app{display:flex;flex-direction:column;height:100%}
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:var(--mono);font-size:10px;line-height:15px;text-align:center;color:var(--text);background:#262c35;border:1px solid var(--border-ctl);border-bottom-width:2px;border-radius:3px;white-space:nowrap}
+kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:var(--mono);font-size:10px;line-height:15px;text-align:center;color:var(--text);background:#e9edf3;border:1px solid var(--border-ctl);border-bottom-width:2px;border-radius:3px;white-space:nowrap}
 
 /* Toolbar: labelled clusters, Select | View | Tools | File */
 #topbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0;min-height:40px;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -58,18 +58,18 @@ kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font-family:v
 .lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle)}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--ctl-h);min-width:28px;padding:0 10px;background:var(--raised);border:1px solid var(--border-ctl);border-radius:var(--r-sm);color:var(--text);font-family:var(--sans);font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:background-color .12s,border-color .12s,color .12s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--ctl-h);min-width:28px;padding:0 10px;background:var(--raised);border:1px solid var(--border-ctl);border-radius:var(--r-sm);color:var(--text);font-family:var(--sans);font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 1px 1px rgba(20,32,48,.07);transition:background-color .12s,border-color .12s,color .12s}
 .btn svg{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .btn svg .fill{fill:currentColor;stroke:none}
 .btn:hover{background:var(--hover);border-color:var(--border-strong)}
-.btn:active{background:var(--surface)}
+.btn:active{background:var(--hover);box-shadow:none}
 .btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px;position:relative;z-index:2}
 .btn.active{background:var(--accent-tint);border-color:var(--accent);color:var(--accent-strong);box-shadow:inset 0 -2px 0 var(--accent)}
-.btn.active:hover{background:#21364c}
+.btn.active:hover{background:#cfe0f6}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:disabled:hover{background:var(--raised);border-color:var(--border-ctl)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
-.btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}
+.btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:var(--on-accent)}
 .btn b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
 select.btn{padding:0 24px 0 9px;appearance:none;-webkit-appearance:none;text-align:left;
   background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
@@ -109,7 +109,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 #canvas3d{display:block;width:100%;height:100%}
 #drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:var(--bg);z-index:5;text-align:center}
 #drop.hidden{display:none}
-#drop .dropcard{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(520px,100%);padding:32px 28px 24px;border:2px dashed var(--border-ctl);border-radius:12px;background:rgba(255,255,255,.015);transition:border-color .15s,background-color .15s}
+#drop .dropcard{display:flex;flex-direction:column;align-items:center;gap:12px;width:min(520px,100%);padding:32px 28px 24px;border:2px dashed var(--border-strong);border-radius:12px;background:rgba(255,255,255,.6);box-shadow:0 1px 2px rgba(30,45,65,.08);transition:border-color .15s,background-color .15s}
 #drop .dropicon{width:44px;height:44px;color:var(--accent);fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 #drop .big{font-size:18px;font-weight:600;color:var(--text)}
 #drop .sub{color:var(--muted);max-width:440px;line-height:1.6}
@@ -176,7 +176,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 #annot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
 #axes{position:absolute;left:8px;bottom:8px;width:110px;height:110px;pointer-events:none;z-index:1}
 
-#spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:10px;background:rgba(19,22,27,.6);z-index:10;font-family:var(--mono);font-size:12px;color:var(--accent-strong);font-variant-numeric:tabular-nums}
+#spin{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:10px;background:rgba(244,246,249,.72);z-index:10;font-family:var(--mono);font-size:12px;color:var(--accent-strong);font-variant-numeric:tabular-nums}
 #spin.show{display:flex}
 #spin::before{content:"";width:16px;height:16px;border:2px solid var(--border-ctl);border-top-color:var(--accent);border-radius:50%;animation:qs-spin .8s linear infinite}
 @keyframes qs-spin{to{transform:rotate(360deg)}}
@@ -199,6 +199,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 @media (max-width:1279px){#hintbar{display:none}#fname{max-width:160px}}
 @media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel{width:auto;left:10px;right:10px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
 @media (prefers-reduced-motion:reduce){*,*::before{transition:none!important;animation:none!important}}
+
 </style>
 </head>
 <body>
@@ -5752,8 +5753,10 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
-const DARK_BG = 0x191c21, LIGHT_BG = 0xffffff;
+const DARK_BG = 0xdde4ec, LIGHT_BG = 0xffffff;   // a light blue-grey viewport (= --bg in viewer.css); White BG for reports
 let whiteBg = false;
+const BG_IS_LIGHT = true;            // DARK_BG is light: drawings on the view take their dark-on-light colours
+function lightVp(){ return whiteBg || BG_IS_LIGHT; }
 scene.background = new THREE.Color(DARK_BG);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 1e6);
@@ -6130,11 +6133,11 @@ function isolate(p){
 }
 let hovered = null;
 function emis(p, hex){ const m = p.mesh.material; if (m && m.emissive) m.emissive.setHex(hex); }
-function baseEmis(p){ return explodeSel.has(p) ? 0x0b3350 : 0; }   // a part picked for the explode keeps a blue tint
+function baseEmis(p){ return explodeSel.has(p) ? 0x00506a : 0; }   // a part picked for the explode keeps a teal tint
 function hover(p, on){
   if (hovered && hovered !== selected){ emis(hovered, baseEmis(hovered)); hovered.rowEl.classList.remove('highlight'); }
   hovered = null;
-  if (on && p !== selected){ emis(p, 0x24402a); p.rowEl.classList.add('highlight'); hovered = p; }
+  if (on && p !== selected){ emis(p, 0x4a3c00); p.rowEl.classList.add('highlight'); hovered = p; }
 }
 $('btnShowAll').addEventListener('click', ()=> parts.forEach(p=>setPartVisible(p, true)));
 $('btnInvert').addEventListener('click', ()=> parts.forEach(p=>setPartVisible(p, !p.visible)));
@@ -6188,7 +6191,7 @@ function selectPart(p, scroll){
   if (selected){ emis(selected, baseEmis(selected)); selected.rowEl.classList.remove('selected'); }
   selected = p;
   if (p){
-    emis(p, 0x5a2410);
+    emis(p, 0x8a2a06);
     p.rowEl.classList.add('selected');
     if (scroll !== false) p.rowEl.scrollIntoView({block:'nearest'});
     if ($('sidebar').classList.contains('hidden') && parts.length > 1){
@@ -6664,7 +6667,7 @@ const FACE_FOOT = {
 function selectFace(part, faceIndex, point){
   const topo = topology(part.mesh.geometry);
   const ent = faceEntity(part, topo.faceId[faceIndex], point);
-  faceOverlay = entityOverlay(ent, 0xff7a45);
+  faceOverlay = entityOverlay(ent, 0xd9480f);
   selectedFace = ent;
   const d = describe(ent);
   showInfo({title:'FACE', rows:[['part', part.name], ['triangles', ent.count.toLocaleString()],
@@ -6769,7 +6772,7 @@ function chainFrom(lineObj, hitIndex){
 }
 function drawEdgeOverlay(points, part){
   const g = new THREE.BufferGeometry().setFromPoints(points);
-  edgeOverlay = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xff7a45, depthTest:false}));
+  edgeOverlay = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xd9480f, depthTest:false}));
   edgeOverlay.renderOrder = 4;
   if (part) follow(edgeOverlay, part, part.offset);      // points are where the part is drawn now
   scene.add(edgeOverlay);
@@ -6850,7 +6853,7 @@ function showInfo(data){
 // Click a face or an edge (an edge wins within a few pixels of the cursor) for its size;
 // click a second one for the distances between the two. Everything is computed on the
 // assembled geometry, from the exact B-rep surfaces when the file carries them.
-const COL_A = '#ff7a45', COL_B = '#5aa7e8', EDGE_PX = 7;
+const COL_A = '#d9480f', COL_B = '#1c6fd1', EDGE_PX = 7;
 const PAR = Math.cos(THREE.MathUtils.degToRad(0.5)), PERP = Math.sin(THREE.MathUtils.degToRad(0.5));
 let measA = null, measB = null, measMd = null, measItems = [], keptItems = [];
 
@@ -7638,7 +7641,7 @@ function dimText(it){
 }
 // s: canvas pixels per CSS pixel, so lines and text keep their size in hi-res screenshots
 function drawAnnotations(ctx, W, H, s, items){
-  const dimCol = whiteBg ? '#c2410c' : '#ffb454', axisCol = whiteBg ? '#2563eb' : '#5aa7e8', labels = [];
+  const dimCol = lightVp() ? '#c2410c' : '#ffb454', axisCol = lightVp() ? '#2563eb' : '#5aa7e8', labels = [];
   const th = 19 * s;
   ctx.save();
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -8041,7 +8044,7 @@ window.addEventListener('pointercancel', moveEnd);
 // it; the handle is outlined so it reads on any part, and while dragged it shows the distance.
 function drawMoveGizmo(ctx, s){
   const W = annotCanvas.width, H = annotCanvas.height, a = moveAxis, hot = !!(moveHover || moveDrag);
-  const col = whiteBg ? '#15803d' : '#5ad18f', halo = whiteBg ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.6)';
+  const col = lightVp() ? '#15803d' : '#5ad18f', halo = lightVp() ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.6)';
   const p0 = toScreen(_ma.copy(a.p).addScaledVector(a.d, -modelSize), a.part, W, H);
   const p1 = toScreen(_mb.copy(a.p).addScaledVector(a.d, modelSize), a.part, W, H);
   ctx.save();
@@ -8068,7 +8071,7 @@ function drawMoveGizmo(ctx, s){
     ctx.beginPath(); ctx.arc(x, y, (4.5 + grow / 2) * s, 0, 2 * Math.PI); ctx.fill();
   };
   shape(halo, 3);
-  shape(hot ? (whiteBg ? '#166534' : '#a7f3c4') : col, 0);
+  shape(hot ? (lightVp() ? '#166534' : '#a7f3c4') : col, 0);
   if (h.u){                                            // "+" past the + end; the distance while dragged
     const v = selected.offset.dot(a.d), text = moveDrag ? (v > 0 ? '+' : '') + L(v) + MM() : '+';
     ctx.font = (moveDrag ? '' : 'bold ') + Math.round((moveDrag ? 11.5 : 15) * s) + 'px ' + ANNOT_FONT;
@@ -8506,9 +8509,9 @@ if (modelUrl){
 // own, so it turns with the camera but is not part of a screenshot. World axes: the model is not moved.
 const axesCanvas = $('axes');
 const AXES = [
-  {name:'X', v:new THREE.Vector3(1, 0, 0), color:'#ff3b30'},
-  {name:'Y', v:new THREE.Vector3(0, 1, 0), color:'#34d13c'},
-  {name:'Z', v:new THREE.Vector3(0, 0, 1), color:'#2f6bff'}
+  {name:'X', v:new THREE.Vector3(1, 0, 0), color:'#d92d20'},
+  {name:'Y', v:new THREE.Vector3(0, 1, 0), color:'#15803d'},
+  {name:'Z', v:new THREE.Vector3(0, 0, 1), color:'#1d4ed8'}
 ];
 const _aq = new THREE.Quaternion(), _av = new THREE.Vector3();
 function drawAxes(){
@@ -8530,9 +8533,12 @@ function drawAxes(){
   ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const p of pts){
-    ctx.strokeStyle = ctx.fillStyle = p.a.color;
-    ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
     const dx = p.x - o, dy = p.y - o, d = Math.hypot(dx, dy) || 1;
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeText(p.a.name, p.x + dx / d * 9, p.y + dy / d * 9);
+    ctx.lineWidth = 2; ctx.strokeStyle = ctx.fillStyle = p.a.color;
+    ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
     ctx.fillText(p.a.name, p.x + dx / d * 9, p.y + dy / d * 9);   // the letter sits just past the tip
   }
 }
