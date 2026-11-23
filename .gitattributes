@@ -7,3 +7,7 @@
 
 # The vendored three.js build is one 607 KB line. Never let any tool touch it.
 vendor/three.min.js -text -diff
+
+# cmd.exe reads a batch file with CRLF line endings; with bare LF, labels and
+# goto can misbehave and a ^ line continuation can swallow the next line.
+*.bat text eol=crlf
