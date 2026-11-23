@@ -102,7 +102,9 @@ function distShift(p, out){
   if (explodeScope === 'picked') return explodeSel.has(p) ? out.copy(explodeDist) : out;
   for (let i = 0; i < 3; i++){
     const span = _dspan.getComponent(i);
-    if (span > 1e-9 * modelSize) out.setComponent(i, explodeDist.getComponent(i) * (p.restCenter.getComponent(i) - modelCenter.getComponent(i)) / span);
+    // clamped: a hidden part beyond the visible span moves the full distance, never more (it would inflate Fit)
+    if (span > 1e-9 * modelSize) out.setComponent(i, explodeDist.getComponent(i) *
+      Math.max(-1, Math.min(1, (p.restCenter.getComponent(i) - modelCenter.getComponent(i)) / span)));
   }
   return out;
 }

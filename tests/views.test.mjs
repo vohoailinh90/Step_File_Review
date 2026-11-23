@@ -320,6 +320,16 @@ test('hiding, showing or isolating parts re-scales a scope-All distance at once'
     run('parts.forEach(p => setPartVisible(p, true)); explodeDist.set(0, 0, 0); applyExplode();');
   });
 });
+test('a hidden part far outside the visible span moves the typed distance, never more', () => {
+  const far = part(plate(), [1, 0, 0], 'far'), near1 = part(plate(), [0.001, 0, 0], 'near'), other = part(plate(), [-0.001, 0, 0], 'other');
+  withModel([far, near1, other], () => {
+    run('parts.forEach(p => p.rowEl = {classList:{toggle(){}, add(){}, remove(){}}});');
+    run('setPartVisible(parts[0], false); setExplodeDist(0, "20");');
+    assert.ok(near(near1.offset.toArray(), [0.02, 0, 0], 1e-12), `visible outermost: ${near1.offset.toArray()}`);
+    assert.ok(near(far.offset.toArray(), [0.02, 0, 0], 1e-12), `hidden far part clamped to 20 mm, got ${far.offset.toArray()}`);
+    run('parts.forEach(p => setPartVisible(p, true)); explodeDist.set(0, 0, 0); applyExplode();');
+  });
+});
 test('a distance that is not a number, or absurdly far, is refused', () => {
   const a = part(plate(), [0.1, 0, 0], 'A');
   withModel([a], () => {
