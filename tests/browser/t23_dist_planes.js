@@ -11,6 +11,10 @@ const {launch, openModel, check, OUT} = L;
   check('no planes until asked', await planes(), /^none$/);
   await pg.keyboard.press('p'); await pg.waitForTimeout(60);
   check('P shows the three planes', await planes(), /^shown YZ,ZX,XY$/);
+  check('each plane carries its label', await pg.evaluate(() => { const r = __qs.scene.children.find(o => o.name === 'reference planes');
+    return r.children.filter(o => o.isSprite).map(o => o.userData.plane + ':' + o.userData.label).join(','); }), /^YZ:Left,ZX:Top,XY:Front$/);
+  await pg.click('[data-view="iso"]'); await pg.waitForTimeout(150);
+  await pg.screenshot({path: OUT + 't23_planes_labels.png'});
   check('the Planes button reads pressed', await pg.evaluate(() => document.getElementById('btnPlanes').getAttribute('aria-pressed')), /^true$/);
   check('the planes are not in the model', await pg.evaluate(() => { let n = 0; __qs.modelRoot.traverse(o => { if (o.userData.plane) n++; }); return n; }), /^0$/);
 
