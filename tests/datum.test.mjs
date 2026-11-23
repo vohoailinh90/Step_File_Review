@@ -157,6 +157,35 @@ test('Look keeps an upside-down view upside down, rather than flipping the axis 
     assert.ok(near(run('camera.up.toArray()'), [0, -1, 0], 1e-9), `${run('camera.up.toArray()')}`);
   });
 });
+test('an axis that crosses the reference is not claimed to be at the typed angle from it: label and toast say what the angle is of', () => {
+  withModel([part()], () => {
+    // axis 30 deg out of Front (normal Z): 30 deg about it is 41.4 deg between the planes, not 30
+    setDatum('1, 0, 0.5773502691896257', ['Front', '0, 0, 1'], 30);
+    const d = run('datumDesc(datumPlane())');
+    assert.match(d, /about the axis from the plane nearest Front \(axis 30\.0° off it\)/, d);
+    const n = normal('1, 0, 0.5773502691896257', '0, 0, 1', 30), dihedral = Math.acos(Math.abs(n[2])) * 180 / Math.PI;
+    assert.ok(Math.abs(dihedral - 41.4) < 0.1, `the planes really are ${dihedral} apart, not 30`);
+    assert.match(run('datumNodes[0].children.find(o => o.isMesh).userData.title'), /about the axis from the plane nearest Front/);
+    setDatum('1, 0, 0', ['Front', '0, 0, 1'], 30);          // parallel: the plain wording, and it is the true angle
+    assert.equal(run('datumDesc(datumPlane())'), '30° from Front');
+  });
+});
+test('a pick fitted to the mesh is not trusted to be near square, says (mesh), and the angle box agrees with the slider', () => {
+  withModel([part()], () => {
+    const tilted = '0.0349, 0, 0.9994';                        // 2 degrees off square to Front
+    setDatum(tilted, ['Front', '0, 0, 1'], 30);
+    assert.ok(run('datumPlane()'), 'an exact pick that tilted is a real tilt');
+    run('datumAxis.exact = false; datumChanged();');
+    assert.equal(run('datumPlane()'), null, 'a mesh fit that near square has no trusted zero direction');
+    setDatum('1, 0, 0', ['Front', '0, 0, 1'], 30);
+    run('datumAxis.exact = false; datumChanged();');
+    assert.match(run('datumDesc(datumPlane())'), /\(mesh\)$/);
+    run('setDatumAngle("270");');
+    assert.equal(run('datumAngle'), -90, 'beyond the slider: the same turn, in its range');
+    run('setDatumAngle("180");');
+    assert.equal(run('datumAngle'), 180);
+  });
+});
 test('Keep leaves the plane there as P1, P2 … without drawing the one just kept twice; Clear takes them all away', () => {
   withModel([part()], () => {
     setDatum('0, 0, 1', ['Top', '0, 1, 0'], 30);

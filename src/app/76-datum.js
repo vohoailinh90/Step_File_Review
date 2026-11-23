@@ -15,6 +15,7 @@ const datumKept = [], datumNodes = [];
 const DATUM_COLOR = 0x7e22ce;
 const DATUM_HALF = 0.75;             // a sheet reaches this many model sizes either side of its axis point
 const DATUM_SKEW = 0.01;             // sin 0.6°: nearer square than this, the reference gives no angle to start from
+const DATUM_SKEW_MESH = 0.05;        // sin 2.9°: a pick fitted to the mesh is that uncertain, so its 0° is not trusted nearer square
 
 $('btnDatum').addEventListener('click', () => datumPanel(!$('datumpanel').classList.contains('show')));
 $('btnDatumAxis').addEventListener('click', () => datumPick('axis'));
@@ -50,25 +51,33 @@ function datumPick(kind){
 function datumPickCancel(){ datumPickMode = null; moveCursor(); datumSync(); }
 function setDatumAngle(text){
   const v = parseFloat(String(text).replace(',', '.'));
-  if (Number.isFinite(v) && Math.abs(v) <= 3600) datumAngle = v;
+  if (Number.isFinite(v) && Math.abs(v) <= 3600) datumAngle = Math.abs(v) > 180 ? v - 360 * Math.round(v / 360) : v;   // the slider's range
   datumChanged();
 }
 
 // The normal of the plane through an axis (unit a) turned deg about it from a reference plane (unit normal
 // r): r with its part along a taken out is the normal of the plane through the axis closest to the
-// reference (n0), and the turn is right-handed about a. Null when a is square to r.
-function datumNormal(a, r, deg){
+// reference (n0), and the turn is right-handed about a. Null when a is square to r, within `skew` (a sine).
+function datumNormal(a, r, deg, skew = DATUM_SKEW){
   const n0 = r.clone().addScaledVector(a, -r.dot(a));
-  if (n0.lengthSq() < DATUM_SKEW * DATUM_SKEW) return null;
+  if (n0.lengthSq() < skew * skew) return null;
   n0.normalize();
   const t = THREE.MathUtils.degToRad(deg), w = new THREE.Vector3().crossVectors(a, n0);
   return n0.multiplyScalar(Math.cos(t)).addScaledVector(w, Math.sin(t)).normalize();
 }
 function datumPlane(){               // the plane the panel describes, or null
   if (!datumAxis || !datumRef) return null;
-  const n = datumNormal(datumAxis.d, datumRef.n, datumAngle);
-  return n && {n, a:datumAxis.d, o:datumAxis.o, part:datumAxis.part, ref:datumRef.name, angle:datumAngle};
+  const exact = !!(datumAxis.exact && datumRef.exact);
+  const n = datumNormal(datumAxis.d, datumRef.n, datumAngle, exact ? DATUM_SKEW : DATUM_SKEW_MESH);
+  return n && {n, a:datumAxis.d, o:datumAxis.o, part:datumAxis.part, ref:datumRef.name, angle:datumAngle, exact,
+               tilt:datumTilt(datumAxis.d, datumRef.n)};
 }
+const datumTilt = (a, r) => THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.abs(a.dot(r)))));   // axis off the reference plane
+// What the plane is, for its label and the toast. An axis that crosses the reference is not in it, so the
+// angle is not the one between the two planes: it says what it is the angle of.
+const datumDesc = d => +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
+  ? ' about the axis from the plane nearest ' + d.ref + ' (axis ' + d.tilt.toFixed(1) + '° off it)' : ' from ' + d.ref) +
+  (d.exact ? '' : ' (mesh)');
 const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o.distanceTo(q.o) < 1e-12 &&
                             p.a.dot(q.a) > 1 - 1e-12;
 
@@ -100,7 +109,7 @@ function datumDraw(){
 function datumNode(d){
   const g = new THREE.Group(), s = DATUM_HALF * modelSize, w = new THREE.Vector3().crossVectors(d.a, d.n).normalize();
   const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => d.o.clone().addScaledVector(d.a, i * s).addScaledVector(w, j * s));
-  const text = d.name + '  ' + +d.angle.toFixed(2) + '° from ' + d.ref;
+  const text = d.name + '  ' + datumDesc(d);
   const [sheet, line] = planeSheet(c, DATUM_COLOR, d.name, d.n, text);
   sheet.userData.up = d.a;           // Normal to stands the axis upright on the screen
   g.add(sheet, line);
@@ -113,8 +122,7 @@ function datumNode(d){
 }
 function datumLook(){
   const d = datumPlane();
-  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane through the axis, ' +
-                      +d.angle.toFixed(2) + '° from ' + d.ref});
+  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane through the axis, ' + datumDesc(d)});
 }
 function datumKeep(){
   const d = datumPlane();
@@ -144,7 +152,7 @@ function datumSync(){                // the panel, after anything that changes t
   $('datumSlider').value = datumAngle; $('datumAngle').value = datumAngle;
   $('btnDatumLook').disabled = $('btnDatumKeep').disabled = !pl;
   $('btnDatumClear').disabled = !datumKept.length && !a && !r;
-  const tilt = a && r ? THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.abs(a.d.dot(r.n))))) : 0;
+  const tilt = a && r ? datumTilt(a.d, r.n) : 0;
   $('datumHint').textContent =
       datumPickMode === 'axis' ? 'Click a cylinder, a cone, a circular edge or a straight edge: its axis is the pivot.'
     : datumPickMode === 'face' ? 'Click a flat face to measure the angle from.'
