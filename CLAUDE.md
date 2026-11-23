@@ -65,7 +65,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 | `src/app/50-section.js`  | 162 | section planes, plane-from-circle, stencil caps, per-part cuts while exploded |
 | `src/app/60-io.js`       | 163 | drag & drop, `/convert`, `/status`, screenshot, units toggle (`setUnitsRaw`), keyboard, autoload |
 | `src/app/70-axes.js`     | 38  | the X / Y / Z triad in the corner of the view |
-| `src/app/75-planes.js`   | 61  | reference planes YZ / ZX / XY through the origin, Planes button / `P` |
+| `src/app/75-planes.js`   | 90  | reference planes Front (XY) / Top (ZX) / Left (YZ) through the origin, their labels, Planes button / `P` |
 | `src/ui/viewer.css`      | 119 | all styling |
 | `src/ui/layout.html`     | 161 | toolbar, sidebar, section / measure / explode panels, status bar |
 | `src/viewer.template.html` | — | the shell and the concatenation order |
@@ -476,6 +476,28 @@ Every pull request you create or drive for a requirement goes through the loop b
 4. **Stop when the review is clean.** Clean means every review command the change requires (the standard review, and the security review where it applies) has a review of the *current* head with no finding (other than a P2/P3 whose recorded rejection stands, see the first bullet below), every earlier finding was fixed or rejected with evidence, CI and the required checks are green, and there is no merge conflict. A fix pushed after the last review is unreviewed, so it is not clean — review it with every command the change requires.
 5. **Merge it yourself — where the repository allows it.** A clean PR is merged without asking for approval, scoped to the validated head commit, provided the base branch requires branches to be up to date and the merging identity cannot bypass that rule (read the branch protection to confirm both). Where either is missing, merging is a genuine blocker: leave the PR open, say it is clean and why it was not merged, and do not merge. Record the merge commit and a one-line summary on the PR.
 6. **Then continue.** Do not stop after the merge to ask what is next: start the next outstanding task from the latest default branch (a merged branch is finished; never stack new commits on it). An outstanding task is one the user explicitly asked for that is not done yet; never invent work or pick up an item the user did not ask for. A task that needs the code of a PR that is not merged waits: skip it rather than stack on that branch. When none remains, report what merged and stop.
+
+**Branch protection on `main`, as the owner configured it (recorded 2026-11-23).** The
+GitHub tools available to an agent here report only that `main` is protected, not its
+settings, so this record is what step 5 reads. The classic branch protection rule for
+`main` has:
+
+- Require a pull request before merging: on. No approval is required, and the other review
+  options are off. The agent merges as the owner's account, which cannot approve its own PR.
+- Require status checks to pass before merging: on, with **Require branches to be up to
+  date before merging** on. The required checks are `ubuntu-latest / py3.13`,
+  `windows-latest / py3.13`, `windows-latest / py3.9`, `cascadio install (windows)` and
+  `exe build (windows)`.
+- **Do not allow bypassing the above settings**: on, so the rule applies to administrators
+  too.
+- Off: conversation resolution, signed commits, linear history, deployments, lock branch,
+  force pushes and deletions.
+
+This satisfies step 5: a clean PR may be merged without asking. If a merge is refused, or
+`main` reads as unprotected, the record is stale. Then do not merge: report it to the
+owner. Whoever changes the rule updates this record in the same change. When a CI job is
+renamed or added, update the required checks in the rule as well as here. A required check
+that no longer runs blocks every merge.
 
 What bounds the loop:
 

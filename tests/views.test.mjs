@@ -361,3 +361,13 @@ test('reference planes: three, through the origin, covering the model and the or
     } finally { run('setPlanes(false); disposePlanes();'); }
   });
 });
+
+test('the planes are named by the views that look square at them: XY Front, ZX Top, YZ Left', () => {
+  const by = JSON.parse(run('JSON.stringify(PLANES.map(p => [p.name, p.label, p.n]))'));
+  assert.deepEqual(by, [['YZ', 'Left', 0], ['ZX', 'Top', 1], ['XY', 'Front', 2]]);
+  // and each is the plane its view looks square at: the view direction is the plane normal
+  for (const [, label, n] of by) {
+    const d = run(`VIEWS.${label.toLowerCase()}.d.toArray()`).map(Math.abs);
+    assert.equal(d.indexOf(1), n, `${label} looks along axis ${n}`);
+  }
+});
