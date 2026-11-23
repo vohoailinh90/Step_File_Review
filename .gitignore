@@ -11,3 +11,7 @@ artifacts/critiques/*
 artifacts/plans/*
 artifacts/reviews/*
 !artifacts/*/.gitkeep
+
+# scripts/build_exe.bat output (PyInstaller work folder and the exe folder)
+/build/
+/dist/

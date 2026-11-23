@@ -101,3 +101,37 @@ jobs:
           python-version: "3.13"
       - run: python -m pip install cascadio numpy
       - run: python stepview.py --check
+
+  # Runs scripts/build_exe.bat exactly as an owner double-clicking it would
+  # (CI is set, so it does not pause), on the platform the exe is for. The
+  # script itself freezes stepview.py with PyInstaller and then smoke-tests the
+  # built exe: --check, and a real STEP conversion. Non-blocking for the same
+  # reason as the engine job -- it installs from PyPI -- but red means the
+  # build is broken. The finished folder is uploaded, so a working QuickSTEP
+  # build can be downloaded from the run without a Windows Python at hand.
+  exe:
+    name: exe build (windows)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: No LF-only batch file reached the working tree
+        shell: python
+        run: |
+          import sys
+          from pathlib import Path
+          data = Path("scripts/build_exe.bat").read_bytes()
+          if data.count(b"\n") != data.count(b"\r\n"):
+              sys.exit("scripts/build_exe.bat has bare LF line endings -- check .gitattributes")
+          print("build_exe.bat is CRLF")
+      - name: Build and smoke-test the exe
+        shell: cmd
+        run: scripts\build_exe.bat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuickSTEP-windows
+          path: dist/QuickSTEP/
+          retention-days: 14

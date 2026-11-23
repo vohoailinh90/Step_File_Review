@@ -32,6 +32,21 @@ Put `stepview.py` and `viewer.html` in the same folder. Optionally add a right-c
 python "C:\tools\quickstep\stepview.py" %1
 ```
 
+### Sharing it as a Windows program (no Python for users)
+
+To hand QuickSTEP to colleagues who have no Python, build it once into a folder with an `.exe`. Do this on a Windows PC with 64-bit Python 3.9–3.13: double-click `scripts\build_exe.bat`, or run it from a console. In 1–3 minutes it:
+- installs `cascadio`, `numpy` and PyInstaller into that Python;
+- checks that `viewer.html` is current and the engine loads;
+- freezes `stepview.py` with `viewer.html` inside;
+- tests the result: the built exe runs `--check` and converts a sample STEP file.
+
+The output is `dist\QuickSTEP\` (about 150–200 MB):
+- `QuickSTEP.exe`;
+- the `_internal\` folder it needs;
+- a `README.txt` for users.
+
+Zip the whole folder and share it. Users unzip it anywhere, then double-click `QuickSTEP.exe` or drag a `.step` file onto it; everything else works exactly as above, cache included. The exe is not code-signed, so Windows SmartScreen may warn on first start ("More info" → "Run anyway"). It is a folder rather than a single file on purpose: a one-file exe would unpack the 100+ MB engine to a temp folder on every start, and antivirus tools flag that far more often. CI builds the same folder on every push (job *exe build (windows)*), and the run's `QuickSTEP-windows` artifact is a ready-made copy.
+
 ## Usage
 
 ```
