@@ -265,3 +265,62 @@ test('a pick mode keeps the move handle from taking its click', () => {
     } finally { run('moveHandle = __mh;'); }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Explode by a typed distance along X / Y / Z, and the reference planes.
+// ---------------------------------------------------------------------------
+test('Picked parts move by exactly the typed X / Y / Z distances; others stay', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A'), b = part(plate(), [-0.05, 0, 0.02], 'B'), c = part(plate(), [0, 0.03, 0], 'C');
+  withModel([a, b, c], () => {
+    v.explodeToggle(a); v.explodeToggle(b);
+    run('setExplodeDist(0, "10"); setExplodeDist(1, "-5"); setExplodeDist(2, "2.5");');   // mm, mesh in metres
+    for (const p of [a, b]) assert.ok(near(p.offset.toArray(), [0.01, -0.005, 0.0025], 1e-12), `${p.name} by ${p.offset.toArray()}`);
+    assert.ok(near(c.offset.toArray(), [0, 0, 0], 0), `C stays, got ${c.offset.toArray()}`);
+    v.setExplode(0.5); run("explodeAxis = 'x'; applyExplode();");      // adds to the % explode
+    assert.ok(near(a.offset.toArray(), [0.06, -0.005, 0.0025], 1e-12), `% plus distance, got ${a.offset.toArray()}`);
+    run('explodeDist.set(0, 0, 0); setExplode(0);');
+    assert.ok(near(a.offset.toArray(), [0, 0, 0], 0), 'cleared: back home');
+  });
+});
+test('scope All: the outermost part centre on each axis moves exactly the typed distance', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A'), b = part(plate(), [-0.05, 0, 0.02], 'B'), c = part(plate(), [0, 0.03, -0.04], 'C');
+  withModel([a, b, c], () => {
+    run('setExplodeDist(0, "20"); setExplodeDist(2, "8");');
+    assert.ok(near(a.offset.toArray(), [0.02, 0, 0], 1e-12), `A, farthest on X, by ${a.offset.toArray()}`);
+    assert.ok(near(b.offset.toArray(), [-0.01, 0, 0.004], 1e-12), `B halfway on X, +half on Z, by ${b.offset.toArray()}`);
+    assert.ok(near(c.offset.toArray(), [0, 0, -0.008], 1e-12), `C, farthest on Z, by ${c.offset.toArray()}`);
+    assert.equal(run('exploded()'), true);
+    run('explodeDist.set(0, 0, 0); applyExplode();');
+  });
+});
+test('a distance that is not a number, or absurdly far, is refused', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A');
+  withModel([a], () => {
+    run('setExplodeDist(0, "abc"); setExplodeDist(1, "1e9");');
+    assert.ok(near(run('explodeDist.toArray()'), [0, 0, 0], 0), `kept 0, got ${run('explodeDist.toArray()')}`);
+  });
+});
+test('reference planes: three, through the origin, covering the model and the origin', () => {
+  const a = part(plate(), [0.3, 0.2, 0.1], 'A');
+  withModel([a], () => {
+    run('bboxCached = new THREE.Box3(new THREE.Vector3(0.25, 0.17, 0.095), new THREE.Vector3(0.35, 0.23, 0.105)); setPlanes(true);');
+    try {
+      assert.equal(run('planeRoot.visible && scene.children.includes(planeRoot)'), true, 'shown, in the scene');
+      assert.equal(run('modelRoot.children.includes(planeRoot)'), false, 'not part of the model');
+      for (const [name, n] of [['YZ', 0], ['ZX', 1], ['XY', 2]]) {
+        const pos = run(`Array.from(planeRoot.children.find(o => o.isMesh && o.userData.plane === '${name}').geometry.attributes.position.array)`);
+        const pts = []; for (let i = 0; i < pos.length; i += 3) pts.push(pos.slice(i, i + 3));
+        assert.ok(pts.every(p => p[n] === 0), `${name} lies on its plane`);
+        for (let k = 0; k < 3; k++) if (k !== n) {
+          const lo = Math.min(...pts.map(p => p[k])), hi = Math.max(...pts.map(p => p[k]));
+          const bmin = [0.25, 0.17, 0.095][k], bmax = [0.35, 0.23, 0.105][k];
+          assert.ok(lo < 0 && hi > bmax && lo <= Math.min(0, bmin), `${name} covers origin and model on axis ${k}: ${lo}..${hi}`);
+        }
+      }
+      run('togglePlanes();');
+      assert.equal(run('planeRoot.visible || planesOn'), false, 'P hides all three');
+      run('togglePlanes();');
+      assert.equal(run('planeRoot.visible'), true, 'and shows them again');
+    } finally { run('setPlanes(false); disposePlanes();'); }
+  });
+});

@@ -150,6 +150,9 @@ select.btn option{background:var(--raised);color:var(--text)}
 #explodepanel input[type=number]{width:96px;min-width:0;height:var(--ctl-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);color:var(--text);padding:0 8px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
 #explodepanel input[type=number]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
 #explodepanel input[type=number]:disabled{opacity:.45;cursor:not-allowed}
+#explodepanel .row.dist input[type=number]{width:62px;padding:0 5px}
+#explodepanel .row.dist .ax{font-family:var(--mono);font-size:11px;font-weight:700;margin-left:2px}
+#explodepanel .ax-x{color:#d92d20}#explodepanel .ax-y{color:#15803d}#explodepanel .ax-z{color:#1d4ed8}
 #explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
 #axisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
 #axisName.none{color:var(--subtle)}
@@ -236,6 +239,7 @@ select.btn option{background:var(--raised);color:var(--text)}
       <button class="btn collapsible" id="btnNormal" aria-label="Normal to face" title="Normal to: look square at the selected flat face, or at the next face you click; again flips to the other side (Ctrl+8)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 13.5h13M8 13.5V2.5M5.5 5 8 2.5 10.5 5M8 11h2.5v2.5"/></svg><span class="t">Normal to</span></button>
       <button class="btn collapsible" id="btnFit" aria-label="Fit" title="Fit model in view (F)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/><rect x="5.5" y="5.5" width="5" height="5" rx=".5"/></svg><span class="t">Fit</span></button>
       <button class="btn collapsible" id="btnEdges" aria-label="Edges" title="Toggle feature edges (E)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5zM2 5l6 3.5L14 5M8 8.5v6"/></svg><span class="t">Edges</span></button>
+      <button class="btn collapsible" id="btnPlanes" aria-label="Planes" aria-pressed="false" title="Show or hide the reference planes through the origin: YZ (normal X, red), ZX (normal Y, green), XY (normal Z, blue) (P)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1.5 10.5 6 7.5h8.5L10 10.5z"/><path d="M6 1.5v9M6 1.5 10 4v9"/></svg><span class="t">Planes</span></button>
       <button class="btn collapsible" id="btnBg" aria-label="White BG" title="White background for reports (B)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6"/><path class="fill" d="M8 2a6 6 0 0 1 0 12z"/></svg><span class="t">White BG</span></button>
     </div>
 
@@ -315,9 +319,17 @@ select.btn option{background:var(--raised);color:var(--text)}
           <button class="btn" id="btnExpFlip" disabled title="Picked parts: move towards minus X / Y / Z, or against the axis">Flip</button>
           <button class="btn" id="btnExpReset" title="Put every part back">Reset</button>
         </div>
+        <div class="row dist">
+          <span class="lbl">distance</span>
+          <label class="ax ax-x" for="expDx">X</label><input type="number" id="expDx" step="any" placeholder="0" title="Explode distance along X: picked parts move exactly this far; with All, the outermost part does">
+          <label class="ax ax-y" for="expDy">Y</label><input type="number" id="expDy" step="any" placeholder="0" title="Explode distance along Y: picked parts move exactly this far; with All, the outermost part does">
+          <label class="ax ax-z" for="expDz">Z</label><input type="number" id="expDz" step="any" placeholder="0" title="Explode distance along Z: picked parts move exactly this far; with All, the outermost part does">
+          <span class="unit" id="expDistUnit">mm</span>
+        </div>
         <div class="row"><span class="hint">All: parts slide away from the assembly centre. Picked: only the
-          picked parts move, as one group, along the chosen direction. Measurements keep using the
-          assembled positions.</span></div>
+          picked parts move, as one group, along the chosen direction. Distance X / Y / Z adds an exact
+          explode: picked parts move exactly that far, with All the outermost part does. Measurements keep
+          using the assembled positions.</span></div>
         <div class="div"></div>
         <div class="row">
           <span class="lbl">axis</span>
@@ -5995,7 +6007,7 @@ function mmScale(kind){ return kind === 'glb' || kind === 'gltf' ? 1000 : 1; }  
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
-  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode();
+  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode(); disposePlanes();
   if (modelRoot){ scene.remove(modelRoot); disposeTree(modelRoot); modelRoot = null; }
   if (edgeRoot){ scene.remove(edgeRoot); disposeTree(edgeRoot); edgeRoot = null; }
   edgesOn = false; $('btnEdges').classList.remove('active');
@@ -6078,6 +6090,7 @@ function afterLoad(name, bytes, ms){
     bboxCached.getCenter(modelCenter);
     $('stBbox').textContent = [s.x,s.y,s.z].map(v=>L(v)).join(' × ') + ' mm';
   }
+  if (planesOn) buildPlanes();       // reference planes sized to this model (75-planes.js)
   setView('iso');
   buildPartList();
 
@@ -7721,6 +7734,12 @@ let explodeAmt = 0, explodeAxis = 'all', explodeScope = 'all', explodeSign = 1, 
 const EXPLODE_MAX = 2;               // at 100 % a part ends up three times as far from the centre
 const EXPLODE_PICKED = 1;            // at 100 % a picked group has moved one model size (largest bbox side)
 const explodeSel = new Set();        // the parts Scope Picked explodes
+// Distance X / Y / Z: an exact explode, typed in the shown units and kept in mesh units. Picked: the group
+// moves by exactly (dX, dY, dZ). All: along each axis a part slides away from the assembly centre in
+// proportion to how far off it its centre sits, so the outermost part centre moves exactly that distance.
+// It adds to the % explode and to a part's own move.
+const explodeDist = new THREE.Vector3();
+['x', 'y', 'z'].forEach((a, i) => $('expD' + a).addEventListener('change', e => setExplodeDist(i, e.target.value)));
 $('btnExplode').addEventListener('click', ()=>{
   if (!modelRoot){ toast('Load a model first'); return; }
   const open = $('explodepanel').classList.toggle('show');
@@ -7780,7 +7799,32 @@ document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click',
   if (explodeAxis === 'axis' && !moveAxis) movePickStart();     // explodes radially until an axis is picked
   applyExplode();
 }));
-$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); });
+$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); explodeDist.set(0, 0, 0); explodeDistSync(); setExplode(0); });
+function setExplodeDist(i, typed){   // i: 0 X, 1 Y, 2 Z; typed in the shown units ('' is 0)
+  const v = typed === '' ? 0 : Number(typed);
+  if (!Number.isFinite(v)) toast('Not a number');
+  else if (Math.abs(v / unitScale) > 100 * modelSize) toast('Too far: more than 100 times the size of the model');
+  else explodeDist.setComponent(i, v / unitScale);
+  explodeDistSync();
+  applyExplode();
+}
+function explodeDistSync(){          // the boxes, after a change of value or of units
+  ['x', 'y', 'z'].forEach((a, i) => { const d = explodeDist.getComponent(i); $('expD' + a).value = d ? moveNum(d) : ''; });
+  $('expDistUnit').textContent = unitsRaw ? '' : 'mm';
+}
+const _dspan = new THREE.Vector3();
+// The vector the typed distances add to part p: (dX, dY, dZ) for a picked part, nothing for one that is not;
+// in scope All, each axis scaled by where p sits between the centre and the farthest part centre on it.
+function distShift(p, out){
+  out.set(0, 0, 0);
+  if (explodeDist.lengthSq() === 0) return out;
+  if (explodeScope === 'picked') return explodeSel.has(p) ? out.copy(explodeDist) : out;
+  for (let i = 0; i < 3; i++){
+    const span = _dspan.getComponent(i);
+    if (span > 1e-9 * modelSize) out.setComponent(i, explodeDist.getComponent(i) * (p.restCenter.getComponent(i) - modelCenter.getComponent(i)) / span);
+  }
+  return out;
+}
 function setExplodeAxis(k){
   explodeAxis = k;
   document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x.dataset.exp === k));
@@ -7796,10 +7840,11 @@ function resetExplode(){             // a newly loaded model starts assembled
   explodeSel.clear(); $('expPickCount').textContent = 0; endPickModes();
   explodeSign = 1; $('btnExpFlip').classList.remove('active'); setExplodeScope('all');
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
+  explodeDist.set(0, 0, 0); explodeDistSync();
   moveReset();
 }
 function exploded(){ return parts.some(p => p.offset.lengthSq() > 0); }    // any part drawn off its assembled place
-const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3(), _zero = new THREE.Vector3(), _gs = new THREE.Vector3();
+const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3(), _zero = new THREE.Vector3(), _gs = new THREE.Vector3(), _ds = new THREE.Vector3();
 // The one vector the picked group moves by: along X / Y / Z (signed by Flip), the picked axis (its own
 // direction, signed by Flip too), or All: away from the assembly centre through the group's centre.
 function groupShift(){
@@ -7820,12 +7865,15 @@ function applyExplode(){
   if (!modelRoot) return;
   const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis], ax = explodeAxis === 'axis' && moveAxis ? moveAxis.d : null;
   const group = explodeScope === 'picked' ? groupShift() : null;
+  _dspan.set(0, 0, 0);                // per axis, the farthest part centre from the assembly centre
+  parts.forEach(p => { for (let i = 0; i < 3; i++)
+    _dspan.setComponent(i, Math.max(_dspan.getComponent(i), Math.abs(p.restCenter.getComponent(i) - modelCenter.getComponent(i)))); });
   parts.forEach(p=>{
-    if (group){ p.offset.copy(explodeSel.has(p) ? group : _zero).add(p.moved); return; }
+    if (group){ p.offset.copy(explodeSel.has(p) ? group : _zero).add(distShift(p, _ds)).add(p.moved); return; }
     p.offset.subVectors(p.restCenter, modelCenter);
     if (k !== undefined) for (let i = 0; i < 3; i++) if (i !== k) p.offset.setComponent(i, 0);
     if (ax){ const s = p.offset.dot(ax); p.offset.copy(ax).multiplyScalar(s); }
-    p.offset.multiplyScalar(f).add(p.moved);
+    p.offset.multiplyScalar(f).add(distShift(p, _ds)).add(p.moved);
   });
   parts.forEach(p=>{                  // `parts` lists parents before their children
     const m = p.mesh;
@@ -8415,7 +8463,7 @@ function setUnitsRaw(raw){
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
-  moveSync();
+  moveSync(); explodeDistSync();
 }
 $('unitToggle').addEventListener('click', ()=>{
   setUnitsRaw(!unitsRaw);
@@ -8439,6 +8487,7 @@ window.addEventListener('keydown', e=>{
   else if (k === '4') setMode('measure');
   else if (k === 'm') setMode(mode === 'measure' ? 'part' : 'measure');
   else if (k === 'v') $('btnExplode').click();
+  else if (k === 'p') togglePlanes();
   else if (k === 'k' && mode === 'measure') measureKeep();
   else if ((k === 'delete' || k === 'backspace') && mode === 'measure') measureClear(true);
   else if (k === 'h' && selected) setPartVisible(selected, !selected.visible);
@@ -8566,6 +8615,67 @@ function drawAxes(){
     ctx.beginPath(); ctx.moveTo(o, o); ctx.lineTo(p.x, p.y); ctx.stroke();
     ctx.fillText(p.a.name, p.x + dx / d * 9, p.y + dy / d * 9);   // the letter sits just past the tip
   }
+}
+// ── Reference planes ─────────────────────────────────────────
+// The three planes of the world frame, through the origin: YZ (normal X, red), ZX (normal Y, green) and
+// XY (normal Z, blue), coloured as the axis triad (70-axes.js). Each is drawn as a translucent sheet with
+// an outline, sized to cover the assembled model's outline on it and the origin, with a margin. They are
+// in the scene, not in the model: not picked, not measured, not cut, and not counted in the bounding box.
+// Toolbar Planes or P shows or hides all three; they are rebuilt for every model.
+let planesOn = false, planeRoot = null;
+const PLANES = [
+  {name:'YZ', n:0, u:1, v:2, color:0xd92d20},     // normal X
+  {name:'ZX', n:1, u:2, v:0, color:0x15803d},     // normal Y
+  {name:'XY', n:2, u:0, v:1, color:0x1d4ed8}      // normal Z
+];
+const PLANE_MARGIN = 0.1;            // each side reaches this share of the model size past what it covers
+$('btnPlanes').addEventListener('click', togglePlanes);
+function togglePlanes(){ setPlanes(!planesOn); }
+function setPlanes(on){
+  planesOn = on;
+  $('btnPlanes').classList.toggle('active', on);
+  $('btnPlanes').setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (on && !planeRoot) buildPlanes();
+  if (planeRoot) planeRoot.visible = on;
+}
+// One plane's rectangle in world coordinates: its four corners, in order, on the plane through the origin.
+function planeCorners(pl, box){
+  const lo = [0, 0], hi = [0, 0], m = PLANE_MARGIN * modelSize;
+  [pl.u, pl.v].forEach((k, j) => {
+    lo[j] = Math.min(0, box ? box.min.getComponent(k) : -modelSize / 2) - m;
+    hi[j] = Math.max(0, box ? box.max.getComponent(k) : modelSize / 2) + m;
+  });
+  return [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]].map(([a, b]) => {
+    const c = new THREE.Vector3();
+    c.setComponent(pl.u, a); c.setComponent(pl.v, b);
+    return c;
+  });
+}
+function buildPlanes(){
+  planeRoot = new THREE.Group();
+  planeRoot.name = 'reference planes';
+  const box = bboxCached || computeBBox();
+  PLANES.forEach(pl => {
+    const c = planeCorners(pl, box), pos = [];
+    [0, 1, 2, 0, 2, 3].forEach(i => pos.push(c[i].x, c[i].y, c[i].z));
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const sheet = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color:pl.color, transparent:true, opacity:0.12,
+      side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}));
+    sheet.renderOrder = 1;
+    const lg = new THREE.BufferGeometry().setFromPoints(c.concat([c[0]]));
+    const line = new THREE.Line(lg, new THREE.LineBasicMaterial({color:pl.color, transparent:true, opacity:0.8}));
+    sheet.userData.plane = line.userData.plane = pl.name;
+    planeRoot.add(sheet, line);
+  });
+  planeRoot.visible = planesOn;
+  scene.add(planeRoot);
+}
+function disposePlanes(){            // a new model: the planes are sized again when next shown
+  if (!planeRoot) return;
+  scene.remove(planeRoot);
+  planeRoot.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  planeRoot = null;
 }
 })();
 </script>

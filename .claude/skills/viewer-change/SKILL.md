@@ -29,7 +29,8 @@ application code at the bottom, split into `src/app/`.
 | Measure: two picks' distances/angles (`relate`), Keep/Clear, panel | `src/app/43-relate.js` |
 | Measure: the "min distance (mesh)" row | `src/app/44-mindist.js` |
 | dimensions drawn on the model and in screenshots | `src/app/45-annotate.js` |
-| exploded view, scope All / Picked, feature-edge toggle | `src/app/46-explode.js` |
+| exploded view, scope All / Picked, typed X / Y / Z distances, feature-edge toggle | `src/app/46-explode.js` |
+| the reference planes YZ / ZX / XY and their show/hide toggle | `src/app/75-planes.js` |
 | Normal to a face, the Ctrl+1…8 view keys | `src/app/48-views.js` |
 | moving a part along a picked axis: Pick…, the distance box, the drag arrow | `src/app/47-move.js` |
 | section planes, offset/flip, plane-from-circle, stencil caps, cuts while exploded | `src/app/50-section.js` |

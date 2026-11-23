@@ -27,6 +27,7 @@ const TESTS = [
   ['t20', 't20_orbit_move.js'],
   ['t21', 't21_axes_arrows.js'],
   ['t22', 't22_views_normal_explode.js'],
+  ['t23', 't23_dist_planes.js'],
 ];
 const REPORT_ONLY = new Set(['t1', 't6']);         // print figures, assert nothing
 
