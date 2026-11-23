@@ -1,6 +1,7 @@
 // ── Normal to a face, and the standard-view shortcuts ───────
 // Normal to (Ctrl+8, as in SolidWorks) turns the view to look square at a face: the face selected in
-// Face mode when it is flat, or else the next face clicked. The camera goes out along the face's normal on the side it was
+// Face mode when it is flat, or else the next face clicked -- or the next plane: a reference plane that is
+// shown (Planes) or a plane made through an axis (76-datum.js), whichever the click reaches first. The camera goes out along the face's normal on the side it was
 // seen from, so the face is looked at from the outside; asked again while already square to it, it
 // looks from the other side. A flat face uses its plane's normal (exact from the B-rep when the file
 // carries it); a curved face the normal of the triangle under the click, and says so. The view turns as
@@ -20,17 +21,19 @@ function normalTo(){
   normalPickMode = true;
   $('btnNormal').classList.add('active');
   moveCursor();
-  toast('Click a face to look square at it (Esc cancels)', 4000);
+  toast('Click a face, or a plane that is shown, to look square at it (Esc cancels)', 4000);
 }
-// One pick mode at a time: Pick axis…, Pick parts…, Normal to… and Plane from circle… each take the next
+// One pick mode at a time: Pick axis…, Pick parts…, Normal to…, Plane from circle… and the datum plane's
+// Axis / Face… each take the next
 // click, so starting one ends the others (and a new model ends them all, via resetExplode()).
 function endPickModes(){
   if (axisPickMode) movePickCancel();
   if (normalPickMode) normalPickCancel();
   if (explodePickMode) explodePickCancel();
   if (circlePickMode){ circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
+  if (datumPickMode) datumPickCancel();
 }
-function pickModeOn(){ return axisPickMode || normalPickMode || explodePickMode || circlePickMode; }
+function pickModeOn(){ return axisPickMode || normalPickMode || explodePickMode || circlePickMode || !!datumPickMode; }
 function normalPickCancel(){
   normalPickMode = false;
   $('btnNormal').classList.remove('active');
@@ -40,6 +43,8 @@ function normalPickCancel(){
 function pickNormal(){
   const hit = raycaster.intersectObjects(parts.filter(p => p.visible).map(p => p.mesh), false)
                        .find(h => notClipped(h.point, h.object));
+  const pl = planeHit();
+  if (pl && (!hit || pl.distance < hit.distance)){ normalPickCancel(); lookAtPlane(pl); return; }   // the nearer of the two
   if (!hit){ toast('No face there — click a face of the model'); return; }
   normalPickCancel();
   const part = parts.find(p => p.mesh === hit.object);
@@ -87,6 +92,19 @@ function viewUp(d, out){
     if (score > best + 1e-9){ best = score; pick = a; }
   }
   return out.copy(pick).addScaledVector(d, -pick.dot(d)).normalize();
+}
+// Look square at a plane {n, point, title, up}: from the side the camera is on, or the other when already
+// square to it. `up`, when it has one, is a direction lying in the plane that is stood upright on the screen
+// (the axis of a plane made through it); else the nearest world axis is, as for a face.
+function lookAtPlane(pl){
+  const d = faceViewDir({geom:{type:'plane', n:pl.n}}, {point:pl.point});
+  let u;
+  if (pl.up){
+    u = pl.up.clone().addScaledVector(d, -pl.up.dot(d)).normalize();
+    if (u.dot(camera.up) < -1e-9) u.negate();         // the end of it nearer the way up now
+  } else u = viewUp(d, new THREE.Vector3());
+  frame(d.clone(), u);
+  toast('Normal to ' + pl.title);
 }
 function lookAtFace(ent, hit){
   const d = faceViewDir(ent, hit);

@@ -31,6 +31,7 @@ application code at the bottom, split into `src/app/`.
 | dimensions drawn on the model and in screenshots | `src/app/45-annotate.js` |
 | exploded view, scope All / Picked, typed X / Y / Z distances, feature-edge toggle | `src/app/46-explode.js` |
 | the reference planes YZ / ZX / XY and their show/hide toggle | `src/app/75-planes.js` |
+| a plane through a cylinder's axis turned by an angle; clicking a plane to look square at it | `src/app/76-datum.js` (+ `lookAtPlane` in `48-views.js`) |
 | Normal to a face, the Ctrl+1…8 view keys | `src/app/48-views.js` |
 | moving a part along a picked axis: Pick…, the distance box, the drag arrow | `src/app/47-move.js` |
 | section planes, offset/flip, plane-from-circle, stencil caps, cuts while exploded | `src/app/50-section.js` |

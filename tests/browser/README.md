@@ -59,6 +59,8 @@ On Windows, run the same commands in PowerShell or `cmd`. To pick the Python use
 | t20 | turning the view straight on over the top (it used to stop there); Explode → Pick… on a cylinder, a typed move, the drag arrow following the cursor in round steps, Along Axis, cuts kept, Reset |
 | t21 | the X / Y / Z triad in the lower-left corner (colours, position, follows the camera); the arrow keys turning the view 15° a press in the same sense as a drag, and leaving sliders alone |
 | t22 | Ctrl+1 … Ctrl+6 standard views from real key presses (a plain digit still changes the mode); Normal to on a clicked face, and again from the other side; Explode with scope Picked moving only the picked part along X, Flip, Clear |
+| t23 | explode by typed X / Y / Z distances through the panel fields; the reference planes shown and hidden by the button and `P` |
+| t24 | the Plane panel: a plane through a shaft's axis at 30° from Top (its normal, Look with the axis upright, Keep → P1, a second one beside it, Clear); Normal to clicking a made plane and a shown reference plane |
 
 t9–t19 were written against review findings on the measure / explode feature (PR #2). The `codexN` in a file name is the order the tests were written in; it does not match the review round number.
 

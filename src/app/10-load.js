@@ -58,7 +58,7 @@ function mmScale(kind){ return kind === 'glb' || kind === 'gltf' ? 1000 : 1; }  
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
-  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode(); disposePlanes();
+  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode(); disposePlanes(); datumReset();
   if (modelRoot){ scene.remove(modelRoot); disposeTree(modelRoot); modelRoot = null; }
   if (edgeRoot){ scene.remove(edgeRoot); disposeTree(edgeRoot); edgeRoot = null; }
   edgesOn = false; $('btnEdges').classList.remove('active');

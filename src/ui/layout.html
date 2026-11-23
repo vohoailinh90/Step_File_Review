@@ -38,6 +38,7 @@
     <div class="tb-group" role="group" aria-label="Tools">
       <span class="tb-label" aria-hidden="true">Tools</span>
       <button class="btn collapsible" id="btnSection" aria-label="Section" title="Section views (X)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M1 10 15 6" stroke-dasharray="2 2"/></svg><span class="t">Section</span></button>
+      <button class="btn collapsible" id="btnDatum" aria-label="Plane" aria-pressed="false" title="Plane through the axis of a cylinder, turned by an angle from Front, Top, Left or a flat face (D)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 11.5 6 8h8.5L10.5 11.5z"/><path d="M8.5 1.5v11" stroke-dasharray="2 1.5"/><path d="M11 4.5a3 3 0 0 1 1.5 2"/></svg><span class="t">Plane</span></button>
       <button class="btn collapsible" id="btnExplode" aria-label="Explode" title="Exploded view (V)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="5" height="5" rx="1"/><path d="M1.5 4V1.5H4M12 1.5h2.5V4M1.5 12v2.5H4M12 14.5h2.5V12"/></svg><span class="t">Explode</span></button>
       <button class="btn collapsible" id="btnParts" aria-label="Parts" title="Show or hide part list"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 4h8.5M6 8h8.5M6 12h8.5"/><path class="fill" d="M2 3h2v2H2zM2 7h2v2H2zM2 11h2v2H2z"/></svg><span class="t">Parts</span></button>
     </div>
@@ -136,6 +137,36 @@
           <button class="btn" id="btnMoveReset" title="Undo the selected part's own move (the explode stays)" disabled>Reset part</button>
         </div>
         <div class="row"><span class="hint" id="moveHint">Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.</span></div>
+      </div>
+
+      <div id="datumpanel">
+        <div class="phead"><span class="ptitle">Plane through axis</span><span class="pkey">toggle <kbd>D</kbd></span></div>
+        <div class="row">
+          <span class="lbl">axis</span>
+          <button class="btn" id="btnDatumAxis" title="Pick the axis: then click a cylinder, a cone, a circular edge or a straight edge">Pick…</button>
+          <span id="datumAxisName" class="none">none</span>
+        </div>
+        <div class="row">
+          <span class="lbl">from</span>
+          <div class="btn-group" role="group" aria-label="Reference plane">
+            <button class="btn" data-dref="Front" title="Measure the angle from the Front plane (XY)">Front</button>
+            <button class="btn" data-dref="Top" title="Measure the angle from the Top plane (ZX)">Top</button>
+            <button class="btn" data-dref="Left" title="Measure the angle from the Left plane (YZ)">Left</button>
+          </div>
+          <button class="btn" id="btnDatumFace" title="Measure the angle from a flat face of a part: click it">Face…</button>
+        </div>
+        <div class="row">
+          <span class="lbl">angle</span>
+          <input type="range" id="datumSlider" min="-180" max="180" step="0.5" value="0" aria-label="Angle, degrees">
+          <input type="number" id="datumAngle" step="any" value="0" aria-label="Angle in degrees">
+          <span class="unit">°</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnDatumLook" disabled title="Look square at this plane">Look</button>
+          <button class="btn" id="btnDatumKeep" disabled title="Leave this plane in the scene, named P1, P2 …, to look at later">Keep</button>
+          <button class="btn" id="btnDatumClear" title="Remove the planes made here">Clear</button>
+        </div>
+        <div class="row"><span class="hint" id="datumHint"></span></div>
       </div>
 
       <div id="sectionpanel">

@@ -4,8 +4,9 @@
 // square at them (00-scene.js: Y up, +Z towards the viewer in Front): XY Front, ZX Top, YZ Left. Each name
 // is a label at the plane's far corner that always faces the camera. Each is drawn as a translucent sheet with
 // an outline, sized to cover the assembled model's outline on it and the origin, with a margin. They are
-// in the scene, not in the model: not picked, not measured, not cut, and not counted in the bounding box.
-// Toolbar Planes or P shows or hides all three; they are rebuilt for every model.
+// in the scene, not in the model: not selected or measured, not cut (Normal to alone can click one), and not counted in the bounding box.
+// Toolbar Planes or P shows or hides all three; they are rebuilt for every model. Normal to (48-views.js)
+// can look square at one: a click on its sheet, planeHit() in 76-datum.js.
 let planesOn = false, planeRoot = null;
 const PLANES = [
   {name:'YZ', label:'Left',  n:0, u:1, v:2, color:0xd92d20},     // normal X
@@ -36,22 +37,30 @@ function planeCorners(pl, box){
     return c;
   });
 }
+// A plane's translucent sheet and outline from its four corners. `normal` and `title` ride on the sheet
+// for Normal to (48-views.js): what a click on it looks square at, and what the toast calls it.
+function planeSheet(c, color, name, normal, title){
+  const pos = [];
+  [0, 1, 2, 0, 2, 3].forEach(i => pos.push(c[i].x, c[i].y, c[i].z));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const sheet = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.12,
+    side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}));
+  sheet.renderOrder = 1;
+  const lg = new THREE.BufferGeometry().setFromPoints(c.concat([c[0]]));
+  const line = new THREE.Line(lg, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.8}));
+  sheet.userData.plane = line.userData.plane = name;
+  sheet.userData.normal = normal; sheet.userData.title = title;
+  return [sheet, line];
+}
 function buildPlanes(){
   planeRoot = new THREE.Group();
   planeRoot.name = 'reference planes';
   const box = bboxCached || computeBBox();
   PLANES.forEach(pl => {
-    const c = planeCorners(pl, box), pos = [];
-    [0, 1, 2, 0, 2, 3].forEach(i => pos.push(c[i].x, c[i].y, c[i].z));
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    const sheet = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color:pl.color, transparent:true, opacity:0.12,
-      side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}));
-    sheet.renderOrder = 1;
-    const lg = new THREE.BufferGeometry().setFromPoints(c.concat([c[0]]));
-    const line = new THREE.Line(lg, new THREE.LineBasicMaterial({color:pl.color, transparent:true, opacity:0.8}));
-    sheet.userData.plane = line.userData.plane = pl.name;
-    planeRoot.add(sheet, line);
+    const c = planeCorners(pl, box);
+    planeRoot.add(...planeSheet(c, pl.color, pl.name, new THREE.Vector3().setComponent(pl.n, 1),
+                                pl.label + ' plane (' + pl.name + ')'));
     const tag = planeLabel(pl);
     if (tag){                        // inside the far corner, pulled a little towards the opposite one
       tag.position.copy(c[2]).lerp(c[0], 0.08);
@@ -81,10 +90,13 @@ function planeLabel(pl){
   sp.userData.plane = pl.name; sp.userData.label = pl.label;
   return sp;
 }
+function disposeNode(root){          // geometries, textures and materials of everything under root
+  root.traverse(o => { if (o.geometry) o.geometry.dispose();
+    if (o.material){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+}
 function disposePlanes(){            // a new model: the planes are sized again when next shown
   if (!planeRoot) return;
   scene.remove(planeRoot);
-  planeRoot.traverse(o => { if (o.geometry) o.geometry.dispose();
-    if (o.material){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+  disposeNode(planeRoot);
   planeRoot = null;
 }
