@@ -116,7 +116,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 #enginewarn code{font-family:var(--mono);color:var(--accent-strong);font-size:11px;user-select:all;background:var(--raised);border:1px solid var(--border);border-radius:3px;padding:1px 5px}
 
 /* Floating panels: one look */
-#info,#measurepanel,#sectionpanel,#explodepanel{position:absolute;display:none;background:var(--overlay);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+#info,#measurepanel,#sectionpanel,#explodepanel,#datumpanel{position:absolute;display:none;background:var(--overlay);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
 .phead{display:flex;align-items:center;gap:8px;margin:-2px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .phead .pkey{font-size:10px;color:var(--subtle);white-space:nowrap}
 .phead .ptitle{flex:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
@@ -127,30 +127,32 @@ select.btn option{background:var(--raised);color:var(--text)}
 #info .v{color:var(--text)}
 #info .hd{color:var(--pick);font-weight:600;margin-bottom:4px;letter-spacing:.02em}
 
-#sectionpanel,#explodepanel{padding:12px 14px;z-index:7}
+#sectionpanel,#explodepanel,#datumpanel{padding:12px 14px;z-index:7}
 #sectionpanel{top:10px;right:10px;width:300px}
 #explodepanel{bottom:12px;right:10px;width:360px}
-#sectionpanel.show,#explodepanel.show{display:block}
-#sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:6px;margin-bottom:10px;min-width:0}
-#sectionpanel .row:last-child,#explodepanel .row:last-child{margin-bottom:0}
-#sectionpanel .row .lbl,#explodepanel .row .lbl{width:48px;flex-shrink:0}
+#datumpanel{top:10px;right:320px;width:340px}
+#sectionpanel.show,#explodepanel.show,#datumpanel.show{display:block}
+#sectionpanel .row,#explodepanel .row,#datumpanel .row{display:flex;align-items:center;gap:6px;margin-bottom:10px;min-width:0}
+#sectionpanel .row:last-child,#explodepanel .row:last-child,#datumpanel .row:last-child{margin-bottom:0}
+#sectionpanel .row .lbl,#explodepanel .row .lbl,#datumpanel .row .lbl{width:48px;flex-shrink:0}
 #explodepanel .row .lbl{width:52px}
-#sectionpanel .btn-group .btn,#explodepanel .btn-group .btn{padding:0 9px}
+#sectionpanel .btn-group .btn,#explodepanel .btn-group .btn,#datumpanel .btn-group .btn{padding:0 9px}
 #sectionpanel .div,#explodepanel .div{border-top:1px solid var(--border);margin:4px 0 12px}
-#sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;min-width:0;height:20px;accent-color:var(--accent);cursor:pointer}
-#sectionpanel input[type=range]:disabled,#explodepanel input[type=range]:disabled{opacity:.4;cursor:not-allowed}
-#explodepanel input[type=number]{width:96px;min-width:0;height:var(--ctl-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);color:var(--text);padding:0 8px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
-#explodepanel input[type=number]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
+#sectionpanel input[type=range],#explodepanel input[type=range],#datumpanel input[type=range]{flex:1;min-width:0;height:20px;accent-color:var(--accent);cursor:pointer}
+#sectionpanel input[type=range]:disabled,#explodepanel input[type=range]:disabled,#datumpanel input[type=range]:disabled{opacity:.4;cursor:not-allowed}
+#explodepanel input[type=number],#datumpanel input[type=number]{width:96px;min-width:0;height:var(--ctl-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);color:var(--text);padding:0 8px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+#explodepanel input[type=number]:focus-visible,#datumpanel input[type=number]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
 #explodepanel input[type=number]:disabled{opacity:.45;cursor:not-allowed}
 #explodepanel .row.dist input[type=number]{width:62px;padding:0 5px}
 #explodepanel .row.dist .ax{font-family:var(--mono);font-size:11px;font-weight:700;margin-left:2px}
 #explodepanel .ax-x{color:#d92d20}#explodepanel .ax-y{color:#15803d}#explodepanel .ax-z{color:#1d4ed8}
-#explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
-#axisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
-#axisName.none{color:var(--subtle)}
+#datumpanel input[type=number]{width:78px}
+#explodepanel .unit,#datumpanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#axisName,#datumAxisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none,#datumAxisName.none{color:var(--subtle)}
 #btnMoveReset{margin-left:auto}
 #sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent-strong);min-width:58px;text-align:right;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
-#sectionpanel .hint,#explodepanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}
+#sectionpanel .hint,#explodepanel .hint,#datumpanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}
 #sectionpanel .hint b{color:var(--pick);font-weight:600}
 #expPickCount{color:var(--expsel)}
 
@@ -192,6 +194,6 @@ select.btn option{background:var(--raised);color:var(--text)}
 @media (max-width:2099px){.tb-label{display:none}}
 @media (max-width:1859px){.btn.collapsible .t{display:none}.btn.collapsible{width:var(--ctl-h);padding:0}}
 @media (max-width:1279px){#hintbar{display:none}#fname{max-width:160px}}
-@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel{width:auto;left:10px;right:10px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
+@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel,#datumpanel{width:auto;left:10px;right:10px}#explodepanel .row,#datumpanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
 @media (prefers-reduced-motion:reduce){*,*::before{transition:none!important;animation:none!important}}
 

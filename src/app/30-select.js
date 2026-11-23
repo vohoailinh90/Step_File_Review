@@ -82,6 +82,7 @@ function pick(e){
   setRay(e);
   if (axisPickMode) return pickAxis(e);           // Explode → Pick axis… (47-move.js)
   if (normalPickMode) return pickNormal(e);       // Normal to… (48-views.js)
+  if (datumPickMode) return pickDatum(e);         // Plane → Axis Pick… / Face… (76-datum.js)
   if (explodePickMode || (mode === 'part' && (e.ctrlKey || e.metaKey) && $('explodepanel').classList.contains('show')))
     return pickExplodePart();                     // Explode → Pick parts…, or Ctrl+click (46-explode.js)
   if (circlePickMode || mode === 'edge') return pickEdge();

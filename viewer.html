@@ -124,7 +124,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 #enginewarn code{font-family:var(--mono);color:var(--accent-strong);font-size:11px;user-select:all;background:var(--raised);border:1px solid var(--border);border-radius:3px;padding:1px 5px}
 
 /* Floating panels: one look */
-#info,#measurepanel,#sectionpanel,#explodepanel{position:absolute;display:none;background:var(--overlay);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+#info,#measurepanel,#sectionpanel,#explodepanel,#datumpanel{position:absolute;display:none;background:var(--overlay);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
 .phead{display:flex;align-items:center;gap:8px;margin:-2px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .phead .pkey{font-size:10px;color:var(--subtle);white-space:nowrap}
 .phead .ptitle{flex:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
@@ -135,30 +135,32 @@ select.btn option{background:var(--raised);color:var(--text)}
 #info .v{color:var(--text)}
 #info .hd{color:var(--pick);font-weight:600;margin-bottom:4px;letter-spacing:.02em}
 
-#sectionpanel,#explodepanel{padding:12px 14px;z-index:7}
+#sectionpanel,#explodepanel,#datumpanel{padding:12px 14px;z-index:7}
 #sectionpanel{top:10px;right:10px;width:300px}
 #explodepanel{bottom:12px;right:10px;width:360px}
-#sectionpanel.show,#explodepanel.show{display:block}
-#sectionpanel .row,#explodepanel .row{display:flex;align-items:center;gap:6px;margin-bottom:10px;min-width:0}
-#sectionpanel .row:last-child,#explodepanel .row:last-child{margin-bottom:0}
-#sectionpanel .row .lbl,#explodepanel .row .lbl{width:48px;flex-shrink:0}
+#datumpanel{top:10px;right:320px;width:340px}
+#sectionpanel.show,#explodepanel.show,#datumpanel.show{display:block}
+#sectionpanel .row,#explodepanel .row,#datumpanel .row{display:flex;align-items:center;gap:6px;margin-bottom:10px;min-width:0}
+#sectionpanel .row:last-child,#explodepanel .row:last-child,#datumpanel .row:last-child{margin-bottom:0}
+#sectionpanel .row .lbl,#explodepanel .row .lbl,#datumpanel .row .lbl{width:48px;flex-shrink:0}
 #explodepanel .row .lbl{width:52px}
-#sectionpanel .btn-group .btn,#explodepanel .btn-group .btn{padding:0 9px}
+#sectionpanel .btn-group .btn,#explodepanel .btn-group .btn,#datumpanel .btn-group .btn{padding:0 9px}
 #sectionpanel .div,#explodepanel .div{border-top:1px solid var(--border);margin:4px 0 12px}
-#sectionpanel input[type=range],#explodepanel input[type=range]{flex:1;min-width:0;height:20px;accent-color:var(--accent);cursor:pointer}
-#sectionpanel input[type=range]:disabled,#explodepanel input[type=range]:disabled{opacity:.4;cursor:not-allowed}
-#explodepanel input[type=number]{width:96px;min-width:0;height:var(--ctl-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);color:var(--text);padding:0 8px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
-#explodepanel input[type=number]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
+#sectionpanel input[type=range],#explodepanel input[type=range],#datumpanel input[type=range]{flex:1;min-width:0;height:20px;accent-color:var(--accent);cursor:pointer}
+#sectionpanel input[type=range]:disabled,#explodepanel input[type=range]:disabled,#datumpanel input[type=range]:disabled{opacity:.4;cursor:not-allowed}
+#explodepanel input[type=number],#datumpanel input[type=number]{width:96px;min-width:0;height:var(--ctl-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);color:var(--text);padding:0 8px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+#explodepanel input[type=number]:focus-visible,#datumpanel input[type=number]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
 #explodepanel input[type=number]:disabled{opacity:.45;cursor:not-allowed}
 #explodepanel .row.dist input[type=number]{width:62px;padding:0 5px}
 #explodepanel .row.dist .ax{font-family:var(--mono);font-size:11px;font-weight:700;margin-left:2px}
 #explodepanel .ax-x{color:#d92d20}#explodepanel .ax-y{color:#15803d}#explodepanel .ax-z{color:#1d4ed8}
-#explodepanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
-#axisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
-#axisName.none{color:var(--subtle)}
+#datumpanel input[type=number]{width:78px}
+#explodepanel .unit,#datumpanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#axisName,#datumAxisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none,#datumAxisName.none{color:var(--subtle)}
 #btnMoveReset{margin-left:auto}
 #sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent-strong);min-width:58px;text-align:right;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
-#sectionpanel .hint,#explodepanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}
+#sectionpanel .hint,#explodepanel .hint,#datumpanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}
 #sectionpanel .hint b{color:var(--pick);font-weight:600}
 #expPickCount{color:var(--expsel)}
 
@@ -200,7 +202,7 @@ select.btn option{background:var(--raised);color:var(--text)}
 @media (max-width:2099px){.tb-label{display:none}}
 @media (max-width:1859px){.btn.collapsible .t{display:none}.btn.collapsible{width:var(--ctl-h);padding:0}}
 @media (max-width:1279px){#hintbar{display:none}#fname{max-width:160px}}
-@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel{width:auto;left:10px;right:10px}#explodepanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
+@media (max-width:760px){#sidebar{position:absolute;z-index:8;height:100%;box-shadow:var(--shadow)}#sectionpanel,#explodepanel,#datumpanel{width:auto;left:10px;right:10px}#explodepanel .row,#datumpanel .row{flex-wrap:wrap}#measurepanel{width:calc(100% - 20px)}}
 @media (prefers-reduced-motion:reduce){*,*::before{transition:none!important;animation:none!important}}
 
 </style>
@@ -246,6 +248,7 @@ select.btn option{background:var(--raised);color:var(--text)}
     <div class="tb-group" role="group" aria-label="Tools">
       <span class="tb-label" aria-hidden="true">Tools</span>
       <button class="btn collapsible" id="btnSection" aria-label="Section" title="Section views (X)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M1 10 15 6" stroke-dasharray="2 2"/></svg><span class="t">Section</span></button>
+      <button class="btn collapsible" id="btnDatum" aria-label="Plane" aria-pressed="false" title="Plane through the axis of a cylinder, turned by an angle from Front, Top, Left or a flat face (D)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 11.5 6 8h8.5L10.5 11.5z"/><path d="M8.5 1.5v11" stroke-dasharray="2 1.5"/><path d="M11 4.5a3 3 0 0 1 1.5 2"/></svg><span class="t">Plane</span></button>
       <button class="btn collapsible" id="btnExplode" aria-label="Explode" title="Exploded view (V)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="5" height="5" rx="1"/><path d="M1.5 4V1.5H4M12 1.5h2.5V4M1.5 12v2.5H4M12 14.5h2.5V12"/></svg><span class="t">Explode</span></button>
       <button class="btn collapsible" id="btnParts" aria-label="Parts" title="Show or hide part list"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 4h8.5M6 8h8.5M6 12h8.5"/><path class="fill" d="M2 3h2v2H2zM2 7h2v2H2zM2 11h2v2H2z"/></svg><span class="t">Parts</span></button>
     </div>
@@ -344,6 +347,36 @@ select.btn option{background:var(--raised);color:var(--text)}
           <button class="btn" id="btnMoveReset" title="Undo the selected part's own move (the explode stays)" disabled>Reset part</button>
         </div>
         <div class="row"><span class="hint" id="moveHint">Pick an axis, then move a part along it: type the distance, or drag the arrow on the part.</span></div>
+      </div>
+
+      <div id="datumpanel">
+        <div class="phead"><span class="ptitle">Plane through axis</span><span class="pkey">toggle <kbd>D</kbd></span></div>
+        <div class="row">
+          <span class="lbl">axis</span>
+          <button class="btn" id="btnDatumAxis" title="Pick the axis: then click a cylinder, a cone, a circular edge or a straight edge">Pick…</button>
+          <span id="datumAxisName" class="none">none</span>
+        </div>
+        <div class="row">
+          <span class="lbl">from</span>
+          <div class="btn-group" role="group" aria-label="Reference plane">
+            <button class="btn" data-dref="Front" title="Measure the angle from the Front plane (XY)">Front</button>
+            <button class="btn" data-dref="Top" title="Measure the angle from the Top plane (ZX)">Top</button>
+            <button class="btn" data-dref="Left" title="Measure the angle from the Left plane (YZ)">Left</button>
+          </div>
+          <button class="btn" id="btnDatumFace" title="Measure the angle from a flat face of a part: click it">Face…</button>
+        </div>
+        <div class="row">
+          <span class="lbl">angle</span>
+          <input type="range" id="datumSlider" min="-180" max="180" step="0.5" value="0" aria-label="Angle, degrees">
+          <input type="number" id="datumAngle" step="any" value="0" aria-label="Angle in degrees">
+          <span class="unit">°</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnDatumLook" disabled title="Look square at this plane">Look</button>
+          <button class="btn" id="btnDatumKeep" disabled title="Leave this plane in the scene, named P1, P2 …, to look at later">Keep</button>
+          <button class="btn" id="btnDatumClear" title="Remove the planes made here">Clear</button>
+        </div>
+        <div class="row"><span class="hint" id="datumHint"></span></div>
       </div>
 
       <div id="sectionpanel">
@@ -6007,7 +6040,7 @@ function mmScale(kind){ return kind === 'glb' || kind === 'gltf' ? 1000 : 1; }  
 function defaultMat(){ return new THREE.MeshStandardMaterial({color:0x9aa4b0, metalness:.25, roughness:.55}); }
 
 function clearModel(){
-  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode(); disposePlanes();
+  clearSelection(); sectionOff(); disposeCaps(); measureClear(true); resetExplode(); disposePlanes(); datumReset();
   if (modelRoot){ scene.remove(modelRoot); disposeTree(modelRoot); modelRoot = null; }
   if (edgeRoot){ scene.remove(edgeRoot); disposeTree(edgeRoot); edgeRoot = null; }
   edgesOn = false; $('btnEdges').classList.remove('active');
@@ -6248,6 +6281,7 @@ function pick(e){
   setRay(e);
   if (axisPickMode) return pickAxis(e);           // Explode → Pick axis… (47-move.js)
   if (normalPickMode) return pickNormal(e);       // Normal to… (48-views.js)
+  if (datumPickMode) return pickDatum(e);         // Plane → Axis Pick… / Face… (76-datum.js)
   if (explodePickMode || (mode === 'part' && (e.ctrlKey || e.metaKey) && $('explodepanel').classList.contains('show')))
     return pickExplodePart();                     // Explode → Pick parts…, or Ctrl+click (46-explode.js)
   if (circlePickMode || mode === 'edge') return pickEdge();
@@ -8068,7 +8102,7 @@ function moveStep(part){             // 1, 2 or 5 x 10^n shown units: the rounde
 function moveCursor(){
   if (moveDrag) canvas.style.cursor = 'grabbing';
   else if (moveHover) canvas.style.cursor = 'grab';
-  else if (axisPickMode || normalPickMode || explodePickMode) canvas.style.cursor = 'crosshair';
+  else if (axisPickMode || normalPickMode || explodePickMode || datumPickMode) canvas.style.cursor = 'crosshair';
   else canvas.style.cursor = '';
 }
 // A drag holds the part by the point of the axis under the cursor. That axis line runs through the
@@ -8150,7 +8184,8 @@ function drawMoveGizmo(ctx, s){
 }
 // ── Normal to a face, and the standard-view shortcuts ───────
 // Normal to (Ctrl+8, as in SolidWorks) turns the view to look square at a face: the face selected in
-// Face mode when it is flat, or else the next face clicked. The camera goes out along the face's normal on the side it was
+// Face mode when it is flat, or else the next face clicked -- or the next plane: a reference plane that is
+// shown (Planes) or a plane made through an axis (76-datum.js), whichever the click reaches first. The camera goes out along the face's normal on the side it was
 // seen from, so the face is looked at from the outside; asked again while already square to it, it
 // looks from the other side. A flat face uses its plane's normal (exact from the B-rep when the file
 // carries it); a curved face the normal of the triangle under the click, and says so. The view turns as
@@ -8170,17 +8205,19 @@ function normalTo(){
   normalPickMode = true;
   $('btnNormal').classList.add('active');
   moveCursor();
-  toast('Click a face to look square at it (Esc cancels)', 4000);
+  toast('Click a face, or a plane that is shown, to look square at it (Esc cancels)', 4000);
 }
-// One pick mode at a time: Pick axis…, Pick parts…, Normal to… and Plane from circle… each take the next
+// One pick mode at a time: Pick axis…, Pick parts…, Normal to…, Plane from circle… and the datum plane's
+// Axis / Face… each take the next
 // click, so starting one ends the others (and a new model ends them all, via resetExplode()).
 function endPickModes(){
   if (axisPickMode) movePickCancel();
   if (normalPickMode) normalPickCancel();
   if (explodePickMode) explodePickCancel();
   if (circlePickMode){ circlePickMode = false; $('btnPickCircle').classList.remove('active'); }
+  if (datumPickMode) datumPickCancel();
 }
-function pickModeOn(){ return axisPickMode || normalPickMode || explodePickMode || circlePickMode; }
+function pickModeOn(){ return axisPickMode || normalPickMode || explodePickMode || circlePickMode || !!datumPickMode; }
 function normalPickCancel(){
   normalPickMode = false;
   $('btnNormal').classList.remove('active');
@@ -8190,6 +8227,8 @@ function normalPickCancel(){
 function pickNormal(){
   const hit = raycaster.intersectObjects(parts.filter(p => p.visible).map(p => p.mesh), false)
                        .find(h => notClipped(h.point, h.object));
+  const pl = planeHit();
+  if (pl && (!hit || pl.distance < hit.distance)){ normalPickCancel(); lookAtPlane(pl); return; }   // the nearer of the two
   if (!hit){ toast('No face there — click a face of the model'); return; }
   normalPickCancel();
   const part = parts.find(p => p.mesh === hit.object);
@@ -8237,6 +8276,19 @@ function viewUp(d, out){
     if (score > best + 1e-9){ best = score; pick = a; }
   }
   return out.copy(pick).addScaledVector(d, -pick.dot(d)).normalize();
+}
+// Look square at a plane {n, point, title, up}: from the side the camera is on, or the other when already
+// square to it. `up`, when it has one, is a direction lying in the plane that is stood upright on the screen
+// (the axis of a plane made through it); else the nearest world axis is, as for a face.
+function lookAtPlane(pl){
+  const d = faceViewDir({geom:{type:'plane', n:pl.n}}, {point:pl.point});
+  let u;
+  if (pl.up){
+    u = pl.up.clone().addScaledVector(d, -pl.up.dot(d)).normalize();
+    if (u.dot(camera.up) < -1e-9) u.negate();         // the end of it nearer the way up now
+  } else u = viewUp(d, new THREE.Vector3());
+  frame(d.clone(), u);
+  toast('Normal to ' + pl.title);
 }
 function lookAtFace(ent, hit){
   const d = faceViewDir(ent, hit);
@@ -8474,7 +8526,7 @@ function setUnitsRaw(raw){
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
-  moveSync(); explodeDistSync();
+  moveSync(); explodeDistSync(); datumSync();
 }
 $('unitToggle').addEventListener('click', ()=>{
   setUnitsRaw(!unitsRaw);
@@ -8499,6 +8551,7 @@ window.addEventListener('keydown', e=>{
   else if (k === 'm') setMode(mode === 'measure' ? 'part' : 'measure');
   else if (k === 'v') $('btnExplode').click();
   else if (k === 'p') togglePlanes();
+  else if (k === 'd') $('btnDatum').click();
   else if (k === 'k' && mode === 'measure') measureKeep();
   else if ((k === 'delete' || k === 'backspace') && mode === 'measure') measureClear(true);
   else if (k === 'h' && selected) setPartVisible(selected, !selected.visible);
@@ -8509,6 +8562,7 @@ window.addEventListener('keydown', e=>{
     if (axisPickMode) movePickCancel();
     if (normalPickMode) normalPickCancel();
     if (explodePickMode) explodePickCancel();
+    if (datumPickMode) datumPickCancel();
   }
 });
 
@@ -8633,8 +8687,9 @@ function drawAxes(){
 // square at them (00-scene.js: Y up, +Z towards the viewer in Front): XY Front, ZX Top, YZ Left. Each name
 // is a label at the plane's far corner that always faces the camera. Each is drawn as a translucent sheet with
 // an outline, sized to cover the assembled model's outline on it and the origin, with a margin. They are
-// in the scene, not in the model: not picked, not measured, not cut, and not counted in the bounding box.
-// Toolbar Planes or P shows or hides all three; they are rebuilt for every model.
+// in the scene, not in the model: not selected or measured, not cut (Normal to alone can click one), and not counted in the bounding box.
+// Toolbar Planes or P shows or hides all three; they are rebuilt for every model. Normal to (48-views.js)
+// can look square at one: a click on its sheet, planeHit() in 76-datum.js.
 let planesOn = false, planeRoot = null;
 const PLANES = [
   {name:'YZ', label:'Left',  n:0, u:1, v:2, color:0xd92d20},     // normal X
@@ -8665,22 +8720,30 @@ function planeCorners(pl, box){
     return c;
   });
 }
+// A plane's translucent sheet and outline from its four corners. `normal` and `title` ride on the sheet
+// for Normal to (48-views.js): what a click on it looks square at, and what the toast calls it.
+function planeSheet(c, color, name, normal, title){
+  const pos = [];
+  [0, 1, 2, 0, 2, 3].forEach(i => pos.push(c[i].x, c[i].y, c[i].z));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const sheet = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.12,
+    side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}));
+  sheet.renderOrder = 1;
+  const lg = new THREE.BufferGeometry().setFromPoints(c.concat([c[0]]));
+  const line = new THREE.Line(lg, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.8}));
+  sheet.userData.plane = line.userData.plane = name;
+  sheet.userData.normal = normal; sheet.userData.title = title;
+  return [sheet, line];
+}
 function buildPlanes(){
   planeRoot = new THREE.Group();
   planeRoot.name = 'reference planes';
   const box = bboxCached || computeBBox();
   PLANES.forEach(pl => {
-    const c = planeCorners(pl, box), pos = [];
-    [0, 1, 2, 0, 2, 3].forEach(i => pos.push(c[i].x, c[i].y, c[i].z));
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    const sheet = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color:pl.color, transparent:true, opacity:0.12,
-      side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}));
-    sheet.renderOrder = 1;
-    const lg = new THREE.BufferGeometry().setFromPoints(c.concat([c[0]]));
-    const line = new THREE.Line(lg, new THREE.LineBasicMaterial({color:pl.color, transparent:true, opacity:0.8}));
-    sheet.userData.plane = line.userData.plane = pl.name;
-    planeRoot.add(sheet, line);
+    const c = planeCorners(pl, box);
+    planeRoot.add(...planeSheet(c, pl.color, pl.name, new THREE.Vector3().setComponent(pl.n, 1),
+                                pl.label + ' plane (' + pl.name + ')'));
     const tag = planeLabel(pl);
     if (tag){                        // inside the far corner, pulled a little towards the opposite one
       tag.position.copy(c[2]).lerp(c[0], 0.08);
@@ -8710,12 +8773,182 @@ function planeLabel(pl){
   sp.userData.plane = pl.name; sp.userData.label = pl.label;
   return sp;
 }
+function disposeNode(root){          // geometries, textures and materials of everything under root
+  root.traverse(o => { if (o.geometry) o.geometry.dispose();
+    if (o.material){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+}
 function disposePlanes(){            // a new model: the planes are sized again when next shown
   if (!planeRoot) return;
   scene.remove(planeRoot);
-  planeRoot.traverse(o => { if (o.geometry) o.geometry.dispose();
-    if (o.material){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+  disposeNode(planeRoot);
   planeRoot = null;
+}
+// ── Plane through an axis, turned by an angle ────────────────
+// Toolbar Plane or D. Axis Pick…: click a cylinder, a cone, a circular edge or a straight edge; its axis is
+// the pivot, its + end the world direction it mostly points along. From: Front, Top or Left (the reference
+// planes of 75-planes.js), or Face… (a flat face of a part). Angle: the plane's turn about the axis, +
+// counter-clockwise seen from the axis's + end. At 0 it is the plane through the axis that lies closest to
+// the reference -- parallel to it when the axis is -- and no angle is defined when the axis is square to the
+// reference. The plane is drawn at once, a sheet in the scene like the reference planes (not picked in the
+// model, not measured, not cut); Look turns the view square to it (Normal to), Keep leaves it there, named
+// P1, P2 …. Normal to can click any drawn plane. A plane follows the part its axis was picked on.
+let datumPickMode = null;            // 'axis' | 'face' while the next click is for it
+let datumAxis = null;                // {o, d, part, geom, exact}: a point on the axis (assembled), unit direction
+let datumRef = null;                 // {name, n, exact}: the reference plane's name and unit normal (assembled)
+let datumAngle = 0, datumSeq = 0;
+const datumKept = [], datumNodes = [];
+const DATUM_COLOR = 0x7e22ce;
+const DATUM_HALF = 0.75;             // a sheet reaches this many model sizes either side of its axis point
+const DATUM_SKEW = 0.01;             // sin 0.6°: nearer square than this, the reference gives no angle to start from
+
+$('btnDatum').addEventListener('click', () => datumPanel(!$('datumpanel').classList.contains('show')));
+$('btnDatumAxis').addEventListener('click', () => datumPick('axis'));
+$('btnDatumFace').addEventListener('click', () => datumPick('face'));
+document.querySelectorAll('[data-dref]').forEach(b => b.addEventListener('click', () => {
+  const pl = PLANES.find(q => q.label === b.dataset.dref);
+  datumRef = {name:pl.label, n:new THREE.Vector3().setComponent(pl.n, 1), exact:true};
+  datumPickMode = null; moveCursor(); datumChanged();
+}));
+$('datumSlider').addEventListener('input', e => setDatumAngle(e.target.value));
+$('datumAngle').addEventListener('change', e => setDatumAngle(e.target.value));
+$('btnDatumLook').addEventListener('click', datumLook);
+$('btnDatumKeep').addEventListener('click', datumKeep);
+$('btnDatumClear').addEventListener('click', datumClear);
+
+function datumPanel(on){
+  $('datumpanel').classList.toggle('show', on);
+  $('btnDatum').classList.toggle('active', on);
+  $('btnDatum').setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (!on && datumPickMode) datumPickCancel();
+  datumSync();
+}
+function datumPick(kind){
+  if (!modelRoot){ toast('Load a model first'); return; }
+  const again = datumPickMode === kind;
+  endPickModes();
+  if (!again){
+    datumPickMode = kind;
+    if (!edgesOn) toggleEdges();     // an edge is easier to aim at when it is drawn
+  }
+  moveCursor(); datumSync();
+}
+function datumPickCancel(){ datumPickMode = null; moveCursor(); datumSync(); }
+function setDatumAngle(text){
+  const v = parseFloat(String(text).replace(',', '.'));
+  if (Number.isFinite(v) && Math.abs(v) <= 3600) datumAngle = v;
+  datumChanged();
+}
+
+// The normal of the plane through an axis (unit a) turned deg about it from a reference plane (unit normal
+// r): r with its part along a taken out is the normal of the plane through the axis closest to the
+// reference (n0), and the turn is right-handed about a. Null when a is square to r.
+function datumNormal(a, r, deg){
+  const n0 = r.clone().addScaledVector(a, -r.dot(a));
+  if (n0.lengthSq() < DATUM_SKEW * DATUM_SKEW) return null;
+  n0.normalize();
+  const t = THREE.MathUtils.degToRad(deg), w = new THREE.Vector3().crossVectors(a, n0);
+  return n0.multiplyScalar(Math.cos(t)).addScaledVector(w, Math.sin(t)).normalize();
+}
+function datumPlane(){               // the plane the panel describes, or null
+  if (!datumAxis || !datumRef) return null;
+  const n = datumNormal(datumAxis.d, datumRef.n, datumAngle);
+  return n && {n, a:datumAxis.d, o:datumAxis.o, part:datumAxis.part, ref:datumRef.name, angle:datumAngle};
+}
+const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o.distanceTo(q.o) < 1e-12 &&
+                            p.a.dot(q.a) > 1 - 1e-12;
+
+// The click after Axis Pick… or Face… (pick() in 30-select.js sends it here): a face or edge, as Measure picks.
+function pickDatum(e){
+  const ent = entityAt(e);
+  if (datumPickMode === 'axis'){
+    const ax = ent && ent.geom.type !== 'plane' && axisFrom(ent);
+    if (!ax){ toast('No axis there — click a cylinder, a cone, a circular edge or a straight edge'); return; }
+    const i = [0, 1, 2].reduce((m, k) => Math.abs(ax.d.getComponent(k)) > Math.abs(ax.d.getComponent(m)) + 1e-9 ? k : m, 0);
+    if (ax.d.getComponent(i) < 0) ax.d.negate();       // + is the world direction it mostly points along
+    datumAxis = {o:footOnLine(modelCenter, ax.p, ax.d), d:ax.d, part:ax.part, geom:ax.geom, exact:ax.exact};
+  } else {
+    if (!ent || ent.geom.type !== 'plane'){ toast('That is not a flat face — click a flat face'); return; }
+    datumRef = {name:'face', n:ent.geom.n.clone().normalize(), exact:!!ent.exact};
+  }
+  datumPickMode = null; moveCursor(); datumChanged();
+}
+
+function datumChanged(){ datumDraw(); datumSync(); }
+// Every kept plane, and the one being set up unless it is the one just kept: a sheet each, in a group that
+// follows its part.
+function datumDraw(){
+  datumNodes.splice(0).forEach(g => { scene.remove(g); followers.delete(g); disposeNode(g); });
+  const cur = datumPlane();
+  datumKept.concat(cur && !datumKept.some(k => datumSame(k, cur)) ? [Object.assign(cur, {name:'Plane'})] : [])
+    .forEach(d => datumNodes.push(datumNode(d)));
+}
+function datumNode(d){
+  const g = new THREE.Group(), s = DATUM_HALF * modelSize, w = new THREE.Vector3().crossVectors(d.a, d.n).normalize();
+  const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => d.o.clone().addScaledVector(d.a, i * s).addScaledVector(w, j * s));
+  const text = d.name + '  ' + +d.angle.toFixed(2) + '° from ' + d.ref;
+  const [sheet, line] = planeSheet(c, DATUM_COLOR, d.name, d.n, text);
+  sheet.userData.up = d.a;           // Normal to stands the axis upright on the screen
+  g.add(sheet, line);
+  const tag = planeLabel({name:d.name, label:text, color:DATUM_COLOR});
+  if (tag){ tag.position.copy(c[2]).lerp(c[0], 0.08); g.add(tag); }
+  g.name = 'datum plane ' + d.name;
+  scene.add(g);
+  follow(g, d.part, null);
+  return g;
+}
+function datumLook(){
+  const d = datumPlane();
+  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane through the axis, ' +
+                      +d.angle.toFixed(2) + '° from ' + d.ref});
+}
+function datumKeep(){
+  const d = datumPlane();
+  if (!d) return;
+  datumKept.push(Object.assign(d, {name:'P' + ++datumSeq}));
+  datumChanged();
+  toast('Kept as ' + d.name);
+}
+function datumClear(){
+  datumKept.length = 0; datumAxis = null; datumRef = null;
+  datumChanged();
+}
+function datumReset(){               // a new model: its parts are gone, and so are the planes through their axes
+  datumKept.length = 0; datumAxis = null; datumRef = null; datumAngle = 0; datumSeq = 0; datumPickMode = null;
+  $('datumSlider').value = 0; $('datumAngle').value = 0;
+  datumDraw(); datumSync();
+}
+const dirText = d => { const i = [0, 1, 2].find(k => Math.abs(d.getComponent(k)) > 0.99999);
+  return i === undefined ? '(' + d.toArray().map(x => x.toFixed(2)).join(', ') + ')' : '+' + 'XYZ'[i]; };
+function datumSync(){                // the panel, after anything that changes the axis, the reference or the angle
+  const pl = datumPlane(), a = datumAxis, r = datumRef;
+  $('datumAxisName').textContent = a ? axisName(a) + ', + along ' + dirText(a.d) : 'none';   // named when shown: follows the units
+  $('datumAxisName').classList.toggle('none', !a);
+  $('btnDatumAxis').classList.toggle('active', datumPickMode === 'axis');
+  $('btnDatumFace').classList.toggle('active', datumPickMode === 'face' || (!!r && r.name === 'face'));
+  document.querySelectorAll('[data-dref]').forEach(b => b.classList.toggle('active', !!r && r.name === b.dataset.dref));
+  $('datumSlider').value = datumAngle; $('datumAngle').value = datumAngle;
+  $('btnDatumLook').disabled = $('btnDatumKeep').disabled = !pl;
+  $('btnDatumClear').disabled = !datumKept.length && !a && !r;
+  const tilt = a && r ? THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.abs(a.d.dot(r.n))))) : 0;
+  $('datumHint').textContent =
+      datumPickMode === 'axis' ? 'Click a cylinder, a cone, a circular edge or a straight edge: its axis is the pivot.'
+    : datumPickMode === 'face' ? 'Click a flat face to measure the angle from.'
+    : !a ? 'Pick the axis the plane passes through.'
+    : !r ? 'Choose what the angle is measured from: Front, Top, Left or a flat face.'
+    : !pl ? 'The axis is square to that reference, so there is no angle to measure from: choose another reference.'
+    : 'Angle from ' + r.name + (r.exact ? '' : ' (mesh)') + ', turned about the axis: + is counter-clockwise seen from its + end.' +
+      (tilt > 0.5 ? ' The axis crosses the reference at ' + tilt.toFixed(1) + '°: 0° is the plane through it that lies closest to the reference.' : '');
+}
+
+// The nearest visible plane sheet under the ray (setRay already called): a reference plane that is shown,
+// or a plane made here. {n, point, distance, title, up}: what a click on it looks square at.
+function planeHit(){
+  const sheets = [];
+  if (planesOn && planeRoot) planeRoot.children.forEach(o => { if (o.isMesh) sheets.push(o); });
+  datumNodes.forEach(g => g.children.forEach(o => { if (o.isMesh) sheets.push(o); }));
+  const h = sheets.length ? raycaster.intersectObjects(sheets, false)[0] : null;
+  const u = h && h.object.userData;
+  return h ? {n:u.normal, point:h.point, distance:h.distance, title:u.title, up:u.up || null} : null;
 }
 })();
 </script>
