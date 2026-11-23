@@ -11,7 +11,14 @@ Start
 
 Keep the folder together
   QuickSTEP.exe needs the _internal folder next to it. Copy or move the
-  whole QuickSTEP folder, never the exe alone.
+  whole QuickSTEP folder, never the exe alone. Unzip it near the top of a
+  drive (for example C:\Tools\QuickSTEP): a very deep folder can exceed the
+  Windows path-length limit, and the unzip then fails.
+
+If the window closes straight away
+  QuickSTEP stopped with an error before you could read it. Open a console
+  in this folder (type cmd in the Explorer address bar, press Enter), run
+  QuickSTEP.exe there, and read the message it prints.
 
 First open of a big assembly
   The first open converts the STEP file on this PC and can take a while;

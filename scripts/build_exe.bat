@@ -27,7 +27,16 @@ REM  non-ASCII character survives every one of them.
 REM ================================================================
 
 REM Work from the repository root, whatever folder this was started from.
-cd /d "%~dp0.."
+REM pushd, not cd /d: cmd cannot make a UNC path (\\server\share\...) its
+REM current folder -- cd /d fails and leaves C:\Windows -- while pushd maps a
+REM temporary drive letter for it. popd on the way out also gives a console
+REM back the folder it started in, which setlocal does not.
+pushd "%~dp0.."
+if errorlevel 1 (
+    echo [ERROR] Cannot open the repository folder. Copy it to a local drive.
+    if not defined CI pause
+    exit /b 1
+)
 set "ROOT=%CD%"
 
 echo ================================================================
@@ -87,6 +96,13 @@ REM ---- 3. clean ---------------------------------------------------------
 echo [3/5] Cleaning the previous build...
 if exist "build\pyinstaller" rmdir /s /q "build\pyinstaller"
 if exist "dist\QuickSTEP"    rmdir /s /q "dist\QuickSTEP"
+if exist "dist\QuickSTEP" (
+    echo [ERROR] Could not remove the old dist\QuickSTEP -- is QuickSTEP.exe
+    echo         still running? Close it and run this again.
+    goto :fail
+)
+REM The smoke test checks that it wrote this file, so none may be left over.
+if exist "build\smoke_test.glb" del "build\smoke_test.glb"
 echo [3/5] Done.
 echo.
 
@@ -151,6 +167,7 @@ echo  Windows SmartScreen may say "Windows protected your PC" because the exe
 echo  is not code-signed: click "More info", then "Run anyway".
 echo.
 if not defined CI pause
+popd
 endlocal
 exit /b 0
 
@@ -159,5 +176,6 @@ echo.
 echo  BUILD FAILED
 echo.
 if not defined CI pause
+popd
 endlocal
 exit /b 1
