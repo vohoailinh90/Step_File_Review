@@ -17,7 +17,8 @@ const explodeSel = new Set();        // the parts Scope Picked explodes
 // proportion to how far off it its centre sits, so the outermost part centre moves exactly that distance.
 // It adds to the % explode and to a part's own move.
 const explodeDist = new THREE.Vector3();
-['x', 'y', 'z'].forEach((a, i) => $('expD' + a).addEventListener('change', e => setExplodeDist(i, e.target.value)));
+['x', 'y', 'z'].forEach((a, i) => $('expD' + a).addEventListener('change', e =>
+  setExplodeDist(i, e.target.validity && e.target.validity.badInput ? 'bad' : e.target.value)));   // '1,5' reads '' in some locales
 $('btnExplode').addEventListener('click', ()=>{
   if (!modelRoot){ toast('Load a model first'); return; }
   const open = $('explodepanel').classList.toggle('show');
@@ -85,6 +86,8 @@ function setExplodeDist(i, typed){   // i: 0 X, 1 Y, 2 Z; typed in the shown uni
   else explodeDist.setComponent(i, v / unitScale);
   explodeDistSync();
   applyExplode();
+  if (v && explodeScope === 'all' && modelRoot && _dspan.getComponent(i) <= 1e-9 * modelSize)
+    toast('No visible part sits off the centre along ' + 'XYZ'[i] + ' — pick parts to move them by this distance');
 }
 function explodeDistSync(){          // the boxes, after a change of value or of units
   ['x', 'y', 'z'].forEach((a, i) => { const d = explodeDist.getComponent(i); $('expD' + a).value = d ? moveNum(d) : ''; });
@@ -143,8 +146,8 @@ function applyExplode(){
   if (!modelRoot) return;
   const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis], ax = explodeAxis === 'axis' && moveAxis ? moveAxis.d : null;
   const group = explodeScope === 'picked' ? groupShift() : null;
-  _dspan.set(0, 0, 0);                // per axis, the farthest part centre from the assembly centre
-  parts.forEach(p => { for (let i = 0; i < 3; i++)
+  _dspan.set(0, 0, 0);                // per axis, the farthest visible part centre from the assembly centre
+  parts.forEach(p => { if (p.visible) for (let i = 0; i < 3; i++)
     _dspan.setComponent(i, Math.max(_dspan.getComponent(i), Math.abs(p.restCenter.getComponent(i) - modelCenter.getComponent(i)))); });
   parts.forEach(p=>{
     if (group){ p.offset.copy(explodeSel.has(p) ? group : _zero).add(distShift(p, _ds)).add(p.moved); return; }

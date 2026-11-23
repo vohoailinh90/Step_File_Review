@@ -293,6 +293,19 @@ test('scope All: the outermost part centre on each axis moves exactly the typed 
     run('explodeDist.set(0, 0, 0); applyExplode();');
   });
 });
+test('scope All scales to the outermost visible part; nothing off-centre on an axis is said, not silent', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A'), b = part(plate(), [-0.05, 0, 0], 'B');
+  withModel([a, b], () => {
+    a.visible = false;
+    run('__toasts = []; __t = toast; toast = m => __toasts.push(m);');
+    try {
+      run('setExplodeDist(0, "20");');
+      assert.ok(near(b.offset.toArray(), [-0.02, 0, 0], 1e-12), `B, outermost visible, moves the full 20 mm: ${b.offset.toArray()}`);
+      run('setExplodeDist(2, "5");');
+      assert.ok(near(b.offset.toArray(), [-0.02, 0, 0], 1e-12) && run('__toasts.length') === 1, `Z: no part off centre, told once: ${run('JSON.stringify(__toasts)')}`);
+    } finally { run('toast = __t; explodeDist.set(0, 0, 0); applyExplode();'); a.visible = true; }
+  });
+});
 test('a distance that is not a number, or absurdly far, is refused', () => {
   const a = part(plate(), [0.1, 0, 0], 'A');
   withModel([a], () => {
