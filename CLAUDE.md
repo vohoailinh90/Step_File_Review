@@ -477,6 +477,28 @@ Every pull request you create or drive for a requirement goes through the loop b
 5. **Merge it yourself — where the repository allows it.** A clean PR is merged without asking for approval, scoped to the validated head commit, provided the base branch requires branches to be up to date and the merging identity cannot bypass that rule (read the branch protection to confirm both). Where either is missing, merging is a genuine blocker: leave the PR open, say it is clean and why it was not merged, and do not merge. Record the merge commit and a one-line summary on the PR.
 6. **Then continue.** Do not stop after the merge to ask what is next: start the next outstanding task from the latest default branch (a merged branch is finished; never stack new commits on it). An outstanding task is one the user explicitly asked for that is not done yet; never invent work or pick up an item the user did not ask for. A task that needs the code of a PR that is not merged waits: skip it rather than stack on that branch. When none remains, report what merged and stop.
 
+**Branch protection on `main`, as the owner configured it (recorded 2026-11-23).** The
+GitHub tools available to an agent here report only that `main` is protected, not its
+settings, so this record is what step 5 reads. The classic branch protection rule for
+`main` has:
+
+- Require a pull request before merging: on. No approval is required, and the other review
+  options are off. The agent merges as the owner's account, which cannot approve its own PR.
+- Require status checks to pass before merging: on, with **Require branches to be up to
+  date before merging** on. The required checks are `ubuntu-latest / py3.13`,
+  `windows-latest / py3.13`, `windows-latest / py3.9`, `cascadio install (windows)` and
+  `exe build (windows)`.
+- **Do not allow bypassing the above settings**: on, so the rule applies to administrators
+  too.
+- Off: conversation resolution, signed commits, linear history, deployments, lock branch,
+  force pushes and deletions.
+
+This satisfies step 5: a clean PR may be merged without asking. If a merge is refused, or
+`main` reads as unprotected, the record is stale. Then do not merge: report it to the
+owner. Whoever changes the rule updates this record in the same change. When a CI job is
+renamed or added, update the required checks in the rule as well as here. A required check
+that no longer runs blocks every merge.
+
 What bounds the loop:
 
 - **No review cap.** The loop runs until every review command the change requires is clean on the current head. A review is still bounded by step 3's rules. Two exits remain: a finding you reject with evidence — a P2/P3 stands at once and blocks nothing, even if Codex raises it again; a P0/P1 is a disagreement unless a review drops it: when other fixes make a new head, push it and let the next review decide (raised again, unchanged or reworded or moved when it is substantially the same issue, means escalate; not raised again means closed), and when no code change is pending escalate at once — report it to the repository owner and do not merge until they decide — and a genuine blocker.
