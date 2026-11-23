@@ -348,8 +348,8 @@ def serve_and_open(glb: Path | None, name: str):
 def setup_problems() -> list[str]:
     """What stops a launch besides the engine, which check_engine() covers.
 
-    `--check` has to fail on everything a normal launch fails on. Codex review
-    round 9 on PR #1: with viewer.html missing it printed "viewer.html present:
+    `--check` has to fail on everything a normal launch fails on. A review found
+    that with viewer.html missing it printed "viewer.html present:
     False" and then "Setup OK", exit 0 -- while serve_and_open() refuses to
     start. Probing the rest found the cache folder the same way: a launch
     creates it and writes a GLB into it, and --check only printed its path, so
