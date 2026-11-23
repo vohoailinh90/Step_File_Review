@@ -306,6 +306,20 @@ test('scope All scales to the outermost visible part; nothing off-centre on an a
     } finally { run('toast = __t; explodeDist.set(0, 0, 0); applyExplode();'); a.visible = true; }
   });
 });
+test('hiding, showing or isolating parts re-scales a scope-All distance at once', () => {
+  const a = part(plate(), [0.1, 0, 0], 'A'), b = part(plate(), [-0.05, 0, 0], 'B'), c = part(plate(), [-0.1, 0, 0], 'C');
+  withModel([a, b, c], () => {
+    run('parts.forEach(p => p.rowEl = {classList:{toggle(){}, add(){}, remove(){}}});');
+    run('setExplodeDist(0, "20");');
+    assert.ok(near(b.offset.toArray(), [-0.01, 0, 0], 1e-12), `B halfway: ${b.offset.toArray()}`);
+    run('isolate(parts[1]);');                         // only B visible: it is now the outermost
+    assert.ok(near(b.offset.toArray(), [-0.02, 0, 0], 1e-12), `isolated B moves the full 20 mm: ${b.offset.toArray()}`);
+    run('setPartVisible(parts[0], true);');            // A back: B halfway again, A the full 20 mm
+    assert.ok(near(b.offset.toArray(), [-0.01, 0, 0], 1e-12) && near(a.offset.toArray(), [0.02, 0, 0], 1e-12),
+      `after showing A: ${a.offset.toArray()} / ${b.offset.toArray()}`);
+    run('parts.forEach(p => setPartVisible(p, true)); explodeDist.set(0, 0, 0); applyExplode();');
+  });
+});
 test('a distance that is not a number, or absurdly far, is refused', () => {
   const a = part(plate(), [0.1, 0, 0], 'A');
   withModel([a], () => {
