@@ -12,6 +12,13 @@ let explodeAmt = 0, explodeAxis = 'all', explodeScope = 'all', explodeSign = 1, 
 const EXPLODE_MAX = 2;               // at 100 % a part ends up three times as far from the centre
 const EXPLODE_PICKED = 1;            // at 100 % a picked group has moved one model size (largest bbox side)
 const explodeSel = new Set();        // the parts Scope Picked explodes
+// Distance X / Y / Z: an exact explode, typed in the shown units and kept in mesh units. Picked: the group
+// moves by exactly (dX, dY, dZ). All: along each axis a part slides away from the assembly centre in
+// proportion to how far off it its centre sits, so the outermost part centre moves exactly that distance.
+// It adds to the % explode and to a part's own move.
+const explodeDist = new THREE.Vector3();
+['x', 'y', 'z'].forEach((a, i) => $('expD' + a).addEventListener('change', e =>
+  setExplodeDist(i, e.target.validity && e.target.validity.badInput ? 'bad' : e.target.value)));   // '1,5' reads '' in some locales
 $('btnExplode').addEventListener('click', ()=>{
   if (!modelRoot){ toast('Load a model first'); return; }
   const open = $('explodepanel').classList.toggle('show');
@@ -71,7 +78,36 @@ document.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click',
   if (explodeAxis === 'axis' && !moveAxis) movePickStart();     // explodes radially until an axis is picked
   applyExplode();
 }));
-$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); setExplode(0); });
+$('btnExpReset').addEventListener('click', ()=>{ parts.forEach(p => p.moved.set(0, 0, 0)); explodeDist.set(0, 0, 0); explodeDistSync(); setExplode(0); });
+function setExplodeDist(i, typed){   // i: 0 X, 1 Y, 2 Z; typed in the shown units ('' is 0)
+  const v = typed === '' ? 0 : Number(typed);
+  if (!Number.isFinite(v)) toast('Not a number');
+  else if (Math.abs(v / unitScale) > 100 * modelSize) toast('Too far: more than 100 times the size of the model');
+  else explodeDist.setComponent(i, v / unitScale);
+  explodeDistSync();
+  applyExplode();
+  if (v && explodeScope === 'all' && modelRoot && _dspan.getComponent(i) <= 1e-9 * modelSize)
+    toast('No visible part sits off the centre along ' + 'XYZ'[i] + ' — pick parts to move them by this distance');
+}
+function explodeDistSync(){          // the boxes, after a change of value or of units
+  ['x', 'y', 'z'].forEach((a, i) => { const d = explodeDist.getComponent(i); $('expD' + a).value = d ? moveNum(d) : ''; });
+  $('expDistUnit').textContent = unitsRaw ? '' : 'mm';
+}
+const _dspan = new THREE.Vector3();
+// The vector the typed distances add to part p: (dX, dY, dZ) for a picked part, nothing for one that is not;
+// in scope All, each axis scaled by where p sits between the centre and the farthest part centre on it.
+function distShift(p, out){
+  out.set(0, 0, 0);
+  if (explodeDist.lengthSq() === 0) return out;
+  if (explodeScope === 'picked') return explodeSel.has(p) ? out.copy(explodeDist) : out;
+  for (let i = 0; i < 3; i++){
+    const span = _dspan.getComponent(i);
+    // clamped: a hidden part beyond the visible span moves the full distance, never more (it would inflate Fit)
+    if (span > 1e-9 * modelSize) out.setComponent(i, explodeDist.getComponent(i) *
+      Math.max(-1, Math.min(1, (p.restCenter.getComponent(i) - modelCenter.getComponent(i)) / span)));
+  }
+  return out;
+}
 function setExplodeAxis(k){
   explodeAxis = k;
   document.querySelectorAll('[data-exp]').forEach(x => x.classList.toggle('active', x.dataset.exp === k));
@@ -87,10 +123,11 @@ function resetExplode(){             // a newly loaded model starts assembled
   explodeSel.clear(); $('expPickCount').textContent = 0; endPickModes();
   explodeSign = 1; $('btnExpFlip').classList.remove('active'); setExplodeScope('all');
   $('expAmount').value = 0; $('expAmountVal').textContent = '0 %';
+  explodeDist.set(0, 0, 0); explodeDistSync();
   moveReset();
 }
 function exploded(){ return parts.some(p => p.offset.lengthSq() > 0); }    // any part drawn off its assembled place
-const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3(), _zero = new THREE.Vector3(), _gs = new THREE.Vector3();
+const _inv = new THREE.Matrix4(), _wp = new THREE.Vector3(), _zero = new THREE.Vector3(), _gs = new THREE.Vector3(), _ds = new THREE.Vector3();
 // The one vector the picked group moves by: along X / Y / Z (signed by Flip), the picked axis (its own
 // direction, signed by Flip too), or All: away from the assembly centre through the group's centre.
 function groupShift(){
@@ -111,12 +148,15 @@ function applyExplode(){
   if (!modelRoot) return;
   const f = explodeAmt * EXPLODE_MAX, k = {x:0, y:1, z:2}[explodeAxis], ax = explodeAxis === 'axis' && moveAxis ? moveAxis.d : null;
   const group = explodeScope === 'picked' ? groupShift() : null;
+  _dspan.set(0, 0, 0);                // per axis, the farthest visible part centre from the assembly centre
+  parts.forEach(p => { if (p.visible) for (let i = 0; i < 3; i++)
+    _dspan.setComponent(i, Math.max(_dspan.getComponent(i), Math.abs(p.restCenter.getComponent(i) - modelCenter.getComponent(i)))); });
   parts.forEach(p=>{
-    if (group){ p.offset.copy(explodeSel.has(p) ? group : _zero).add(p.moved); return; }
+    if (group){ p.offset.copy(explodeSel.has(p) ? group : _zero).add(distShift(p, _ds)).add(p.moved); return; }
     p.offset.subVectors(p.restCenter, modelCenter);
     if (k !== undefined) for (let i = 0; i < 3; i++) if (i !== k) p.offset.setComponent(i, 0);
     if (ax){ const s = p.offset.dot(ax); p.offset.copy(ax).multiplyScalar(s); }
-    p.offset.multiplyScalar(f).add(p.moved);
+    p.offset.multiplyScalar(f).add(distShift(p, _ds)).add(p.moved);
   });
   parts.forEach(p=>{                  // `parts` lists parents before their children
     const m = p.mesh;

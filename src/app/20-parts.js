@@ -20,15 +20,21 @@ function buildPartList(){
     p.rowEl = row; box.appendChild(row);
   });
 }
-function setPartVisible(p, v){
+// batch: the caller changes several parts and calls visibilityChanged() once after.
+function setPartVisible(p, v, batch){
+  const was = p.visible;
   p.visible = v; p.mesh.visible = v;
   p.rowEl.classList.toggle('hiddenpart', !v);
   if (p.edges) p.edges.visible = v && edgesOn;
   if (p.capBack){ p.capBack.visible = v; p.capFront.visible = v; p.capQuad.visible = v; }
+  if (!batch && was !== v) visibilityChanged();
 }
+// A typed explode distance in scope All scales to the visible parts (46-explode.js): follow the new set.
+function visibilityChanged(){ if (explodeDist.lengthSq() > 0 && explodeScope === 'all') applyExplode(); }
 function isolate(p){
   const onlyOne = parts.every(q => (q===p) === q.visible);
-  parts.forEach(q => setPartVisible(q, onlyOne ? true : q === p));
+  parts.forEach(q => setPartVisible(q, onlyOne ? true : q === p, true));
+  visibilityChanged();
 }
 let hovered = null;
 function emis(p, hex){ const m = p.mesh.material; if (m && m.emissive) m.emissive.setHex(hex); }
@@ -38,8 +44,8 @@ function hover(p, on){
   hovered = null;
   if (on && p !== selected){ emis(p, 0x4a3c00); p.rowEl.classList.add('highlight'); hovered = p; }
 }
-$('btnShowAll').addEventListener('click', ()=> parts.forEach(p=>setPartVisible(p, true)));
-$('btnInvert').addEventListener('click', ()=> parts.forEach(p=>setPartVisible(p, !p.visible)));
+$('btnShowAll').addEventListener('click', ()=>{ parts.forEach(p => setPartVisible(p, true, true)); visibilityChanged(); });
+$('btnInvert').addEventListener('click', ()=>{ parts.forEach(p => setPartVisible(p, !p.visible, true)); visibilityChanged(); });
 $('btnParts').addEventListener('click', ()=>{
   $('sidebar').classList.toggle('hidden'); $('btnParts').classList.toggle('active');
 });

@@ -59,11 +59,13 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 | `src/app/43-relate.js`   | 231 | `relate()` — two picks' distances and angles; Keep/Clear; the measure panel |
 | `src/app/44-mindist.js`  | 155 | `minDistance()` — BVH over the picked triangles, the "(mesh)" minimum |
 | `src/app/45-annotate.js` | 99  | dimensions drawn on the model and into screenshots |
-| `src/app/46-explode.js`  | 87  | exploded view (`EXPLODE_MAX`, along X / Y / Z / Axis, `exploded()`), feature-edge toggle |
+| `src/app/46-explode.js`  | 194 | exploded view (`EXPLODE_MAX`, along X / Y / Z / Axis, typed X / Y / Z distances `explodeDist`, `exploded()`), feature-edge toggle |
 | `src/app/47-move.js`     | 220 | a part moved along a picked axis (`moved`): Pick…, typed distance, the drag arrow |
 | `src/app/48-views.js`    | 81  | Normal to a face (`normalTo`, `faceViewDir`, `viewUp`), the Ctrl+1…8 view keys (`viewKey`) |
 | `src/app/50-section.js`  | 162 | section planes, plane-from-circle, stencil caps, per-part cuts while exploded |
 | `src/app/60-io.js`       | 163 | drag & drop, `/convert`, `/status`, screenshot, units toggle (`setUnitsRaw`), keyboard, autoload |
+| `src/app/70-axes.js`     | 38  | the X / Y / Z triad in the corner of the view |
+| `src/app/75-planes.js`   | 61  | reference planes YZ / ZX / XY through the origin, Planes button / `P` |
 | `src/ui/viewer.css`      | 119 | all styling |
 | `src/ui/layout.html`     | 161 | toolbar, sidebar, section / measure / explode panels, status bar |
 | `src/viewer.template.html` | — | the shell and the concatenation order |

@@ -50,7 +50,7 @@ function setUnitsRaw(raw){
   }
   $('secOffsetVal').textContent = L(sectionOffset);
   if (mode === 'measure') renderMeasure();
-  moveSync();
+  moveSync(); explodeDistSync();
 }
 $('unitToggle').addEventListener('click', ()=>{
   setUnitsRaw(!unitsRaw);
@@ -74,6 +74,7 @@ window.addEventListener('keydown', e=>{
   else if (k === '4') setMode('measure');
   else if (k === 'm') setMode(mode === 'measure' ? 'part' : 'measure');
   else if (k === 'v') $('btnExplode').click();
+  else if (k === 'p') togglePlanes();
   else if (k === 'k' && mode === 'measure') measureKeep();
   else if ((k === 'delete' || k === 'backspace') && mode === 'measure') measureClear(true);
   else if (k === 'h' && selected) setPartVisible(selected, !selected.visible);
