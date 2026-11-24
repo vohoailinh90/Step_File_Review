@@ -148,8 +148,9 @@ select.btn option{background:var(--raised);color:var(--text)}
 #explodepanel .ax-x{color:#d92d20}#explodepanel .ax-y{color:#15803d}#explodepanel .ax-z{color:#1d4ed8}
 #datumpanel input[type=number]{width:78px}
 #explodepanel .unit,#datumpanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
-#axisName,#datumAxisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
-#axisName.none,#datumAxisName.none{color:var(--subtle)}
+#datumpanel .row[hidden]{display:none}
+#axisName,#datumAxisName,#datumAxis2Name{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none,#datumAxisName.none,#datumAxis2Name.none{color:var(--subtle)}
 #btnMoveReset{margin-left:auto}
 #sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent-strong);min-width:58px;text-align:right;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
 #sectionpanel .hint,#explodepanel .hint,#datumpanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}

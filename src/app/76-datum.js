@@ -7,7 +7,10 @@
 // reference. The plane is drawn at once, a sheet in the scene like the reference planes (not picked in the
 // model, not measured, not cut); Look turns the view square to it (Normal to), Keep leaves it there, named
 // P1, P2 …. Normal to can click any drawn plane. A plane follows the part its axis was picked on.
-let datumPickMode = null;            // 'axis' | 'face' while the next click is for it
+// Mode: Axis + angle (above) or Two axes -- the plane holding two parallel axes (77-datum2.js).
+let datumPickMode = null;            // 'axis' | 'axis2' | 'face' while the next click is for it
+let datumMode = 'angle';             // 'angle': one axis turned from a reference | 'two': through two parallel axes
+let datumAxis2 = null;               // the second axis, as datumAxis, in Two axes mode
 let datumAxis = null;                // {o, d, part, geom, exact}: a point on the axis (assembled), unit direction
 let datumRef = null;                 // {name, n, exact}: the reference plane's name and unit normal (assembled)
 let datumAngle = 0, datumSeq = 0;
@@ -20,6 +23,9 @@ const DATUM_SKEW_MESH = 0.05;        // sin 2.9°: a pick fitted to the mesh is 
 $('btnDatum').addEventListener('click', () => datumPanel(!$('datumpanel').classList.contains('show')));
 $('btnDatumAxis').addEventListener('click', () => datumPick('axis'));
 $('btnDatumFace').addEventListener('click', () => datumPick('face'));
+$('btnDatumAxis2').addEventListener('click', () => datumPick('axis2'));
+$('btnDatumModeAngle').addEventListener('click', () => setDatumMode('angle'));
+$('btnDatumModeTwo').addEventListener('click', () => setDatumMode('two'));
 document.querySelectorAll('[data-dref]').forEach(b => b.addEventListener('click', () => {
   const pl = PLANES.find(q => q.label === b.dataset.dref);
   datumRef = {name:pl.label, n:new THREE.Vector3().setComponent(pl.n, 1), exact:true};
@@ -66,6 +72,7 @@ function datumNormal(a, r, deg, skew = DATUM_SKEW){
   return n0.multiplyScalar(Math.cos(t)).addScaledVector(w, Math.sin(t)).normalize();
 }
 function datumPlane(){               // the plane the panel describes, or null
+  if (datumMode === 'two') return twoAxisPlane();
   if (!datumAxis || !datumRef) return null;
   const exact = !!(datumAxis.exact && datumRef.exact);
   const n = datumNormal(datumAxis.d, datumRef.n, datumAngle, exact ? DATUM_SKEW : DATUM_SKEW_MESH);
@@ -75,7 +82,7 @@ function datumPlane(){               // the plane the panel describes, or null
 const datumTilt = (a, r) => THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.abs(a.dot(r)))));   // axis off the reference plane
 // What the plane is, for its label and the toast. An axis that crosses the reference is not in it, so the
 // angle is not the one between the two planes: it says what it is the angle of.
-const datumDesc = d => +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
+const datumDesc = d => d.two ? 'through two axes' + (d.exact ? '' : ' (mesh)') : +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
   ? ' about the axis from the plane nearest ' + d.ref + ' (axis ' + d.tilt.toFixed(1) + '° off it)' : ' from ' + d.ref) +
   (d.exact ? '' : ' (mesh)');
 const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o.distanceTo(q.o) < 1e-12 &&
@@ -84,12 +91,13 @@ const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o
 // The click after Axis Pick… or Face… (pick() in 30-select.js sends it here): a face or edge, as Measure picks.
 function pickDatum(e){
   const ent = entityAt(e);
-  if (datumPickMode === 'axis'){
+  if (datumPickMode === 'axis' || datumPickMode === 'axis2'){
     const ax = ent && ent.geom.type !== 'plane' && axisFrom(ent);
     if (!ax){ toast('No axis there — click a cylinder, a cone, a circular edge or a straight edge'); return; }
     const i = [0, 1, 2].reduce((m, k) => Math.abs(ax.d.getComponent(k)) > Math.abs(ax.d.getComponent(m)) + 1e-9 ? k : m, 0);
     if (ax.d.getComponent(i) < 0) ax.d.negate();       // + is the world direction it mostly points along
-    datumAxis = {o:footOnLine(modelCenter, ax.p, ax.d), d:ax.d, part:ax.part, geom:ax.geom, exact:ax.exact};
+    const v = {o:footOnLine(modelCenter, ax.p, ax.d), d:ax.d, part:ax.part, geom:ax.geom, exact:ax.exact};
+    if (datumPickMode === 'axis2') datumAxis2 = v; else datumAxis = v;
   } else {
     if (!ent || ent.geom.type !== 'plane'){ toast('That is not a flat face — click a flat face'); return; }
     datumRef = {name:'face', n:ent.geom.n.clone().normalize(), exact:!!ent.exact};
@@ -122,7 +130,7 @@ function datumNode(d){
 }
 function datumLook(){
   const d = datumPlane();
-  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane through the axis, ' + datumDesc(d)});
+  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane ' + (d.two ? '' : 'through the axis, ') + datumDesc(d)});
 }
 function datumKeep(){
   const d = datumPlane();
@@ -132,11 +140,11 @@ function datumKeep(){
   toast('Kept as ' + d.name);
 }
 function datumClear(){
-  datumKept.length = 0; datumAxis = null; datumRef = null;
+  datumKept.length = 0; datumAxis = null; datumAxis2 = null; datumRef = null;
   datumChanged();
 }
 function datumReset(){               // a new model: its parts are gone, and so are the planes through their axes
-  datumKept.length = 0; datumAxis = null; datumRef = null; datumAngle = 0; datumSeq = 0; datumPickMode = null;
+  datumKept.length = 0; datumAxis = null; datumAxis2 = null; datumRef = null; datumAngle = 0; datumSeq = 0; datumPickMode = null;
   $('datumSlider').value = 0; $('datumAngle').value = 0;
   datumDraw(); datumSync();
 }
@@ -151,7 +159,8 @@ function datumSync(){                // the panel, after anything that changes t
   document.querySelectorAll('[data-dref]').forEach(b => b.classList.toggle('active', !!r && r.name === b.dataset.dref));
   $('datumSlider').value = datumAngle; $('datumAngle').value = datumAngle;
   $('btnDatumLook').disabled = $('btnDatumKeep').disabled = !pl;
-  $('btnDatumClear').disabled = !datumKept.length && !a && !r;
+  $('btnDatumClear').disabled = !datumKept.length && !a && !r && !datumAxis2;
+  if (twoAxisSync()) return;         // Two axes mode has its own rows and hint
   const tilt = a && r ? datumTilt(a.d, r.n) : 0;
   $('datumHint').textContent =
       datumPickMode === 'axis' ? 'Click a cylinder, a cone, a circular edge or a straight edge: its axis is the pivot.'

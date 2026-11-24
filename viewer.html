@@ -156,8 +156,9 @@ select.btn option{background:var(--raised);color:var(--text)}
 #explodepanel .ax-x{color:#d92d20}#explodepanel .ax-y{color:#15803d}#explodepanel .ax-z{color:#1d4ed8}
 #datumpanel input[type=number]{width:78px}
 #explodepanel .unit,#datumpanel .unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
-#axisName,#datumAxisName{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
-#axisName.none,#datumAxisName.none{color:var(--subtle)}
+#datumpanel .row[hidden]{display:none}
+#axisName,#datumAxisName,#datumAxis2Name{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35;font-family:var(--mono);font-size:11px;color:var(--ok)}
+#axisName.none,#datumAxisName.none,#datumAxis2Name.none{color:var(--subtle)}
 #btnMoveReset{margin-left:auto}
 #sectionpanel .val,#explodepanel .val{font-family:var(--mono);font-size:11px;color:var(--accent-strong);min-width:58px;text-align:right;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
 #sectionpanel .hint,#explodepanel .hint,#datumpanel .hint{font-size:11.5px;color:var(--muted);line-height:1.55}
@@ -248,7 +249,7 @@ select.btn option{background:var(--raised);color:var(--text)}
     <div class="tb-group" role="group" aria-label="Tools">
       <span class="tb-label" aria-hidden="true">Tools</span>
       <button class="btn collapsible" id="btnSection" aria-label="Section" title="Section views (X)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M1 10 15 6" stroke-dasharray="2 2"/></svg><span class="t">Section</span></button>
-      <button class="btn collapsible" id="btnDatum" aria-label="Plane" aria-pressed="false" title="Plane through the axis of a cylinder, turned by an angle from Front, Top, Left or a flat face (D)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 11.5 6 8h8.5L10.5 11.5z"/><path d="M8.5 1.5v11" stroke-dasharray="2 1.5"/><path d="M11 4.5a3 3 0 0 1 1.5 2"/></svg><span class="t">Plane</span></button>
+      <button class="btn collapsible" id="btnDatum" aria-label="Plane" aria-pressed="false" title="Plane through the axis of a cylinder turned by an angle from Front, Top, Left or a flat face, or through two parallel axes (D)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 11.5 6 8h8.5L10.5 11.5z"/><path d="M8.5 1.5v11" stroke-dasharray="2 1.5"/><path d="M11 4.5a3 3 0 0 1 1.5 2"/></svg><span class="t">Plane</span></button>
       <button class="btn collapsible" id="btnExplode" aria-label="Explode" title="Exploded view (V)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="5" height="5" rx="1"/><path d="M1.5 4V1.5H4M12 1.5h2.5V4M1.5 12v2.5H4M12 14.5h2.5V12"/></svg><span class="t">Explode</span></button>
       <button class="btn collapsible" id="btnParts" aria-label="Parts" title="Show or hide part list"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 4h8.5M6 8h8.5M6 12h8.5"/><path class="fill" d="M2 3h2v2H2zM2 7h2v2H2zM2 11h2v2H2z"/></svg><span class="t">Parts</span></button>
     </div>
@@ -350,13 +351,25 @@ select.btn option{background:var(--raised);color:var(--text)}
       </div>
 
       <div id="datumpanel">
-        <div class="phead"><span class="ptitle">Plane through axis</span><span class="pkey">toggle <kbd>D</kbd></span></div>
+        <div class="phead"><span class="ptitle" id="datumTitle">Plane through axis</span><span class="pkey">toggle <kbd>D</kbd></span></div>
+        <div class="row">
+          <span class="lbl">mode</span>
+          <div class="btn-group" role="group" aria-label="Plane through">
+            <button class="btn active" id="btnDatumModeAngle" aria-pressed="true" title="A plane through one axis, turned by an angle from Front, Top, Left or a flat face">Axis + angle</button>
+            <button class="btn" id="btnDatumModeTwo" aria-pressed="false" title="A plane through two parallel axes: two holes, two shafts, a hole and an edge">Two axes</button>
+          </div>
+        </div>
         <div class="row">
           <span class="lbl">axis</span>
           <button class="btn" id="btnDatumAxis" title="Pick the axis: then click a cylinder, a cone, a circular edge or a straight edge">Pick…</button>
           <span id="datumAxisName" class="none">none</span>
         </div>
-        <div class="row">
+        <div class="row" id="datumRowAxis2" hidden>
+          <span class="lbl">axis 2</span>
+          <button class="btn" id="btnDatumAxis2" title="Pick the second axis, parallel to the first: then click a cylinder, a cone, a circular edge or a straight edge">Pick…</button>
+          <span id="datumAxis2Name" class="none">none</span>
+        </div>
+        <div class="row" id="datumRowFrom">
           <span class="lbl">from</span>
           <div class="btn-group" role="group" aria-label="Reference plane">
             <button class="btn" data-dref="Front" title="Measure the angle from the Front plane (XY)">Front</button>
@@ -365,7 +378,7 @@ select.btn option{background:var(--raised);color:var(--text)}
           </div>
           <button class="btn" id="btnDatumFace" title="Measure the angle from a flat face of a part: click it">Face…</button>
         </div>
-        <div class="row">
+        <div class="row" id="datumRowAngle">
           <span class="lbl">angle</span>
           <input type="range" id="datumSlider" min="-180" max="180" step="0.5" value="0" aria-label="Angle, degrees">
           <input type="number" id="datumAngle" step="any" value="0" aria-label="Angle in degrees">
@@ -8792,7 +8805,10 @@ function disposePlanes(){            // a new model: the planes are sized again 
 // reference. The plane is drawn at once, a sheet in the scene like the reference planes (not picked in the
 // model, not measured, not cut); Look turns the view square to it (Normal to), Keep leaves it there, named
 // P1, P2 …. Normal to can click any drawn plane. A plane follows the part its axis was picked on.
-let datumPickMode = null;            // 'axis' | 'face' while the next click is for it
+// Mode: Axis + angle (above) or Two axes -- the plane holding two parallel axes (77-datum2.js).
+let datumPickMode = null;            // 'axis' | 'axis2' | 'face' while the next click is for it
+let datumMode = 'angle';             // 'angle': one axis turned from a reference | 'two': through two parallel axes
+let datumAxis2 = null;               // the second axis, as datumAxis, in Two axes mode
 let datumAxis = null;                // {o, d, part, geom, exact}: a point on the axis (assembled), unit direction
 let datumRef = null;                 // {name, n, exact}: the reference plane's name and unit normal (assembled)
 let datumAngle = 0, datumSeq = 0;
@@ -8805,6 +8821,9 @@ const DATUM_SKEW_MESH = 0.05;        // sin 2.9°: a pick fitted to the mesh is 
 $('btnDatum').addEventListener('click', () => datumPanel(!$('datumpanel').classList.contains('show')));
 $('btnDatumAxis').addEventListener('click', () => datumPick('axis'));
 $('btnDatumFace').addEventListener('click', () => datumPick('face'));
+$('btnDatumAxis2').addEventListener('click', () => datumPick('axis2'));
+$('btnDatumModeAngle').addEventListener('click', () => setDatumMode('angle'));
+$('btnDatumModeTwo').addEventListener('click', () => setDatumMode('two'));
 document.querySelectorAll('[data-dref]').forEach(b => b.addEventListener('click', () => {
   const pl = PLANES.find(q => q.label === b.dataset.dref);
   datumRef = {name:pl.label, n:new THREE.Vector3().setComponent(pl.n, 1), exact:true};
@@ -8851,6 +8870,7 @@ function datumNormal(a, r, deg, skew = DATUM_SKEW){
   return n0.multiplyScalar(Math.cos(t)).addScaledVector(w, Math.sin(t)).normalize();
 }
 function datumPlane(){               // the plane the panel describes, or null
+  if (datumMode === 'two') return twoAxisPlane();
   if (!datumAxis || !datumRef) return null;
   const exact = !!(datumAxis.exact && datumRef.exact);
   const n = datumNormal(datumAxis.d, datumRef.n, datumAngle, exact ? DATUM_SKEW : DATUM_SKEW_MESH);
@@ -8860,7 +8880,7 @@ function datumPlane(){               // the plane the panel describes, or null
 const datumTilt = (a, r) => THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.abs(a.dot(r)))));   // axis off the reference plane
 // What the plane is, for its label and the toast. An axis that crosses the reference is not in it, so the
 // angle is not the one between the two planes: it says what it is the angle of.
-const datumDesc = d => +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
+const datumDesc = d => d.two ? 'through two axes' + (d.exact ? '' : ' (mesh)') : +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
   ? ' about the axis from the plane nearest ' + d.ref + ' (axis ' + d.tilt.toFixed(1) + '° off it)' : ' from ' + d.ref) +
   (d.exact ? '' : ' (mesh)');
 const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o.distanceTo(q.o) < 1e-12 &&
@@ -8869,12 +8889,13 @@ const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o
 // The click after Axis Pick… or Face… (pick() in 30-select.js sends it here): a face or edge, as Measure picks.
 function pickDatum(e){
   const ent = entityAt(e);
-  if (datumPickMode === 'axis'){
+  if (datumPickMode === 'axis' || datumPickMode === 'axis2'){
     const ax = ent && ent.geom.type !== 'plane' && axisFrom(ent);
     if (!ax){ toast('No axis there — click a cylinder, a cone, a circular edge or a straight edge'); return; }
     const i = [0, 1, 2].reduce((m, k) => Math.abs(ax.d.getComponent(k)) > Math.abs(ax.d.getComponent(m)) + 1e-9 ? k : m, 0);
     if (ax.d.getComponent(i) < 0) ax.d.negate();       // + is the world direction it mostly points along
-    datumAxis = {o:footOnLine(modelCenter, ax.p, ax.d), d:ax.d, part:ax.part, geom:ax.geom, exact:ax.exact};
+    const v = {o:footOnLine(modelCenter, ax.p, ax.d), d:ax.d, part:ax.part, geom:ax.geom, exact:ax.exact};
+    if (datumPickMode === 'axis2') datumAxis2 = v; else datumAxis = v;
   } else {
     if (!ent || ent.geom.type !== 'plane'){ toast('That is not a flat face — click a flat face'); return; }
     datumRef = {name:'face', n:ent.geom.n.clone().normalize(), exact:!!ent.exact};
@@ -8907,7 +8928,7 @@ function datumNode(d){
 }
 function datumLook(){
   const d = datumPlane();
-  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane through the axis, ' + datumDesc(d)});
+  if (d) lookAtPlane({n:d.n, point:d.o.clone().add(d.part.offset), up:d.a, title:'the plane ' + (d.two ? '' : 'through the axis, ') + datumDesc(d)});
 }
 function datumKeep(){
   const d = datumPlane();
@@ -8917,11 +8938,11 @@ function datumKeep(){
   toast('Kept as ' + d.name);
 }
 function datumClear(){
-  datumKept.length = 0; datumAxis = null; datumRef = null;
+  datumKept.length = 0; datumAxis = null; datumAxis2 = null; datumRef = null;
   datumChanged();
 }
 function datumReset(){               // a new model: its parts are gone, and so are the planes through their axes
-  datumKept.length = 0; datumAxis = null; datumRef = null; datumAngle = 0; datumSeq = 0; datumPickMode = null;
+  datumKept.length = 0; datumAxis = null; datumAxis2 = null; datumRef = null; datumAngle = 0; datumSeq = 0; datumPickMode = null;
   $('datumSlider').value = 0; $('datumAngle').value = 0;
   datumDraw(); datumSync();
 }
@@ -8936,7 +8957,8 @@ function datumSync(){                // the panel, after anything that changes t
   document.querySelectorAll('[data-dref]').forEach(b => b.classList.toggle('active', !!r && r.name === b.dataset.dref));
   $('datumSlider').value = datumAngle; $('datumAngle').value = datumAngle;
   $('btnDatumLook').disabled = $('btnDatumKeep').disabled = !pl;
-  $('btnDatumClear').disabled = !datumKept.length && !a && !r;
+  $('btnDatumClear').disabled = !datumKept.length && !a && !r && !datumAxis2;
+  if (twoAxisSync()) return;         // Two axes mode has its own rows and hint
   const tilt = a && r ? datumTilt(a.d, r.n) : 0;
   $('datumHint').textContent =
       datumPickMode === 'axis' ? 'Click a cylinder, a cone, a circular edge or a straight edge: its axis is the pivot.'
@@ -8957,6 +8979,72 @@ function planeHit(){
   const h = sheets.length ? raycaster.intersectObjects(sheets, false)[0] : null;
   const u = h && h.object.userData;
   return h ? {n:u.normal, point:h.point, distance:h.distance, title:u.title, up:u.up || null} : null;
+}
+// ── Plane through two parallel axes ──────────────────────────
+// Plane panel → Mode: Two axes. Axis Pick… and Axis 2 Pick…: click a cylinder, a cone, a circular edge or a
+// straight edge each, as for the plane through one axis (76-datum.js shares its state, its drawing, Look, Keep
+// and Clear). The plane is the one that holds both axes, so they must be parallel -- within DATUM_PAR when
+// both come from the STEP B-rep, within DATUM_SKEW_MESH when either is fitted to the mesh -- and not the same
+// line. Its direction in the plane is the two axes' mean, its sheet centred midway between them, and it
+// follows the part the first axis was picked on.
+const DATUM_PAR = 1e-4;              // sin 0.006°: B-rep axes nearer parallel than this are parallel
+
+function setDatumMode(m){
+  if (m === datumMode) return;
+  if (datumPickMode && datumPickMode !== 'axis') datumPickCancel();   // Axis 2 / Face… belong to one mode
+  datumMode = m;
+  datumChanged();
+}
+
+// The plane through two axes {o, d, exact} (o a point on each, d unit), or {why} saying why there is none:
+// 'skew' (not parallel, `deg` apart) or 'same' (one line). `d` of the plane is the axes' mean direction,
+// `o` the point midway between them, `dist` how far apart they are.
+function twoAxisFit(p, q){
+  const exact = !!(p.exact && q.exact);
+  const d2 = p.d.dot(q.d) < 0 ? q.d.clone().negate() : q.d.clone();
+  const s = new THREE.Vector3().crossVectors(p.d, d2).length();
+  const deg = THREE.MathUtils.radToDeg(Math.asin(Math.min(1, s)));
+  if (s > (exact ? DATUM_PAR : DATUM_SKEW_MESH)) return {why:'skew', deg};
+  const a = p.d.clone().add(d2).normalize();
+  const v = new THREE.Vector3().subVectors(q.o, p.o);
+  v.addScaledVector(a, -v.dot(a));                   // across from one axis to the other, square to both
+  const dist = v.length();
+  if (dist < 1e-6 * Math.max(modelSize, 1e-9)) return {why:'same', deg};
+  return {n:new THREE.Vector3().crossVectors(a, v).normalize(), a, o:p.o.clone().addScaledVector(v, 0.5),
+          dist, deg, exact};
+}
+function twoAxisPlane(){             // the Two axes plane the panel describes, or null
+  if (!datumAxis || !datumAxis2) return null;
+  const f = twoAxisFit(datumAxis, datumAxis2);
+  return f.why ? null : Object.assign(f, {part:datumAxis.part, two:true, ref:'two axes', angle:0});
+}
+
+// The rows and the hint for the mode chosen (datumSync calls it); true in Two axes mode, where the rest of
+// datumSync -- the reference and angle rows -- does not apply.
+function twoAxisSync(){
+  const two = datumMode === 'two', b = datumAxis2;
+  $('btnDatumModeAngle').classList.toggle('active', !two);
+  $('btnDatumModeTwo').classList.toggle('active', two);
+  $('btnDatumModeAngle').setAttribute('aria-pressed', two ? 'false' : 'true');
+  $('btnDatumModeTwo').setAttribute('aria-pressed', two ? 'true' : 'false');
+  $('datumRowFrom').hidden = $('datumRowAngle').hidden = two;
+  $('datumRowAxis2').hidden = !two;
+  $('datumTitle').textContent = two ? 'Plane through two axes' : 'Plane through axis';
+  if (!two) return false;
+  $('datumAxis2Name').textContent = b ? axisName(b) + ', + along ' + dirText(b.d) : 'none';
+  $('datumAxis2Name').classList.toggle('none', !b);
+  $('btnDatumAxis2').classList.toggle('active', datumPickMode === 'axis2');
+  const a = datumAxis, f = a && b ? twoAxisFit(a, b) : null;
+  $('datumHint').textContent =
+      datumPickMode === 'axis' || datumPickMode === 'axis2'
+      ? 'Click a cylinder, a cone, a circular edge or a straight edge: the plane passes through its axis.'
+    : !a || !b ? 'Pick two parallel axes — two holes, two shafts, a hole and an edge: the plane passes through both.'
+    : f.why === 'skew' ? 'The axes are ' + f.deg.toFixed(2) + '° apart, not parallel, so no one plane holds both: pick another.'
+    : f.why === 'same' ? 'The two axes are one line, so any plane through it holds both: pick one beside it, or use Axis + angle.'
+    : 'Through both axes, ' + L(f.dist) + MM() + ' apart' + (f.exact ? '' : ' (mesh)') +
+      (f.deg >= 0.005 ? '; they are ' + f.deg.toFixed(2) + '° off parallel, so it runs along their mean direction.' : '.') +
+      (a.part !== b.part ? ' It follows the first axis\'s part when the assembly is exploded.' : '');
+  return true;
 }
 })();
 </script>

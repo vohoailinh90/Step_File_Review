@@ -328,3 +328,79 @@ test('a plane made through an axis can be clicked too, and the axis stands uprig
     assert.match(run('__toasts.at(-1)'), /90° from Top/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Through: Two axes -- the plane holding two parallel axes (src/app/77-datum2.js).
+// ---------------------------------------------------------------------------
+const setAxes = (o1, d1, o2, d2, { exact1 = true, exact2 = true, part2 = 0 } = {}) => {
+  run(`setDatumMode('two');
+       datumAxis = {o:new THREE.Vector3(${o1}), d:new THREE.Vector3(${d1}).normalize(), part:parts[0], geom:{type:'cylinder', r:0.005}, exact:${exact1}};
+       datumAxis2 = {o:new THREE.Vector3(${o2}), d:new THREE.Vector3(${d2}).normalize(), part:parts[${part2}], geom:{type:'cylinder', r:0.004}, exact:${exact2}};
+       datumChanged();`);
+};
+test('two parallel axes: the plane holds both, centred midway between them', () => {
+  withModel([part()], () => {
+    setAxes('0, 0, 0', '0, 0, 1', '0.03, 0.04, 0.02', '0, 0, 1');
+    const n = run('datumPlane().n.toArray()');
+    // the plane through two Z axes at (0,0) and (0.03,0.04): normal square to Z and to (0.6, 0.8, 0)
+    assert.ok(near(n.map(Math.abs), [0.8, 0.6, 0], 1e-12), `normal ${n}`);
+    for (const p of [[0, 0, 0], [0.03, 0.04, 0.02], [0.03, 0.04, -5]])
+      assert.ok(Math.abs(dot(n, p)) < 1e-12, `${p} lies in the plane`);
+    assert.ok(near(run('datumPlane().o.toArray()'), [0.015, 0.02, 0], 1e-12), 'midway, square across from the first axis point');
+    assert.ok(Math.abs(run('twoAxisFit(datumAxis, datumAxis2).dist') - 0.05) < 1e-12, '0.05 apart, along Z ignored');
+    assert.equal(run('datumNodes.length'), 1, 'drawn at once');
+    assert.equal(run('datumDesc(datumPlane())'), 'through two axes');
+    assert.match(run('$("datumHint").textContent'), /50\.00 mm apart\.$/);
+  });
+});
+test('two axes picked pointing opposite ways are still parallel; the plane runs along the first one', () => {
+  withModel([part()], () => {
+    setAxes('0, 0, 0', '1, 0, 0', '0, 0.02, 0', '-1, 0, 0');
+    assert.ok(run('datumPlane()'), 'antiparallel is parallel');
+    assert.ok(near(run('datumPlane().a.toArray()'), [1, 0, 0], 1e-12));
+    assert.ok(near(run('datumPlane().n.toArray()').map(Math.abs), [0, 0, 1], 1e-12), 'the XY plane through both');
+  });
+});
+test('axes that are not parallel, or are one line, give no plane, and the panel says why', () => {
+  withModel([part()], () => {
+    setAxes('0, 0, 0', '0, 0, 1', '0.02, 0, 0', '0, 0.01, 1');
+    assert.equal(run('datumPlane()'), null, '0.57° apart is not parallel for B-rep axes');
+    assert.match(run('$("datumHint").textContent'), /0\.57° apart, not parallel/);
+    run('datumAxis2.exact = false; datumChanged();');
+    assert.ok(run('datumPlane()'), 'a mesh fit is that uncertain: taken as parallel');
+    assert.match(run('$("datumHint").textContent'), /\(mesh\); they are 0\.57° off parallel/);
+    assert.match(run('datumDesc(datumPlane())'), /\(mesh\)$/);
+    setAxes('0, 0, 0', '0, 0, 1', '0, 0, 0.05', '0, 0, -1');
+    assert.equal(run('datumPlane()'), null, 'the same line: no one plane');
+    assert.match(run('$("datumHint").textContent'), /one line/);
+  });
+});
+test('Axis 2 Pick… takes the second axis; the mode switch ends its pick and keeps the first axis', () => {
+  withModel([part()], p0 => {
+    run('setDatumMode("two")');
+    assert.equal(run('datumMode'), 'two');
+    v.ctx.__ent = { part: p0, exact: true, hit: new T.Vector3(0.03, 0, 0.01),
+                    geom: { type: 'line', p0: new T.Vector3(0.03, 0, -0.01), p1: new T.Vector3(0.03, 0, 0.03),
+                            d: new T.Vector3(0, 0, -1), len: 0.04 } };
+    run('entityAt = () => __ent; datumPick("axis2"); pickDatum({});');
+    assert.equal(run('datumPickMode'), null);
+    assert.ok(near(run('datumAxis2.d.toArray()'), [0, 0, 1], 1e-12), '+ along +Z');
+    assert.equal(run('datumAxis'), null, 'the first axis is not touched');
+    run('datumPick("axis2"); setDatumMode("angle");');
+    assert.equal(run('datumPickMode'), null, 'leaving Two axes ends its pick');
+    assert.equal(run('datumMode'), 'angle');
+    run('datumClear();');
+    assert.equal(run('datumAxis2'), null);
+  });
+});
+test('Keep names a two-axis plane P1 like any other; a new model forgets the second axis', () => {
+  withModel([part()], () => {
+    setAxes('0, 0, 0', '0, 1, 0', '0.04, 0, 0', '0, 1, 0');
+    run('datumKeep();');
+    assert.equal(run('datumKept.map(k => k.name).join()'), 'P1');
+    assert.equal(run('datumNodes.length'), 1);
+    assert.match(run('datumNodes[0].children.find(o => o.isMesh).userData.title'), /through two axes/);
+    run('datumReset();');
+    assert.equal(run('datumKept.length + (datumAxis2 ? 1 : 0)'), 0);
+  });
+});
