@@ -41,7 +41,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 ## Where the code lives
 
-3253 lines of application code, in one shared closure, split by concern:
+3,253 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
