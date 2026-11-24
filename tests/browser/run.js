@@ -29,6 +29,7 @@ const TESTS = [
   ['t22', 't22_views_normal_explode.js'],
   ['t23', 't23_dist_planes.js'],
   ['t24', 't24_datum.js'],
+  ['t25', 't25_datum_two_axes.js'],
 ];
 const REPORT_ONLY = new Set(['t1', 't6']);         // print figures, assert nothing
 
