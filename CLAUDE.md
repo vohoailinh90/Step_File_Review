@@ -41,7 +41,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 
 ## Where the code lives
 
-3,246 lines of application code, in one shared closure, split by concern:
+3253 lines of application code, in one shared closure, split by concern:
 
 | file | lines | owns |
 |---|---|---|
@@ -67,7 +67,7 @@ upgrade edit every metadata file in `vendor/`; an invariant asks it about each o
 | `src/app/70-axes.js`     | 38  | the X / Y / Z triad in the corner of the view |
 | `src/app/75-planes.js`   | 100 | reference planes Front (XY) / Top (ZX) / Left (YZ) through the origin, their labels, Planes button / `P` |
 | `src/app/76-datum.js`    | 184 | plane through an axis turned by an angle from a reference (`datumNormal`), Plane panel / `D` and its Mode switch, `planeHit()` for Normal to |
-| `src/app/77-datum2.js`   | 66  | plane through two parallel axes (`twoAxisFit`), Mode: Two axes rows and hint |
+| `src/app/77-datum2.js`   | 73  | plane through two parallel axes (`twoAxisFit`), Mode: Two axes rows and hint |
 | `src/ui/viewer.css`      | 119 | all styling |
 | `src/ui/layout.html`     | 161 | toolbar, sidebar, section / measure / explode panels, status bar |
 | `src/viewer.template.html` | — | the shell and the concatenation order |

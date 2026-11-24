@@ -82,7 +82,7 @@ function datumPlane(){               // the plane the panel describes, or null
 const datumTilt = (a, r) => THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.abs(a.dot(r)))));   // axis off the reference plane
 // What the plane is, for its label and the toast. An axis that crosses the reference is not in it, so the
 // angle is not the one between the two planes: it says what it is the angle of.
-const datumDesc = d => d.two ? 'through two axes' + (d.exact ? '' : ' (mesh)') : +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
+const datumDesc = d => d.two ? 'through two axes' + (d.assembled ? ' as assembled' : '') + (d.exact ? '' : ' (mesh)') : +d.angle.toFixed(2) + '°' + (d.tilt > 0.5
   ? ' about the axis from the plane nearest ' + d.ref + ' (axis ' + d.tilt.toFixed(1) + '° off it)' : ' from ' + d.ref) +
   (d.exact ? '' : ' (mesh)');
 const datumSame = (p, q) => p.part === q.part && p.n.dot(q.n) > 1 - 1e-12 && p.o.distanceTo(q.o) < 1e-12 &&

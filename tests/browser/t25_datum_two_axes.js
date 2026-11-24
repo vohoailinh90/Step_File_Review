@@ -30,14 +30,14 @@ const {launch, openModel, setCam, click, hideAllBut, check, OUT} = L;
   await click(pg, far(0.02, 0, 0.008, 0.0));                              // the Ø16 hole's far wall
   check('Axis 2: the Ø16 hole', await text('datumAxis2Name'), /^cylinder Ø16\.00 mm, \+ along \+Z$/);
   check('the plane through both is y = 0', JSON.stringify(await nodes()), /^\[\["datum plane Plane",\[0,1,0\]\]\]$/);
-  check('50 mm apart, exact', await text('datumHint'), /^Through both axes, 50\.00 mm apart\. It follows the first axis's part/);
+  check('50 mm apart, exact', await text('datumHint'), /^Through both axes, 50\.00 mm apart\. They are on two parts: the plane is through them as assembled/);
   await pg.screenshot({path: OUT + 't25_two_axes.png'});
 
   await pg.click('#btnDatumLook'); await pg.waitForTimeout(120);
   const c = await pg.evaluate(() => __qs.camera.position.clone().sub(__qs.controls.target).normalize().toArray());
   check('Look: square to it', Math.abs(c[1]).toFixed(3), /^1\.000$/);
   check('with the axes upright', await pg.evaluate(() => __qs.camera.up.toArray().map(v => +v.toFixed(3) || 0).join()), /^0,0,1$/);
-  check('and says what it is', await text('toast'), /Normal to the plane through two axes$/);
+  check('and says what it is', await text('toast'), /Normal to the plane through two axes as assembled$/);
   await pg.click('#btnDatumKeep'); await pg.waitForTimeout(60);
   check('Keep names it P1', JSON.stringify((await nodes()).map(n => n[0])), /^\["datum plane P1"\]$/);
 

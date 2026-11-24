@@ -368,11 +368,39 @@ test('axes that are not parallel, or are one line, give no plane, and the panel 
     assert.match(run('$("datumHint").textContent'), /0\.57° apart, not parallel/);
     run('datumAxis2.exact = false; datumChanged();');
     assert.ok(run('datumPlane()'), 'a mesh fit is that uncertain: taken as parallel');
-    assert.match(run('$("datumHint").textContent'), /\(mesh\); they are 0\.57° off parallel/);
+    assert.match(run('$("datumHint").textContent'), /\(mesh\), along their mean direction: they are 0\.57° off parallel, so the gap .* is not given\.$/);
+    assert.doesNotMatch(run('$("datumHint").textContent'), /mm apart/, 'no one distance for axes that far off parallel');
     assert.match(run('datumDesc(datumPlane())'), /\(mesh\)$/);
     setAxes('0, 0, 0', '0, 0, 1', '0, 0, 0.05', '0, 0, -1');
     assert.equal(run('datumPlane()'), null, 'the same line: no one plane');
     assert.match(run('$("datumHint").textContent'), /one line/);
+  });
+});
+test('the tolerances: B-rep axes 0.05° apart are not parallel, mesh axes 5° apart neither; mesh axes 2 µm apart are one line', () => {
+  withModel([part()], () => {
+    const t = Math.sin(0.05 * Math.PI / 180) / Math.cos(0.05 * Math.PI / 180);
+    setAxes('0, 0, 0', '0, 0, 1', '0.02, 0, 0', `0, ${t}, 1`);
+    assert.equal(run('datumPlane()'), null, 'exact axes 0.05° apart');
+    run('datumAxis2.exact = false; datumChanged();');
+    assert.ok(run('datumPlane()'), 'the same pair fitted to the mesh is parallel within its uncertainty');
+    assert.match(run('$("datumHint").textContent'), /20\.00 mm apart \(mesh\)\.$/, 'and 0.05° is close enough to give the gap');
+    const t5 = Math.tan(5 * Math.PI / 180);
+    setAxes('0, 0, 0', '0, 0, 1', '0.02, 0, 0', `0, ${t5}, 1`, { exact1: false, exact2: false });
+    assert.equal(run('datumPlane()'), null, 'mesh axes 5° apart');
+    setAxes('0, 0, 0', '0, 0, 1', '0.000002, 0, 0.03', '0, 0, 1', { exact1: false, exact2: false });
+    assert.equal(run('datumPlane()'), null, 'two mesh fits of one bore, 2 µm apart, are one line');
+    assert.match(run('$("datumHint").textContent'), /one line/);
+    run('datumAxis.exact = datumAxis2.exact = true; datumChanged();');
+    assert.ok(run('datumPlane()'), 'two B-rep axes 2 µm apart are two axes');
+  });
+});
+test('axes on two parts: the plane says it is through them as assembled', () => {
+  withModel([part(), part([0.2, 0, 0], 'other')], () => {
+    setAxes('0, 0, 0', '0, 0, 1', '0.03, 0, 0', '0, 0, 1', { part2: 1 });
+    assert.equal(run('datumDesc(datumPlane())'), 'through two axes as assembled');
+    assert.match(run('$("datumHint").textContent'), /on two parts: the plane is through them as assembled/);
+    setAxes('0, 0, 0', '0, 0, 1', '0.03, 0, 0', '0, 0, 1');
+    assert.equal(run('datumDesc(datumPlane())'), 'through two axes');
   });
 });
 test('Axis 2 Pick… takes the second axis; the mode switch ends its pick and keeps the first axis', () => {
